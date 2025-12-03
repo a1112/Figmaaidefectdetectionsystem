@@ -1,0 +1,131 @@
+import { AlertTriangle, Circle, Target } from 'lucide-react';
+import { Defect } from '../App';
+
+interface DefectListProps {
+  defects: Defect[];
+  isDetecting: boolean;
+  surface: 'all' | 'top' | 'bottom';
+  defectColors?: { [key: string]: { bg: string; border: string; text: string } };
+}
+
+export function DefectList({ defects, isDetecting, surface, defectColors }: DefectListProps) {
+  const getSeverityColor = (severity: string) => {
+    switch (severity) {
+      case 'high':
+        return 'text-red-500 border-red-500/50 bg-red-500/10';
+      case 'medium':
+        return 'text-yellow-500 border-yellow-500/50 bg-yellow-500/10';
+      case 'low':
+        return 'text-green-500 border-green-500/50 bg-green-500/10';
+      default:
+        return 'text-muted-foreground border-border bg-muted/50';
+    }
+  };
+
+  const getDefectColor = (type: string) => {
+    if (defectColors && defectColors[type]) {
+      return defectColors[type];
+    }
+    return { bg: 'bg-primary/10', border: 'border-primary/40', text: 'text-primary' };
+  };
+
+  return (
+    <div className="h-full flex flex-col">
+      {isDetecting ? (
+        <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground space-y-4">
+          <div className="relative">
+            <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-2 h-2 bg-primary rounded-full"></div>
+            </div>
+          </div>
+          <p className="text-xs animate-pulse">ANALYZING IMAGE...</p>
+        </div>
+      ) : defects.length === 0 ? (
+        <div className="flex-1 flex flex-col text-muted-foreground/50">
+          <div className="flex flex-col items-center justify-center py-4 border-b border-border/30">
+            <Target className="w-8 h-8 mb-2 opacity-20" />
+            <p className="text-xs">NO DEFECTS DETECTED</p>
+            <p className="text-[10px] mt-1 opacity-50">SHOWING SAMPLE DATA</p>
+          </div>
+          
+          {/* 模拟示例数据 */}
+          <div className="space-y-2 p-2 overflow-auto">
+            {[
+              { id: 'sample-1', type: '纵向裂纹', severity: 'high' as const, confidence: 0.89, x: 45, y: 32, width: 8, height: 15, surface: 'top' as const },
+              { id: 'sample-2', type: '划伤', severity: 'medium' as const, confidence: 0.76, x: 68, y: 54, width: 12, height: 4, surface: 'top' as const },
+              { id: 'sample-3', type: '辊印', severity: 'low' as const, confidence: 0.82, x: 23, y: 71, width: 6, height: 9, surface: 'bottom' as const },
+            ].filter(d => surface === 'all' || d.surface === surface).map((defect) => (
+              <div
+                key={defect.id}
+                className="p-3 border border-border/30 bg-card/30 opacity-40"
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-primary/50 rounded-none"></span>
+                    {defect.type}
+                  </h3>
+                  <span className={`px-1.5 py-0.5 text-[10px] uppercase border ${
+                    defect.severity === 'high' ? 'text-red-500 border-red-500/50 bg-red-500/10' :
+                    defect.severity === 'medium' ? 'text-yellow-500 border-yellow-500/50 bg-yellow-500/10' :
+                    'text-green-500 border-green-500/50 bg-green-500/10'
+                  }`}>
+                    {defect.severity}
+                  </span>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-2 text-[10px] text-muted-foreground font-mono">
+                  <div>CONF: {Math.round(defect.confidence * 100)}%</div>
+                  <div>POS: {Math.round(defect.x)},{Math.round(defect.y)}</div>
+                  <div>SIZE: {Math.round(defect.width)}x{Math.round(defect.height)}</div>
+                </div>
+
+                <div className="mt-2 bg-secondary h-1 w-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary/50 transition-all duration-500"
+                    style={{ width: `${defect.confidence * 100}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {defects.map((defect) => {
+            const typeColor = getDefectColor(defect.type);
+            return (
+              <div
+                key={defect.id}
+                className="p-3 border border-border bg-card hover:bg-accent/50 transition-colors group"
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <h3 className={`text-sm font-medium flex items-center gap-2 ${typeColor.text}`}>
+                    <span className={`w-1.5 h-1.5 rounded-none ${typeColor.bg}`}></span>
+                    {defect.type}
+                  </h3>
+                  <span className={`px-1.5 py-0.5 text-[10px] uppercase border ${getSeverityColor(defect.severity)}`}>
+                    {defect.severity}
+                  </span>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-2 text-[10px] text-muted-foreground font-mono">
+                  <div>CONF: {Math.round(defect.confidence * 100)}%</div>
+                  <div>POS: {Math.round(defect.x)},{Math.round(defect.y)}</div>
+                  <div>SIZE: {Math.round(defect.width)}x{Math.round(defect.height)}</div>
+                </div>
+
+                <div className="mt-2 bg-secondary h-1 w-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-all duration-500"
+                    style={{ width: `${defect.confidence * 100}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
