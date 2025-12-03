@@ -69,6 +69,7 @@
     --color-red-700: oklch(.505 .213 27.518);
     --color-orange-400: oklch(.75 .183 55.934);
     --color-orange-500: oklch(.705 .213 47.604);
+    --color-yellow-200: oklch(.945 .129 101.54);
     --color-yellow-400: oklch(.852 .199 91.936);
     --color-yellow-500: oklch(.795 .184 86.047);
     --color-yellow-600: oklch(.681 .162 75.834);
@@ -77,6 +78,7 @@
     --color-green-500: oklch(.723 .219 149.579);
     --color-cyan-400: oklch(.789 .154 211.53);
     --color-cyan-500: oklch(.715 .143 215.221);
+    --color-blue-200: oklch(.882 .059 254.128);
     --color-blue-400: oklch(.707 .165 254.624);
     --color-blue-500: oklch(.623 .214 259.815);
     --color-blue-600: oklch(.546 .245 262.881);
@@ -1963,6 +1965,10 @@
     padding-block: calc(var(--spacing) * 2.5);
   }
 
+  .py-3 {
+    padding-block: calc(var(--spacing) * 3);
+  }
+
   .py-4 {
     padding-block: calc(var(--spacing) * 4);
   }
@@ -2108,8 +2114,22 @@
     color: #000;
   }
 
+  .text-blue-200\/90 {
+    color: color-mix(in srgb, oklch(.882 .059 254.128) 90%, transparent);
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .text-blue-200\/90 {
+      color: color-mix(in oklab, var(--color-blue-200) 90%, transparent);
+    }
+  }
+
   .text-blue-400 {
     color: var(--color-blue-400);
+  }
+
+  .text-blue-500 {
+    color: var(--color-blue-500);
   }
 
   .text-cyan-400 {
@@ -2176,6 +2196,16 @@
     color: var(--color-white);
   }
 
+  .text-yellow-200\/90 {
+    color: color-mix(in srgb, oklch(.945 .129 101.54) 90%, transparent);
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .text-yellow-200\/90 {
+      color: color-mix(in oklab, var(--color-yellow-200) 90%, transparent);
+    }
+  }
+
   .text-yellow-400 {
     color: var(--color-yellow-400);
   }
@@ -2214,6 +2244,10 @@
 
   .opacity-60 {
     opacity: .6;
+  }
+
+  .opacity-70 {
+    opacity: .7;
   }
 
   .opacity-80 {
