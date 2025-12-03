@@ -3,7 +3,7 @@
  * 根据环境模式自动切换 Mock 数据或真实 API
  */
 
-import { env } from '../config/env';
+import { env } from "../config/env";
 import type {
   SteelListResponse,
   DefectResponse,
@@ -13,16 +13,21 @@ import type {
   Surface,
   mapSteelItem,
   mapDefectItem,
-} from './types';
-import * as mock from './mock';
+} from "./types";
+import * as mock from "./mock";
 
 // 导入映射函数
-import { mapSteelItem as mapSteel, mapDefectItem as mapDefect } from './types';
+import {
+  mapSteelItem as mapSteel,
+  mapDefectItem as mapDefect,
+} from "./types";
 
 /**
  * 获取钢板列表
  */
-export async function listSteels(limit: number = 20): Promise<SteelItem[]> {
+export async function listSteels(
+  limit: number = 20,
+): Promise<SteelItem[]> {
   // 开发模式：使用 Mock 数据
   if (env.isDevelopment()) {
     const response = await mock.mockListSteels(limit);
@@ -32,16 +37,20 @@ export async function listSteels(limit: number = 20): Promise<SteelItem[]> {
   // 生产模式：调用真实 API
   try {
     const baseUrl = env.getApiBaseUrl();
-    const response = await fetch(`${baseUrl}/steels?limit=${limit}`);
-    
+    const response = await fetch(
+      `${baseUrl}/ui/steels?limit=${limit}`,
+    );
+
     if (!response.ok) {
-      throw new Error(`API Error: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `API Error: ${response.status} ${response.statusText}`,
+      );
     }
-    
+
     const data: SteelListResponse = await response.json();
     return data.steels.map(mapSteel);
   } catch (error) {
-    console.error('Failed to fetch steels:', error);
+    console.error("Failed to fetch steels:", error);
     throw error;
   }
 }
@@ -49,7 +58,9 @@ export async function listSteels(limit: number = 20): Promise<SteelItem[]> {
 /**
  * 获取指定钢板的缺陷列表
  */
-export async function getDefects(seqNo: number): Promise<DefectItem[]> {
+export async function getDefects(
+  seqNo: number,
+): Promise<DefectItem[]> {
   // 开发模式：使用 Mock 数据
   if (env.isDevelopment()) {
     const response = await mock.mockGetDefects(seqNo);
@@ -59,16 +70,20 @@ export async function getDefects(seqNo: number): Promise<DefectItem[]> {
   // 生产模式：调用真实 API
   try {
     const baseUrl = env.getApiBaseUrl();
-    const response = await fetch(`${baseUrl}/defects/${seqNo}`);
-    
+    const response = await fetch(
+      `${baseUrl}/ui/defects/${seqNo}`,
+    );
+
     if (!response.ok) {
-      throw new Error(`API Error: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `API Error: ${response.status} ${response.statusText}`,
+      );
     }
-    
+
     const data: DefectResponse = await response.json();
     return data.defects.map(mapDefect);
   } catch (error) {
-    console.error('Failed to fetch defects:', error);
+    console.error("Failed to fetch defects:", error);
     throw error;
   }
 }
@@ -79,11 +94,15 @@ export async function getDefects(seqNo: number): Promise<DefectItem[]> {
 export async function getFrameImage(
   surface: Surface,
   seqNo: number,
-  imageIndex: number
+  imageIndex: number,
 ): Promise<string> {
   // 开发模式：使用 Mock 图像
   if (env.isDevelopment()) {
-    return await mock.mockGetFrameImage(surface, seqNo, imageIndex);
+    return await mock.mockGetFrameImage(
+      surface,
+      seqNo,
+      imageIndex,
+    );
   }
 
   // 生产模式：返回真实 API 图像 URL
@@ -102,17 +121,19 @@ export async function healthCheck(): Promise<HealthResponse> {
 
   // 生产模式：调用真实 API
   try {
-    const response = await fetch('/health');
-    
+    const response = await fetch("/health");
+
     if (!response.ok) {
-      throw new Error(`Health check failed: ${response.status}`);
+      throw new Error(
+        `Health check failed: ${response.status}`,
+      );
     }
-    
+
     return await response.json();
   } catch (error) {
-    console.error('Health check failed:', error);
+    console.error("Health check failed:", error);
     return {
-      status: 'unhealthy',
+      status: "unhealthy",
       timestamp: new Date().toISOString(),
     };
   }
@@ -122,16 +143,17 @@ export async function healthCheck(): Promise<HealthResponse> {
  * 获取当前 API 模式的状态信息
  */
 export function getApiStatus(): {
-  mode: 'development' | 'production';
+  mode: "development" | "production";
   description: string;
   baseUrl: string;
 } {
   const mode = env.getMode();
   return {
     mode,
-    description: mode === 'development' 
-      ? '开发模式 - 使用模拟数据' 
-      : '生产模式 - 连接真实后端',
-    baseUrl: env.getApiBaseUrl() || 'Mock Data',
+    description:
+      mode === "development"
+        ? "开发模式 - 使用模拟数据"
+        : "生产模式 - 连接真实后端",
+    baseUrl: env.getApiBaseUrl() || "Mock Data",
   };
 }
