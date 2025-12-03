@@ -9,6 +9,10 @@ import { SearchDialog, SearchCriteria } from './components/SearchDialog';
 import { FilterDialog, FilterCriteria } from './components/FilterDialog';
 import { SystemDiagnosticDialog } from './components/SystemDiagnosticDialog';
 import { ModeSwitch } from './components/ModeSwitch';
+// 引入 API 客户端和环境配置
+import { env } from './src/config/env';
+import { listSteels, getDefects } from './src/api/client';
+import type { SteelItem, DefectItem } from './src/api/types';
 import { 
   LayoutDashboard, 
   FileImage, 
@@ -98,6 +102,8 @@ export default function App() {
   const [selectedPlateId, setSelectedPlateId] = useState<string | null>(null);
   const [defectLogView, setDefectLogView] = useState<'list' | 'chart'>('list');
   const [surfaceFilter, setSurfaceFilter] = useState<'all' | 'top' | 'bottom'>('all');
+  const [plateDefects, setPlateDefects] = useState<Defect[]>([]); // 当前选中钢板的缺陷
+  const [isLoadingDefects, setIsLoadingDefects] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
   const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
@@ -151,16 +157,57 @@ export default function App() {
     '划伤': { bg: 'bg-pink-500/10', border: 'border-pink-500/40', text: 'text-pink-400', activeBg: 'bg-pink-500', activeBorder: 'border-pink-500', activeText: 'text-white' }
   };
 
-  // 钢板记录模拟数据
-  const [steelPlates] = useState<SteelPlate[]>([
-    { serialNumber: '00000001', plateId: 'SP240001', steelGrade: 'Q345B', dimensions: { length: 12000, width: 2500, thickness: 20 }, timestamp: new Date('2024-12-02T08:23:15'), level: 'A', defectCount: 2 },
-    { serialNumber: '00000002', plateId: 'SP240002', steelGrade: 'Q235B', dimensions: { length: 10000, width: 2000, thickness: 16 }, timestamp: new Date('2024-12-02T09:15:42'), level: 'B', defectCount: 5 },
-    { serialNumber: '00000003', plateId: 'SP240003', steelGrade: 'Q345B', dimensions: { length: 11000, width: 2200, thickness: 18 }, timestamp: new Date('2024-12-02T10:08:21'), level: 'A', defectCount: 1 },
-    { serialNumber: '00000004', plateId: 'SP240004', steelGrade: '16MnR', dimensions: { length: 9500, width: 1800, thickness: 22 }, timestamp: new Date('2024-12-02T11:42:33'), level: 'C', defectCount: 8 },
-    { serialNumber: '00000005', plateId: 'SP240005', steelGrade: 'Q235B', dimensions: { length: 13000, width: 2600, thickness: 25 }, timestamp: new Date('2024-12-02T13:25:18'), level: 'B', defectCount: 4 },
-    { serialNumber: '00000006', plateId: 'SP240006', steelGrade: 'Q345B', dimensions: { length: 11500, width: 2300, thickness: 20 }, timestamp: new Date('2024-12-02T14:17:09'), level: 'A', defectCount: 3 },
-    { serialNumber: '00000007', plateId: 'SP240007', steelGrade: '20MnK', dimensions: { length: 10500, width: 2100, thickness: 30 }, timestamp: new Date('2024-12-02T15:33:27'), level: 'D', defectCount: 12 },
-  ]);
+  // 钢板记录数据（从 API 或本地模拟数据加载）
+  const [steelPlates, setSteelPlates] = useState<SteelPlate[]>([]);
+  const [isLoadingSteels, setIsLoadingSteels] = useState(false);
+  const [steelsLoadError, setSteelsLoadError] = useState<string | null>(null);
+
+  // 加载钢板列表
+  useEffect(() => {
+    const loadSteelPlates = async () => {
+      setIsLoadingSteels(true);
+      setSteelsLoadError(null);
+      
+      try {
+        const items: SteelItem[] = await listSteels(50);
+        
+        // 将 API 返回的 SteelItem 转换为 SteelPlate 格式
+        const mapped: SteelPlate[] = items.map(item => ({
+          serialNumber: item.serialNumber,
+          plateId: item.plateId,
+          steelGrade: item.steelGrade,
+          dimensions: item.dimensions,
+          timestamp: item.timestamp,
+          level: item.level,
+          defectCount: item.defectCount,
+        }));
+        
+        setSteelPlates(mapped);
+        console.log(`✅ 成功加载 ${mapped.length} 条钢板记录 (${env.getMode()} 模式)`);
+      } catch (error) {
+        console.error('❌ 加载钢板列表失败:', error);
+        setSteelsLoadError(error instanceof Error ? error.message : '加载失败');
+        
+        // 生产模式失败时使用空数组，开发模式已经在 mock 层处理
+        if (env.isProduction()) {
+          setSteelPlates([]);
+        }
+      } finally {
+        setIsLoadingSteels(false);
+      }
+    };
+
+    loadSteelPlates();
+
+    // 监听模式切换事件，重新加载数据
+    const handleModeChange = () => {
+      console.log('🔄 检测到模式切换，重新加载钢板列表...');
+      loadSteelPlates();
+    };
+
+    window.addEventListener('app_mode_change', handleModeChange);
+    return () => window.removeEventListener('app_mode_change', handleModeChange);
+  }, []);
 
   // 筛选和搜索钢板列表
   const filteredSteelPlates = steelPlates.filter(plate => {
@@ -191,6 +238,56 @@ export default function App() {
 
     return true;
   });
+
+  // 当选中钢板时，加载该钢板的缺陷数据
+  useEffect(() => {
+    if (!selectedPlateId) {
+      setPlateDefects([]);
+      return;
+    }
+
+    const loadPlateDefects = async () => {
+      setIsLoadingDefects(true);
+      
+      try {
+        // 从 plateId 中提取 seq_no（去除前导零）
+        const selectedPlate = steelPlates.find(p => p.plateId === selectedPlateId);
+        if (!selectedPlate) {
+          console.warn('未找到选中的钢板:', selectedPlateId);
+          setPlateDefects([]);
+          return;
+        }
+
+        const seqNo = parseInt(selectedPlate.serialNumber, 10);
+        console.log(`🔍 加载钢板 ${selectedPlateId} (seq_no: ${seqNo}) 的缺陷数据...`);
+        
+        const defectItems: DefectItem[] = await getDefects(seqNo);
+        
+        // 将 DefectItem 转换为 Defect 格式
+        const mapped: Defect[] = defectItems.map(item => ({
+          id: item.defectId,
+          type: item.defectType,
+          severity: item.severity,
+          x: item.x,
+          y: item.y,
+          width: item.width,
+          height: item.height,
+          confidence: item.confidence,
+          surface: item.surface,
+        }));
+        
+        setPlateDefects(mapped);
+        console.log(`✅ 成功加载 ${mapped.length} 个缺陷 (${env.getMode()} 模式)`);
+      } catch (error) {
+        console.error('❌ 加载缺陷数据失败:', error);
+        setPlateDefects([]);
+      } finally {
+        setIsLoadingDefects(false);
+      }
+    };
+
+    loadPlateDefects();
+  }, [selectedPlateId, steelPlates]);
 
   const handleImageUpload = (imageUrl: string) => {
     setCurrentImage(imageUrl);
@@ -330,29 +427,35 @@ export default function App() {
             <div className="flex items-center gap-2 px-2 py-1 bg-background/50 border border-border rounded">
               <button
                 onClick={() => {
+                  if (filteredSteelPlates.length === 0) return;
                   const currentIndex = filteredSteelPlates.findIndex(p => p.plateId === selectedPlateId);
                   const prevIndex = currentIndex > 0 ? currentIndex - 1 : filteredSteelPlates.length - 1;
-                  setSelectedPlateId(filteredSteelPlates[prevIndex].plateId);
+                  const prevPlate = filteredSteelPlates[prevIndex];
+                  if (prevPlate) setSelectedPlateId(prevPlate.plateId);
                 }}
                 className="p-0.5 hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors rounded"
                 title="上一块钢板"
+                disabled={filteredSteelPlates.length === 0}
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <span className="text-xs font-mono font-bold text-foreground px-1">
                 {(() => {
                   const currentPlate = filteredSteelPlates.find(p => p.plateId === selectedPlateId) || filteredSteelPlates[0];
-                  return currentPlate.plateId;
+                  return currentPlate?.plateId || '-';
                 })()}
               </span>
               <button
                 onClick={() => {
+                  if (filteredSteelPlates.length === 0) return;
                   const currentIndex = filteredSteelPlates.findIndex(p => p.plateId === selectedPlateId);
                   const nextIndex = currentIndex < filteredSteelPlates.length - 1 ? currentIndex + 1 : 0;
-                  setSelectedPlateId(filteredSteelPlates[nextIndex].plateId);
+                  const nextPlate = filteredSteelPlates[nextIndex];
+                  if (nextPlate) setSelectedPlateId(nextPlate.plateId);
                 }}
                 className="p-0.5 hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors rounded"
                 title="下一块钢板"
+                disabled={filteredSteelPlates.length === 0}
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -491,27 +594,33 @@ export default function App() {
               <div className="flex items-center gap-1 px-2 py-1 bg-muted border border-border rounded shrink-0">
                 <button
                   onClick={() => {
+                    if (filteredSteelPlates.length === 0) return;
                     const currentIndex = filteredSteelPlates.findIndex(p => p.plateId === selectedPlateId);
                     const prevIndex = currentIndex > 0 ? currentIndex - 1 : filteredSteelPlates.length - 1;
-                    setSelectedPlateId(filteredSteelPlates[prevIndex].plateId);
+                    const prevPlate = filteredSteelPlates[prevIndex];
+                    if (prevPlate) setSelectedPlateId(prevPlate.plateId);
                   }}
                   className="p-0.5 hover:bg-accent/50 active:bg-accent text-muted-foreground hover:text-foreground transition-colors rounded"
+                  disabled={filteredSteelPlates.length === 0}
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
                 <span className="text-xs font-mono font-bold text-foreground px-1 min-w-[70px] text-center">
                   {(() => {
                     const currentPlate = filteredSteelPlates.find(p => p.plateId === selectedPlateId) || filteredSteelPlates[0];
-                    return currentPlate.plateId;
+                    return currentPlate?.plateId || '-';
                   })()}
                 </span>
                 <button
                   onClick={() => {
+                    if (filteredSteelPlates.length === 0) return;
                     const currentIndex = filteredSteelPlates.findIndex(p => p.plateId === selectedPlateId);
                     const nextIndex = currentIndex < filteredSteelPlates.length - 1 ? currentIndex + 1 : 0;
-                    setSelectedPlateId(filteredSteelPlates[nextIndex].plateId);
+                    const nextPlate = filteredSteelPlates[nextIndex];
+                    if (nextPlate) setSelectedPlateId(nextPlate.plateId);
                   }}
                   className="p-0.5 hover:bg-accent/50 active:bg-accent text-muted-foreground hover:text-foreground transition-colors rounded"
+                  disabled={filteredSteelPlates.length === 0}
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>
@@ -572,6 +681,16 @@ export default function App() {
                   </div>
                   {(() => {
                     const currentPlate = filteredSteelPlates.find(p => p.plateId === selectedPlateId) || filteredSteelPlates[0] || steelPlates[0];
+                    
+                    // 如果没有钢板数据，显示加载或空状态
+                    if (!currentPlate) {
+                      return (
+                        <div className="p-2 text-xs text-center text-muted-foreground">
+                          {isLoadingSteels ? '加载中...' : '暂无钢板数据'}
+                        </div>
+                      );
+                    }
+                    
                     return (
                       <div className="p-2 text-xs space-y-1">
                         <div className="flex justify-between py-0.5 border-b border-border/30">
