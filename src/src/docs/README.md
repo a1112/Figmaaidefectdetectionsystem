@@ -18,14 +18,14 @@
 ## 📚 文档导航
 
 ### 🚀 快速开始
-- **我是前端开发者** → 阅读 [`DEV_PROD_MODE_README.md`](./DEV_PROD_MODE_README.md)
-- **我是后端开发者** → 阅读 [`BACKEND_QUICKSTART.md`](./BACKEND_QUICKSTART.md)
-- **我需要快速查找** → 阅读 [`QUICK_REFERENCE.md`](./QUICK_REFERENCE.md)
+- **我是前端开发者** → 阅读 [`快速开始.md`](./快速开始.md)
+- **我是后端开发者** → 阅读 [`后端快速入门.md`](./后端快速入门.md)
+- **我需要快速查找** → 阅读 [`快速参考.md`](./快速参考.md)
 
 ### 📖 详细指南
-- **完整的 API 集成指南** → [`API_INTEGRATION_GUIDE.md`](./API_INTEGRATION_GUIDE.md)
-- **代码集成示例** → [`INTEGRATION_EXAMPLE.md`](./INTEGRATION_EXAMPLE.md)
-- **后端接口规范** → [`guidelines/Guidelines.md`](./guidelines/Guidelines.md)
+- **完整的 API 集成指南** → [`API集成指南.md`](./API集成指南.md)
+- **代码集成示例** → [`集成示例.md`](./集成示例.md)
+- **后端接口规范** → `../../../guidelines/Guidelines.md`
 
 ### 💻 核心文件
 - **环境配置** → `src/config/env.ts`
@@ -72,7 +72,7 @@
 ### 1. 环境自动切换
 ```typescript
 // 环境配置自动管理
-import { env } from './src/config/env';
+import { env } from '../config/env';
 
 env.getMode();           // 'development' | 'production'
 env.isDevelopment();     // true/false
@@ -83,7 +83,7 @@ env.getApiBaseUrl();     // '/api' 或 ''
 ### 2. 统一的 API 调用
 ```typescript
 // 所有 API 调用都通过 client.ts
-import { listSteels, getDefects } from './src/api/client';
+import { listSteels, getDefects } from '../api/client';
 
 // 开发模式：自动使用 Mock 数据
 // 生产模式：自动调用真实 API
@@ -94,7 +94,7 @@ const defects = await getDefects(1001);
 ### 3. 类型安全
 ```typescript
 // 完整的 TypeScript 类型支持
-import type { SteelItem, DefectItem } from './src/api/types';
+import type { SteelItem, DefectItem } from '../api/types';
 
 // 自动转换 snake_case ↔ camelCase
 const steel: SteelItem = {
@@ -143,7 +143,7 @@ const steel: SteelItem = {
 
 #### 2. 在代码中使用 API
 ```typescript
-import { listSteels, getDefects, getFrameImage } from './src/api/client';
+import { listSteels, getDefects, getFrameImage } from '../api/client';
 
 // 使用示例
 async function loadData() {
@@ -164,7 +164,7 @@ async function loadData() {
 ### 后端开发者
 
 #### 1. 了解接口规范
-阅读 [`BACKEND_QUICKSTART.md`](./BACKEND_QUICKSTART.md)
+阅读 [`后端快速入门.md`](./后端快速入门.md)
 
 #### 2. 实现 4 个接口
 - `GET /api/steels?limit=N`
@@ -236,7 +236,7 @@ localStorage.getItem('app_mode')
 
 ### 调试 API 调用
 ```typescript
-import { getApiStatus } from './src/api/client';
+import { getApiStatus } from '../api/client';
 
 // 查看当前 API 状态
 console.log(getApiStatus());
@@ -300,7 +300,7 @@ console.log(getApiStatus());
 ## 🎓 学习路径
 
 ### 第 1 天：了解概念
-- [ ] 阅读 `DEV_PROD_MODE_README.md`
+- [ ] 阅读 `快速开始.md`
 - [ ] 理解为什么需要两种模式
 - [ ] 在 UI 中尝试切换模式
 
@@ -310,7 +310,7 @@ console.log(getApiStatus());
 - [ ] 阅读 `src/api/client.ts`
 
 ### 第 3 天：实践集成
-- [ ] 阅读 `INTEGRATION_EXAMPLE.md`
+- [ ] 阅读 `集成示例.md`
 - [ ] 选择一个简单的功能开始改造
 - [ ] 测试开发和生产模式
 
@@ -357,16 +357,6 @@ console.log(getApiStatus());
 ✅ **类型安全** - TypeScript 全程保护  
 ✅ **易于调试** - 清晰的错误提示  
 ✅ **易于维护** - 统一的 API 调用方式  
-
----
-
-## 📖 延伸阅读
-
-- [API Integration Guide](./API_INTEGRATION_GUIDE.md) - 完整的集成指南
-- [Quick Reference](./QUICK_REFERENCE.md) - 快速参考卡片
-- [Backend Quickstart](./BACKEND_QUICKSTART.md) - 后端快速入门
-- [Integration Example](./INTEGRATION_EXAMPLE.md) - 代码示例
-- [Guidelines](./guidelines/Guidelines.md) - 后端接口规范
 
 ---
 
