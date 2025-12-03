@@ -1,0 +1,177 @@
+/**
+ * API 数据类型定义
+ * 前端使用 camelCase，与后端 snake_case 进行映射
+ */
+
+// ==================== 钢板相关类型 ====================
+
+/**
+ * 钢板项（后端返回）
+ */
+export interface SteelItemRaw {
+  seq_no: number;        // 流水号
+  steel_no: string;      // 钢板号
+  steel_type: string;    // 钢种
+  length: number;        // 长度 (mm)
+  width: number;         // 宽度 (mm)
+  thickness: number;     // 厚度 (mm)
+  timestamp: string;     // ISO 时间戳
+  level: 'A' | 'B' | 'C' | 'D';  // 质量等级
+  defect_count: number;  // 缺陷数量
+}
+
+/**
+ * 钢板项（前端使用）
+ */
+export interface SteelItem {
+  serialNumber: string;  // 流水号
+  plateId: string;       // 钢板号
+  steelGrade: string;    // 钢种
+  dimensions: {
+    length: number;
+    width: number;
+    thickness: number;
+  };
+  timestamp: Date;
+  level: 'A' | 'B' | 'C' | 'D';
+  defectCount: number;
+}
+
+/**
+ * 钢板列表响应
+ */
+export interface SteelListResponse {
+  steels: SteelItemRaw[];
+  total: number;
+}
+
+// ==================== 缺陷相关类型 ====================
+
+/**
+ * 缺陷类型枚举
+ */
+export type DefectType = 
+  | '纵向裂纹'
+  | '横向裂纹'
+  | '异物压入'
+  | '孔洞'
+  | '辊印'
+  | '压氧'
+  | '边裂'
+  | '划伤';
+
+/**
+ * 表面类型
+ */
+export type Surface = 'top' | 'bottom';
+
+/**
+ * 严重程度
+ */
+export type Severity = 'low' | 'medium' | 'high';
+
+/**
+ * 缺陷项（后端返回）
+ */
+export interface DefectItemRaw {
+  defect_id: string;
+  defect_type: string;
+  severity: Severity;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  confidence: number;
+  surface: Surface;
+  image_index: number;  // 关联的图像索引
+}
+
+/**
+ * 缺陷项（前端使用）
+ */
+export interface DefectItem {
+  id: string;
+  type: DefectType;
+  severity: Severity;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  confidence: number;
+  surface: Surface;
+  imageIndex: number;
+}
+
+/**
+ * 缺陷响应
+ */
+export interface DefectResponse {
+  seq_no: number;
+  defects: DefectItemRaw[];
+  total_count: number;
+}
+
+// ==================== 图像相关类型 ====================
+
+/**
+ * 图像查询参数
+ */
+export interface FrameImageParams {
+  surface: Surface;
+  seq_no: number;
+  image_index: number;
+}
+
+// ==================== 健康检查 ====================
+
+/**
+ * 健康检查响应
+ */
+export interface HealthResponse {
+  status: 'healthy' | 'unhealthy';
+  timestamp: string;
+  version?: string;
+  database?: {
+    connected: boolean;
+    latency_ms?: number;
+  };
+}
+
+// ==================== 工具函数 ====================
+
+/**
+ * 将后端钢板数据转换为前端格式
+ */
+export function mapSteelItem(raw: SteelItemRaw): SteelItem {
+  return {
+    serialNumber: raw.seq_no.toString().padStart(8, '0'),
+    plateId: raw.steel_no,
+    steelGrade: raw.steel_type,
+    dimensions: {
+      length: raw.length,
+      width: raw.width,
+      thickness: raw.thickness,
+    },
+    timestamp: new Date(raw.timestamp),
+    level: raw.level,
+    defectCount: raw.defect_count,
+  };
+}
+
+/**
+ * 将后端缺陷数据转换为前端格式
+ */
+export function mapDefectItem(raw: DefectItemRaw): DefectItem {
+  return {
+    id: raw.defect_id,
+    type: raw.defect_type as DefectType,
+    severity: raw.severity,
+    x: raw.x,
+    y: raw.y,
+    width: raw.width,
+    height: raw.height,
+    confidence: raw.confidence,
+    surface: raw.surface,
+    imageIndex: raw.image_index,
+  };
+}

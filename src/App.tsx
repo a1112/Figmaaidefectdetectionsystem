@@ -8,6 +8,7 @@ import { DefectDistributionChart } from './components/DefectDistributionChart';
 import { SearchDialog, SearchCriteria } from './components/SearchDialog';
 import { FilterDialog, FilterCriteria } from './components/FilterDialog';
 import { SystemDiagnosticDialog } from './components/SystemDiagnosticDialog';
+import { ModeSwitch } from './components/ModeSwitch';
 import { 
   LayoutDashboard, 
   FileImage, 
@@ -868,7 +869,7 @@ export default function App() {
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <input
                         type="text"
-                        placeholder="搜索钢板号、流水号..."
+                        placeholder="搜索钢��号、流水号..."
                         className="w-full pl-10 pr-4 py-2.5 bg-muted border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                         onChange={(e) => {
                           const value = e.target.value;
@@ -1522,6 +1523,9 @@ export default function App() {
                   <h3 className="text-lg font-medium">SYSTEM CONFIGURATION</h3>
                   <p className="text-sm text-muted-foreground">Manage detection parameters and device settings</p>
                 </div>
+                
+                {/* API 模式切换 */}
+                <ModeSwitch />
                 
                 <div className="space-y-4">
                   {/* 主题设置 */}
