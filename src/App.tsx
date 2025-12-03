@@ -93,6 +93,7 @@ export default function App() {
   const [history, setHistory] = useState<DetectionRecord[]>([]);
   const [activeTab, setActiveTab] = useState<'defects' | 'images' | 'plates' | 'reports' | 'settings'>('defects');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [showPlatesPanel, setShowPlatesPanel] = useState(false); // 手机模式：是否显示钢板面板
   const [selectedPlateId, setSelectedPlateId] = useState<string | null>(null);
   const [defectLogView, setDefectLogView] = useState<'list' | 'chart'>('list');
   const [surfaceFilter, setSurfaceFilter] = useState<'all' | 'top' | 'bottom'>('all');
@@ -289,47 +290,34 @@ export default function App() {
           
           <div className="w-px h-4 bg-border mx-1"></div>
 
-          {/* Tab Buttons */}
+          {/* Tab Buttons - 缺陷/图像 */}
           <button 
             onClick={() => setActiveTab('defects')}
-            className={`flex items-center gap-1.5 px-3 py-1 text-xs transition-colors rounded-sm ${
-              activeTab === 'defects' 
-                ? 'bg-primary/80 text-primary-foreground border border-primary' 
-                : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors rounded-sm ${
+              activeTab === 'defects'
+                ? 'bg-primary/90 text-primary-foreground border border-primary/50'
+                : 'bg-muted/50 text-muted-foreground hover:bg-accent/50 hover:text-foreground border border-border'
             }`}
           >
             <AlertCircle className="w-3.5 h-3.5" />
             缺陷
           </button>
+          
           <button 
             onClick={() => setActiveTab('images')}
-            className={`flex items-center gap-1.5 px-3 py-1 text-xs transition-colors rounded-sm ${
-              activeTab === 'images' 
-                ? 'bg-primary/80 text-primary-foreground border border-primary' 
-                : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors rounded-sm ${
+              activeTab === 'images'
+                ? 'bg-primary/90 text-primary-foreground border border-primary/50'
+                : 'bg-muted/50 text-muted-foreground hover:bg-accent/50 hover:text-foreground border border-border'
             }`}
           >
             <Images className="w-3.5 h-3.5" />
             图像
           </button>
-          <button 
-            onClick={() => {
-              setActiveTab('reports');
-              setIsSidebarCollapsed(true);
-            }}
-            className={`flex items-center gap-1.5 px-3 py-1 text-xs transition-colors rounded-sm ${
-              activeTab === 'reports' 
-                ? 'bg-primary/80 text-primary-foreground border border-primary' 
-                : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
-            }`}
-          >
-            <BarChart3 className="w-3.5 h-3.5" />
-            报表
-          </button>
         </div>
 
-        {/* Center: App Title */}
-        <div className="flex items-center gap-2 flex-1 justify-center px-4">
+        {/* Center: App Title - 仅在桌面大屏显示 */}
+        <div className="hidden xl:flex items-center gap-2 flex-1 justify-center px-4">
           <Scan className="w-5 h-5 text-primary" />
           <span className="text-sm font-medium tracking-wider">STEEL-EYE PRO v2.0.1</span>
         </div>
@@ -374,8 +362,8 @@ export default function App() {
             SYSTEM READY
           </div>
           
-          {/* 表面切换 */}
-          {activeTab === 'defects' && (
+          {/* 表面切换 - 缺陷和图像界面都显示 */}
+          {(activeTab === 'defects' || activeTab === 'images') && (
             <div className="flex items-center gap-1 bg-background/50 border border-border rounded-sm p-0.5">
               <button
                 onClick={() => setSurfaceFilter('top')}
@@ -411,110 +399,160 @@ export default function App() {
           )}
           
           <div className="flex items-center gap-2">
+            {/* 功能按钮 */}
+            <button 
+              onClick={() => {
+                setActiveTab('reports');
+                setShowPlatesPanel(false);
+              }}
+              className="p-1.5 hover:bg-white/10 rounded transition-colors"
+              title="报表"
+            >
+              <BarChart3 className="w-4 h-4" />
+            </button>
             <button 
               ref={diagnosticButtonRef}
               onClick={() => setIsDiagnosticDialogOpen(true)}
               className="p-1.5 hover:bg-white/10 rounded transition-colors"
-              title="系统诊断"
+              title="监控诊断"
             >
               <Activity className="w-4 h-4" />
             </button>
             <button 
-              onClick={() => setActiveTab('settings')}
+              onClick={() => {
+                setActiveTab('settings');
+                setShowPlatesPanel(false);
+              }}
               className="p-1.5 hover:bg-white/10 rounded transition-colors"
               title="系统设置"
             >
               <Settings className="w-4 h-4" />
             </button>
-            <button className="p-1.5 hover:bg-white/10 rounded"><Minus className="w-4 h-4" /></button>
-            <button className="p-1.5 hover:bg-white/10 rounded"><Maximize2 className="w-4 h-4" /></button>
-            <button className="p-1.5 hover:bg-red-500/80 rounded"><X className="w-4 h-4" /></button>
+            
+            <div className="w-px h-4 bg-border mx-1 hidden xl:block"></div>
+            
+            {/* 窗口控制按钮 - 仅桌面版本显示 */}
+            <div className="hidden xl:flex items-center gap-2">
+              <button className="p-1.5 hover:bg-white/10 rounded"><Minus className="w-4 h-4" /></button>
+              <button className="p-1.5 hover:bg-white/10 rounded"><Maximize2 className="w-4 h-4" /></button>
+              <button className="p-1.5 hover:bg-red-500/80 rounded"><X className="w-4 h-4" /></button>
+            </div>
           </div>
         </div>
       </div>
       )}
       
       {/* 手机模式：顶部导航栏 */}
-      {isMobileDevice && (
-        <div className="h-14 bg-card border-b border-border flex items-center justify-between px-3 shrink-0">
-          {/* 左侧：侧边栏开关（仅在图像界面显示） */}
-          {activeTab === 'images' && (
+      {isMobileDevice && !showPlatesPanel && (
+        <div className="h-14 bg-card border-b border-border flex items-center justify-between px-2 shrink-0 gap-2">
+          {/* 左侧：钢板列表按钮 */}
+          <button
+            onClick={() => setShowPlatesPanel(true)}
+            className="p-2 bg-[rgba(23,23,23,0)] text-[rgb(0,0,0)] hover:bg-primary/80 rounded shrink-0"
+            title="钢板列表"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          
+          {/* 中间区域：缺陷/图像切换 + 钢板切换 + 表面切换 */}
+          <div className="flex items-center gap-2 flex-1 min-w-0 justify-center">
+            {/* 缺陷/图像切换 */}
             <button
-              onClick={() => setIsMobileHistorySidebarOpen(true)}
-              className="p-2 bg-primary text-primary-foreground hover:bg-primary/80 rounded"
-              title="打开历史记录"
+              onClick={() => {
+                if (activeTab === 'defects') {
+                  setActiveTab('images');
+                } else if (activeTab === 'images') {
+                  setActiveTab('defects');
+                } else {
+                  setActiveTab('defects');
+                }
+              }}
+              className="flex items-center gap-1 px-2 py-1.5 bg-muted hover:bg-accent border border-border rounded shrink-0 transition-colors"
+              title={activeTab === 'defects' ? '切换到图像' : activeTab === 'images' ? '切换到缺陷' : '缺陷/图像'}
             >
-              <Menu className="w-5 h-5" />
+              {activeTab === 'defects' ? (
+                <>
+                  <AlertCircle className="w-4 h-4" />
+                  <ChevronRight className="w-3 h-3" />
+                  <Images className="w-4 h-4" />
+                </>
+              ) : (
+                <>
+                  <Images className="w-4 h-4" />
+                  <ChevronRight className="w-3 h-3" />
+                  <AlertCircle className="w-4 h-4" />
+                </>
+              )}
             </button>
-          )}
-          
-          {/* 中间：钢板切换 */}
-          {filteredSteelPlates.length > 0 && (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-muted border border-border rounded">
-              <button
-                onClick={() => {
-                  const currentIndex = filteredSteelPlates.findIndex(p => p.plateId === selectedPlateId);
-                  const prevIndex = currentIndex > 0 ? currentIndex - 1 : filteredSteelPlates.length - 1;
-                  setSelectedPlateId(filteredSteelPlates[prevIndex].plateId);
-                }}
-                className="p-0.5 hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors rounded"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              <span className="text-sm font-mono font-bold text-foreground px-2 min-w-[80px] text-center">
-                {(() => {
-                  const currentPlate = filteredSteelPlates.find(p => p.plateId === selectedPlateId) || filteredSteelPlates[0];
-                  return currentPlate.plateId;
-                })()}
-              </span>
-              <button
-                onClick={() => {
-                  const currentIndex = filteredSteelPlates.findIndex(p => p.plateId === selectedPlateId);
-                  const nextIndex = currentIndex < filteredSteelPlates.length - 1 ? currentIndex + 1 : 0;
-                  setSelectedPlateId(filteredSteelPlates[nextIndex].plateId);
-                }}
-                className="p-0.5 hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors rounded"
-              >
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            </div>
-          )}
-          
-          {/* 右侧：表面切换按钮 */}
-          {activeTab === 'defects' && (
-            <div className="flex items-center gap-1 bg-muted border border-border rounded p-0.5">
-              <button
-                onClick={() => setSurfaceFilter('top')}
-                className={`px-2 py-1 text-xs font-bold rounded transition-colors ${
-                  surfaceFilter === 'top'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground'
-                }`}
-              >
-                上表
-              </button>
-              <button
-                onClick={() => setSurfaceFilter('bottom')}
-                className={`px-2 py-1 text-xs font-bold rounded transition-colors ${
-                  surfaceFilter === 'bottom'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground'
-                }`}
-              >
-                下表
-              </button>
-              <button
-                onClick={() => setSurfaceFilter('all')}
-                className={`px-2 py-1 text-xs font-bold rounded transition-colors ${
-                  surfaceFilter === 'all'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground'
-                }`}
-              >
-                全部
-              </button>
-            </div>
-          )}
+            
+            {/* 钢板切换 */}
+            {filteredSteelPlates.length > 0 && (
+              <div className="flex items-center gap-1 px-2 py-1 bg-muted border border-border rounded shrink-0">
+                <button
+                  onClick={() => {
+                    const currentIndex = filteredSteelPlates.findIndex(p => p.plateId === selectedPlateId);
+                    const prevIndex = currentIndex > 0 ? currentIndex - 1 : filteredSteelPlates.length - 1;
+                    setSelectedPlateId(filteredSteelPlates[prevIndex].plateId);
+                  }}
+                  className="p-0.5 hover:bg-accent/50 active:bg-accent text-muted-foreground hover:text-foreground transition-colors rounded"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-xs font-mono font-bold text-foreground px-1 min-w-[70px] text-center">
+                  {(() => {
+                    const currentPlate = filteredSteelPlates.find(p => p.plateId === selectedPlateId) || filteredSteelPlates[0];
+                    return currentPlate.plateId;
+                  })()}
+                </span>
+                <button
+                  onClick={() => {
+                    const currentIndex = filteredSteelPlates.findIndex(p => p.plateId === selectedPlateId);
+                    const nextIndex = currentIndex < filteredSteelPlates.length - 1 ? currentIndex + 1 : 0;
+                    setSelectedPlateId(filteredSteelPlates[nextIndex].plateId);
+                  }}
+                  className="p-0.5 hover:bg-accent/50 active:bg-accent text-muted-foreground hover:text-foreground transition-colors rounded"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+            
+            {/* 表面切换（上表/下表/全部） */}
+            {(activeTab === 'defects' || activeTab === 'images') && (
+              <div className="flex items-center gap-1 bg-muted border border-border rounded p-0.5 shrink-0">
+                <button
+                  onClick={() => setSurfaceFilter('top')}
+                  className={`px-2 py-1 text-xs font-bold rounded transition-colors ${
+                    surfaceFilter === 'top'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground'
+                  }`}
+                >
+                  上表
+                </button>
+                <button
+                  onClick={() => setSurfaceFilter('bottom')}
+                  className={`px-2 py-1 text-xs font-bold rounded transition-colors ${
+                    surfaceFilter === 'bottom'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground'
+                  }`}
+                >
+                  下表
+                </button>
+                <button
+                  onClick={() => setSurfaceFilter('all')}
+                  className={`px-2 py-1 text-xs font-bold rounded transition-colors ${
+                    surfaceFilter === 'all'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground'
+                  }`}
+                >
+                  全部
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
       
@@ -626,7 +664,7 @@ export default function App() {
               <div className="flex-1 overflow-auto p-2 space-y-1">
                 {filteredSteelPlates.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    <p className="text-xs">没有找到匹配的钢板记录</p>
+                    <p className="text-xs">没有找到��配的钢板记录</p>
                     <button
                       onClick={() => {
                         setSearchCriteria({});
@@ -737,10 +775,7 @@ export default function App() {
           {!isMobileDevice && (
           <div className="h-12 border-b border-border flex items-center justify-between px-4 bg-card/50 shrink-0">
             <h2 className="font-medium text-lg tracking-tight">
-              {activeTab === 'defects' ? 'DASHBOARD / REAL-TIME' : 
-               activeTab === 'images' ? 'DATABASE / HISTORY LOGS' : 
-               activeTab === 'reports' ? 'STATISTICS / DEFECT ANALYSIS' :
-               'SYSTEM CONFIGURATION'}
+              {/* 移除文字显示 */}
             </h2>
             <div className="flex items-center gap-3">
               {/* 缺陷类型过滤器 */}
@@ -815,7 +850,202 @@ export default function App() {
 
           {/* Scrollable Content */}
           <div className={`flex-1 overflow-auto ${isMobileDevice ? 'p-2' : 'p-4'}`}>
-            {activeTab === 'defects' && (
+            {/* 钢板面板（桌面和手机模式） */}
+            {showPlatesPanel && (
+              <div className={`h-full flex flex-col bg-background ${isMobileDevice ? '-m-2' : '-m-4'}`}>
+                {/* 顶部搜索栏 */}
+                <div className={`bg-card border-b border-border shrink-0 ${isMobileDevice ? 'p-3' : 'p-4'}`}>
+                  <div className="flex items-center gap-2">
+                    {/* 桌面模式：标题和关闭按钮 */}
+                    {!isMobileDevice && (
+                      <div className="flex items-center gap-2 mr-2">
+                        <Database className="w-5 h-5 text-primary" />
+                        <h2 className="font-medium">钢板列表</h2>
+                      </div>
+                    )}
+                    
+                    <div className="flex-1 relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <input
+                        type="text"
+                        placeholder="搜索钢板号、流水号..."
+                        className="w-full pl-10 pr-4 py-2.5 bg-muted border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setSearchCriteria({
+                            plateId: value,
+                            serialNumber: value
+                          });
+                        }}
+                      />
+                    </div>
+                    <button
+                      onClick={() => setIsSearchDialogOpen(true)}
+                      className={`p-2.5 rounded-lg border transition-colors ${
+                        Object.keys(searchCriteria).length > 0
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-muted border-border text-muted-foreground'
+                      }`}
+                      title="高级查询"
+                    >
+                      <Search className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => setIsFilterDialogOpen(true)}
+                      className={`p-2.5 rounded-lg border transition-colors ${
+                        filterCriteria.levels.length > 0
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-muted border-border text-muted-foreground'
+                      }`}
+                      title="筛选"
+                    >
+                      <Filter className="w-5 h-5" />
+                    </button>
+                    
+                    {/* 桌面模式：关闭按钮 */}
+                    {!isMobileDevice && (
+                      <button
+                        onClick={() => setShowPlatesPanel(false)}
+                        className="p-2.5 rounded-lg border border-border bg-muted hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                        title="关闭钢板列表"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    )}
+                  </div>
+                  
+                  {/* 筛选标签显示 */}
+                  {(Object.keys(searchCriteria).length > 0 || filterCriteria.levels.length > 0) && (
+                    <div className="flex items-center gap-2 mt-3 flex-wrap">
+                      {filterCriteria.levels.map(level => (
+                        <span key={level} className="px-2 py-1 bg-primary/20 text-primary text-xs rounded-full border border-primary/30">
+                          {getLevelText(level)}
+                        </span>
+                      ))}
+                      <button
+                        onClick={() => {
+                          setSearchCriteria({});
+                          setFilterCriteria({ levels: [] });
+                        }}
+                        className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        清除筛选
+                      </button>
+                    </div>
+                  )}
+                </div>
+                
+                {/* 钢板列表 */}
+                <div className="flex-1 overflow-auto">
+                  {/* 统计信息 */}
+                  <div className={`bg-card border-b border-border ${isMobileDevice ? 'p-3' : 'p-4'}`}>
+                    <div className="grid grid-cols-4 gap-4">
+                      <div className="text-center">
+                        <p className={`${isMobileDevice ? 'text-xl' : 'text-2xl'} font-bold text-primary`}>{filteredSteelPlates.length}</p>
+                        <p className="text-xs text-muted-foreground mt-1">总数</p>
+                      </div>
+                      <div className="text-center">
+                        <p className={`${isMobileDevice ? 'text-xl' : 'text-2xl'} font-bold text-green-500`}>
+                          {filteredSteelPlates.filter(p => p.level === 'A').length}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">一等品</p>
+                      </div>
+                      <div className="text-center">
+                        <p className={`${isMobileDevice ? 'text-xl' : 'text-2xl'} font-bold text-yellow-500`}>
+                          {filteredSteelPlates.filter(p => p.level === 'B' || p.level === 'C').length}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">合格品</p>
+                      </div>
+                      <div className="text-center">
+                        <p className={`${isMobileDevice ? 'text-xl' : 'text-2xl'} font-bold text-red-500`}>
+                          {filteredSteelPlates.filter(p => p.level === 'D').length}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">等外品</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* 钢板列表项 */}
+                  {filteredSteelPlates.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                      <Database className="w-16 h-16 mb-4 opacity-50" />
+                      <p className="text-sm">没有找到匹配的钢板记录</p>
+                      <button
+                        onClick={() => {
+                          setSearchCriteria({});
+                          setFilterCriteria({ levels: [] });
+                        }}
+                        className="mt-4 px-4 py-2 text-xs text-primary hover:underline"
+                      >
+                        清除筛选条件
+                      </button>
+                    </div>
+                  ) : (
+                    <div className={`${isMobileDevice ? 'p-2' : 'p-4'} space-y-2`}>
+                      {filteredSteelPlates.map((plate) => (
+                        <div
+                          key={plate.plateId}
+                          onClick={() => {
+                            setSelectedPlateId(plate.plateId);
+                            setShowPlatesPanel(false); // 选择钢板后关闭面板
+                          }}
+                          className={`bg-card border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md ${
+                            selectedPlateId === plate.plateId
+                              ? 'border-primary shadow-lg shadow-primary/20'
+                              : 'border-border hover:border-primary/50'
+                          }`}
+                        >
+                          {/* 头部：流水号和等级 */}
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="text-xs font-mono text-muted-foreground">
+                              NO.{plate.serialNumber}
+                            </span>
+                            <span className={`px-2 py-1 rounded text-xs font-medium border ${
+                              plate.level === 'A' ? 'bg-green-500/10 border-green-500/30 text-green-400' :
+                              plate.level === 'B' ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' :
+                              plate.level === 'C' ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' :
+                              'bg-red-500/10 border-red-500/30 text-red-400'
+                            }`}>
+                              {getLevelText(plate.level)}
+                            </span>
+                          </div>
+                          
+                          {/* 主要信息 */}
+                          <div className="space-y-2">
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-lg font-mono font-bold text-foreground">{plate.plateId}</span>
+                              <span className="text-sm font-mono text-muted-foreground">{plate.steelGrade}</span>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              <div className="flex items-center gap-1 text-muted-foreground">
+                                <span className="font-medium">规格:</span>
+                                <span className="font-mono">
+                                  {plate.dimensions.length}×{plate.dimensions.width}×{plate.dimensions.thickness}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1 text-muted-foreground">
+                                <span className="font-medium">缺陷:</span>
+                                <span className={`font-mono ${plate.defectCount > 5 ? 'text-red-400' : 'text-foreground'}`}>
+                                  {plate.defectCount}
+                                </span>
+                              </div>
+                            </div>
+                            
+                            <div className="text-xs text-muted-foreground font-mono">
+                              {plate.timestamp.toLocaleString('zh-CN')}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {/* 正常内容（非钢板面板时） */}
+            {!showPlatesPanel && activeTab === 'defects' && (
               <div className={`h-full flex flex-col ${isMobileDevice ? 'gap-2' : 'space-y-4'}`}>
                 <div className={`grid grid-cols-1 gap-4 flex-1 min-h-0 ${!isMobileDevice && 'lg:grid-cols-3'}`}>
                   {/* Left: Viewport */}
@@ -905,10 +1135,10 @@ export default function App() {
               </div>
             )}
 
-            {activeTab === 'images' && (
+            {!showPlatesPanel && activeTab === 'images' && (
               <div className="h-full relative">
-                {/* 移动设备：抽屉遮罩层 */}
-                {isMobileDevice && (
+                {/* 移动设备：不再显示抽屉 */}
+                {false && isMobileDevice && (
                   <div 
                     className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity duration-300 ${
                       isMobileHistorySidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
@@ -917,8 +1147,8 @@ export default function App() {
                   />
                 )}
                 
-                {/* 移动设备：抽屉（浮动在界面上层，不占据布局空间） */}
-                {isMobileDevice && (
+                {/* 移动设备：不再显示抽屉 */}
+                {false && isMobileDevice && (
                   <div className={`
                     fixed top-0 left-0 h-full z-50 
                     transition-all duration-300 ease-out 
@@ -929,7 +1159,7 @@ export default function App() {
                     ${isMobileHistorySidebarOpen ? 'translate-x-0' : '-translate-x-full'}
                   `}>
                     <div className="p-3 border-b border-border bg-muted/20 flex items-center justify-between">
-                      <h3 className="font-medium text-sm">HISTORY LOGS</h3>
+                      <h3 className="font-medium text-sm"></h3>
                       <div className="flex items-center gap-2">
                         <button className="px-2 py-1 bg-primary text-primary-foreground text-xs rounded-sm hover:bg-primary/80">EXPORT</button>
                         <button 
@@ -987,7 +1217,7 @@ export default function App() {
                 {!isMobileDevice && (
                   <div className="absolute top-0 left-0 bottom-0 w-96 bg-card border-r border-border flex flex-col z-10">
                     <div className="p-3 border-b border-border bg-muted/20 flex items-center justify-between">
-                      <h3 className="font-medium text-sm">HISTORY LOGS</h3>
+                      <h3 className="font-medium text-sm"></h3>
                       <button className="px-2 py-1 bg-primary text-primary-foreground text-xs rounded-sm hover:bg-primary/80">EXPORT</button>
                     </div>
                     <div className="flex-1 overflow-auto p-2 space-y-2">
@@ -1034,28 +1264,58 @@ export default function App() {
                 <div className={`h-full bg-card flex flex-col ${!isMobileDevice ? 'ml-96 border border-border' : ''}`}>
                   {!isMobileDevice && (
                   <div className="p-3 border-b border-border bg-muted/20 flex items-center justify-between">
-                    <h3 className="font-medium text-sm">IMAGE VIEWER</h3>
+                    <h3 className="font-medium text-sm"></h3>
                   </div>
                   )}
                   <div className="flex-1 relative min-h-0">
-                    {!selectedHistoryImage ? (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
-                        <Images className="w-16 h-16 mb-4 opacity-50" />
-                        <p className="text-sm">{isMobileDevice ? '点击左上角菜单选择图像' : 'SELECT AN IMAGE FROM HISTORY'}</p>
-                      </div>
-                    ) : (
-                      <DetectionResult
-                        imageUrl={selectedHistoryImage.fullImageUrl}
-                        defects={selectedHistoryImage.defects}
-                        isDetecting={false}
-                      />
-                    )}
+                    {(() => {
+                      // 手机模式：显示当前钢板的fullImageUrl（如果有历史记录）
+                      if (isMobileDevice) {
+                        const currentPlateRecords = history.filter(h => h.id.includes(selectedPlateId || ''));
+                        const imageToShow = currentPlateRecords[0] || history[0];
+                        
+                        if (!imageToShow) {
+                          return (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
+                              <Images className="w-16 h-16 mb-4 opacity-50" />
+                              <p className="text-sm">暂无图像数据</p>
+                            </div>
+                          );
+                        }
+                        
+                        return (
+                          <DetectionResult
+                            imageUrl={imageToShow.fullImageUrl}
+                            defects={imageToShow.defects.filter(d => surfaceFilter === 'all' || d.surface === surfaceFilter)}
+                            isDetecting={false}
+                          />
+                        );
+                      }
+                      
+                      // 桌面模式：显示选中的历史图像
+                      if (!selectedHistoryImage) {
+                        return (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
+                            <Images className="w-16 h-16 mb-4 opacity-50" />
+                            <p className="text-sm">SELECT AN IMAGE FROM HISTORY</p>
+                          </div>
+                        );
+                      }
+                      
+                      return (
+                        <DetectionResult
+                          imageUrl={selectedHistoryImage.fullImageUrl}
+                          defects={selectedHistoryImage.defects}
+                          isDetecting={false}
+                        />
+                      );
+                    })()}
                   </div>
                   
-                  {/* 底部信息栏 */}
-                  {selectedHistoryImage && (
+                  {/* 底部信息栏（仅桌面模式） */}
+                  {!isMobileDevice && selectedHistoryImage && (
                     <div className="p-3 border-t border-border bg-muted/20">
-                      <div className={`grid ${isMobileDevice ? 'grid-cols-2' : 'grid-cols-4'} gap-4 text-xs`}>
+                      <div className="grid grid-cols-4 gap-4 text-xs">
                         <div>
                           <p className="text-muted-foreground mb-1">ID</p>
                           <p className="font-mono truncate">{selectedHistoryImage.id}</p>
@@ -1085,11 +1345,11 @@ export default function App() {
               </div>
             )}
 
-            {activeTab === 'reports' && (
+            {!showPlatesPanel && activeTab === 'reports' && (
               <DefectReport data={getDefectStats()} steelPlates={steelPlates} />
             )}
 
-            {activeTab === 'plates' && (
+            {!showPlatesPanel && activeTab === 'plates' && (
               <div className="h-full flex flex-col bg-background">
                 {/* 手机模式：顶部搜索栏 */}
                 {isMobileDevice && (
@@ -1197,8 +1457,8 @@ export default function App() {
                           onClick={() => {
                             setSelectedPlateId(plate.plateId);
                             if (isMobileDevice) {
-                              // 手机模式下点击后可以显示详情或切换到缺陷界面
-                              setActiveTab('defects');
+                              // 手机模式下点击后关闭钢板面板
+                              setShowPlatesPanel(false);
                             }
                           }}
                           className={`bg-card border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md ${
@@ -1256,7 +1516,7 @@ export default function App() {
               </div>
             )}
 
-            {activeTab === 'settings' && (
+            {!showPlatesPanel && activeTab === 'settings' && (
               <div className="max-w-2xl mx-auto space-y-6 p-8 border border-border bg-card mt-8">
                 <div className="pb-4 border-b border-border">
                   <h3 className="text-lg font-medium">SYSTEM CONFIGURATION</h3>
@@ -1333,67 +1593,46 @@ export default function App() {
         </div>
       )}
       
-      {/* 手机模式：底部导航栏 */}
-      {isMobileDevice && (
-        <div className="h-16 bg-card border-t border-border flex items-center justify-around px-1 shrink-0 safe-area-inset-bottom">
+      {/* 底部导航栏（钢板面板显示时） - 报表/监控/设置 */}
+      {showPlatesPanel && (
+        <div className={`bg-card border-t border-border flex items-center justify-around shrink-0 ${isMobileDevice ? 'h-16 px-4 safe-area-inset-bottom' : 'h-12 px-8'}`}>
           <button
-            onClick={() => setActiveTab('defects')}
-            className={`flex flex-col items-center justify-center gap-1 px-2 py-2 rounded-lg transition-colors flex-1 ${
-              activeTab === 'defects'
-                ? 'bg-primary/20 text-primary'
-                : 'text-muted-foreground'
+            onClick={() => {
+              setActiveTab('reports');
+              setShowPlatesPanel(false);
+            }}
+            className={`flex items-center justify-center gap-2 rounded-lg transition-colors flex-1 text-muted-foreground hover:text-primary hover:bg-accent/50 ${
+              isMobileDevice ? 'flex-col px-4 py-2' : 'flex-row px-6 py-2'
             }`}
           >
-            <AlertCircle className={`w-5 h-5 ${activeTab === 'defects' ? 'stroke-[2.5]' : ''}`} />
-            <span className="text-[9px] font-medium">缺陷</span>
+            <BarChart3 className={isMobileDevice ? 'w-7 h-7' : 'w-5 h-5'} />
+            <span className={isMobileDevice ? 'text-[11px] font-medium' : 'text-sm font-medium'}>报表</span>
           </button>
           
           <button
-            onClick={() => setActiveTab('images')}
-            className={`flex flex-col items-center justify-center gap-1 px-2 py-2 rounded-lg transition-colors flex-1 ${
-              activeTab === 'images'
-                ? 'bg-primary/20 text-primary'
-                : 'text-muted-foreground'
+            onClick={() => {
+              setIsDiagnosticDialogOpen(true);
+              setShowPlatesPanel(false);
+            }}
+            className={`flex items-center justify-center gap-2 rounded-lg transition-colors flex-1 text-muted-foreground hover:text-primary hover:bg-accent/50 ${
+              isMobileDevice ? 'flex-col px-4 py-2' : 'flex-row px-6 py-2'
             }`}
           >
-            <Images className={`w-5 h-5 ${activeTab === 'images' ? 'stroke-[2.5]' : ''}`} />
-            <span className="text-[9px] font-medium">图像</span>
+            <Activity className={isMobileDevice ? 'w-7 h-7' : 'w-5 h-5'} />
+            <span className={isMobileDevice ? 'text-[11px] font-medium' : 'text-sm font-medium'}>系统监控</span>
           </button>
           
           <button
-            onClick={() => setActiveTab('plates')}
-            className={`flex flex-col items-center justify-center gap-1 px-2 py-2 rounded-lg transition-colors flex-1 ${
-              activeTab === 'plates'
-                ? 'bg-primary/20 text-primary'
-                : 'text-muted-foreground'
+            onClick={() => {
+              setActiveTab('settings');
+              setShowPlatesPanel(false);
+            }}
+            className={`flex items-center justify-center gap-2 rounded-lg transition-colors flex-1 text-muted-foreground hover:text-primary hover:bg-accent/50 ${
+              isMobileDevice ? 'flex-col px-4 py-2' : 'flex-row px-6 py-2'
             }`}
           >
-            <Database className={`w-5 h-5 ${activeTab === 'plates' ? 'stroke-[2.5]' : ''}`} />
-            <span className="text-[9px] font-medium">钢板</span>
-          </button>
-          
-          <button
-            onClick={() => setActiveTab('reports')}
-            className={`flex flex-col items-center justify-center gap-1 px-2 py-2 rounded-lg transition-colors flex-1 ${
-              activeTab === 'reports'
-                ? 'bg-primary/20 text-primary'
-                : 'text-muted-foreground'
-            }`}
-          >
-            <BarChart3 className={`w-5 h-5 ${activeTab === 'reports' ? 'stroke-[2.5]' : ''}`} />
-            <span className="text-[9px] font-medium">报表</span>
-          </button>
-          
-          <button
-            onClick={() => setActiveTab('settings')}
-            className={`flex flex-col items-center justify-center gap-1 px-2 py-2 rounded-lg transition-colors flex-1 ${
-              activeTab === 'settings'
-                ? 'bg-primary/20 text-primary'
-                : 'text-muted-foreground'
-            }`}
-          >
-            <Settings className={`w-5 h-5 ${activeTab === 'settings' ? 'stroke-[2.5]' : ''}`} />
-            <span className="text-[9px] font-medium">设置</span>
+            <Settings className={isMobileDevice ? 'w-7 h-7' : 'w-5 h-5'} />
+            <span className={isMobileDevice ? 'text-[11px] font-medium' : 'text-sm font-medium'}>设置</span>
           </button>
         </div>
       )}
