@@ -50,77 +50,49 @@ export function DefectList({ defects, isDetecting, surface, defectColors }: Defe
           </div>
           
           {/* 模拟示例数据 */}
-          <div className="space-y-2 p-2 overflow-auto">
+          <div className="p-2 space-y-1">
             {[
               { id: 'sample-1', type: '纵向裂纹', severity: 'high' as const, confidence: 0.89, x: 45, y: 32, width: 8, height: 15, surface: 'top' as const },
               { id: 'sample-2', type: '划伤', severity: 'medium' as const, confidence: 0.76, x: 68, y: 54, width: 12, height: 4, surface: 'top' as const },
               { id: 'sample-3', type: '辊印', severity: 'low' as const, confidence: 0.82, x: 23, y: 71, width: 6, height: 9, surface: 'bottom' as const },
-            ].filter(d => surface === 'all' || d.surface === surface).map((defect) => (
+            ].filter(d => surface === 'all' || d.surface === surface).map((defect, index) => (
               <div
                 key={defect.id}
-                className="p-3 border border-border/30 bg-card/30 opacity-40"
+                className="flex items-center gap-2 px-2 py-1.5 border border-border/30 bg-card/30 opacity-40 text-xs"
               >
-                <div className="flex items-start justify-between mb-2">
-                  <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 bg-primary/50 rounded-none"></span>
-                    {defect.type}
-                  </h3>
-                  <span className={`px-1.5 py-0.5 text-[10px] uppercase border ${
-                    defect.severity === 'high' ? 'text-red-500 border-red-500/50 bg-red-500/10' :
-                    defect.severity === 'medium' ? 'text-yellow-500 border-yellow-500/50 bg-yellow-500/10' :
-                    'text-green-500 border-green-500/50 bg-green-500/10'
-                  }`}>
-                    {defect.severity}
-                  </span>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-2 text-[10px] text-muted-foreground font-mono">
-                  <div>CONF: {Math.round(defect.confidence * 100)}%</div>
-                  <div>POS: {Math.round(defect.x)},{Math.round(defect.y)}</div>
-                  <div>SIZE: {Math.round(defect.width)}x{Math.round(defect.height)}</div>
-                </div>
-
-                <div className="mt-2 bg-secondary h-1 w-full overflow-hidden">
-                  <div
-                    className="h-full bg-primary/50 transition-all duration-500"
-                    style={{ width: `${defect.confidence * 100}%` }}
-                  />
-                </div>
+                <span className="text-muted-foreground font-mono w-8">#{index + 1}</span>
+                <span className="font-medium text-foreground flex-1">{defect.type}</span>
+                <span className="text-muted-foreground font-mono text-[10px]">
+                  ({Math.round(defect.x)},{Math.round(defect.y)})
+                </span>
+                <span className={`px-1.5 py-0.5 text-[10px] uppercase border ${
+                  defect.severity === 'high' ? 'text-red-500 border-red-500/50 bg-red-500/10' :
+                  defect.severity === 'medium' ? 'text-yellow-500 border-yellow-500/50 bg-yellow-500/10' :
+                  'text-green-500 border-green-500/50 bg-green-500/10'
+                }`}>
+                  {Math.round(defect.confidence * 100)}%
+                </span>
               </div>
             ))}
           </div>
         </div>
       ) : (
-        <div className="space-y-2">
-          {defects.map((defect) => {
+        <div className="space-y-1">
+          {defects.map((defect, index) => {
             const typeColor = getDefectColor(defect.type);
             return (
               <div
                 key={defect.id}
-                className="p-3 border border-border bg-card hover:bg-accent/50 transition-colors group"
+                className="flex items-center gap-2 px-2 py-1.5 border border-border bg-card hover:bg-accent/50 transition-colors text-xs"
               >
-                <div className="flex items-start justify-between mb-2">
-                  <h3 className={`text-sm font-medium flex items-center gap-2 ${typeColor.text}`}>
-                    <span className={`w-1.5 h-1.5 rounded-none ${typeColor.bg}`}></span>
-                    {defect.type}
-                  </h3>
-                  <span className={`px-1.5 py-0.5 text-[10px] uppercase border ${getSeverityColor(defect.severity)}`}>
-                    {defect.severity}
-                  </span>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-2 text-[10px] text-muted-foreground font-mono">
-                  <div>CONF: {Math.round(defect.confidence * 100)}%</div>
-                  <div>POS: {Math.round(defect.x)},{Math.round(defect.y)}</div>
-                  <div>SIZE: {Math.round(defect.width)}x{Math.round(defect.height)}</div>
-                </div>
-
-                <div className="mt-2 bg-secondary h-1 w-full overflow-hidden">
-                  <div
-                    className="h-full bg-primary transition-all duration-500"
-                    style={{ width: `${defect.confidence * 100}%` }}
-                  />
-                </div>
+                <span className="text-muted-foreground font-mono w-8">#{index + 1}</span>
+                <span className={`font-medium flex-1 ${typeColor.text}`}>{defect.type}</span>
+                <span className="text-muted-foreground font-mono text-[10px]">
+                  ({Math.round(defect.x)},{Math.round(defect.y)})
+                </span>
+                <span className={`px-1.5 py-0.5 text-[10px] uppercase border ${getSeverityColor(defect.severity)}`}>
+                  {Math.round(defect.confidence * 100)}%
+                </span>
               </div>
             );
           })}
