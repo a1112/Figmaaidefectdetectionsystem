@@ -37,20 +37,57 @@ export async function listSteels(
   // 生产模式：调用真实 API
   try {
     const baseUrl = env.getApiBaseUrl();
-    const response = await fetch(
-      `${baseUrl}/ui/steels?limit=${limit}`,
-    );
+    const url = `${baseUrl}/ui/steels?limit=${limit}`;
+    console.log(`🌐 [生产模式] 请求钢板列表: ${url}`);
+    
+    const response = await fetch(url);
 
     if (!response.ok) {
+      const contentType = response.headers.get("content-type");
+      let errorMessage = `API Error: ${response.status} ${response.statusText}`;
+      
+      // 检查是否返回了 HTML 而不是 JSON（通常是 404 页面）
+      if (contentType && contentType.includes("text/html")) {
+        errorMessage += "\n\n⚠️ 后端返回了 HTML 页面而不是 JSON 数据。\n";
+        errorMessage += "可能的原因：\n";
+        errorMessage += "1. 后端服务器没有运行（请执行: python run_server.bat）\n";
+        errorMessage += "2. API 路径不正确\n";
+        errorMessage += "3. Vite 代理配置有问题（请检查 vite.config.ts）\n";
+        errorMessage += `\n请求的 URL: ${url}`;
+      }
+      
+      throw new Error(errorMessage);
+    }
+
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
       throw new Error(
-        `API Error: ${response.status} ${response.statusText}`,
+        `服务器返回了非 JSON 数据 (Content-Type: ${contentType})\n` +
+        `这通常意味着后端没有正确运行或返回了错误页面。\n` +
+        `请确保后端服务器正在运行在 http://localhost:8120`
       );
     }
 
     const data: SteelListResponse = await response.json();
     return data.steels.map(mapSteel);
   } catch (error) {
-    console.error("Failed to fetch steels:", error);
+    console.error("❌ 加载钢板列表失败:", error);
+    
+    // 如果是 JSON 解析错误，提供更友好的提示
+    if (error instanceof SyntaxError && error.message.includes("JSON")) {
+      throw new Error(
+        "后端返回了无效的响应（可能是 HTML 错误页面）\n\n" +
+        "📋 请检查：\n" +
+        "1. 后端是否正在运行？\n" +
+        "   → 执行: python run_server.bat\n" +
+        "   → 访问: http://localhost:8120/health\n\n" +
+        "2. Vite 开发服务器是否正确配置了代理？\n" +
+        "   → 检查: vite.config.ts\n\n" +
+        "3. 如果以上都正常，请切换回开发模式继续开发\n" +
+        "   → 在系统设置中切换到「开发模式」"
+      );
+    }
+    
     throw error;
   }
 }
@@ -70,20 +107,38 @@ export async function getDefects(
   // 生产模式：调用真实 API
   try {
     const baseUrl = env.getApiBaseUrl();
-    const response = await fetch(
-      `${baseUrl}/ui/defects/${seqNo}`,
-    );
+    const url = `${baseUrl}/ui/defects/${seqNo}`;
+    console.log(`🌐 [生产模式] 请求缺陷数据: ${url}`);
+    
+    const response = await fetch(url);
 
     if (!response.ok) {
+      const contentType = response.headers.get("content-type");
+      let errorMessage = `API Error: ${response.status} ${response.statusText}`;
+      
+      if (contentType && contentType.includes("text/html")) {
+        errorMessage += "\n\n⚠️ 后端返回了 HTML 页面而不是 JSON 数据";
+      }
+      
+      throw new Error(errorMessage);
+    }
+
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
       throw new Error(
-        `API Error: ${response.status} ${response.statusText}`,
+        `服务器返回了非 JSON 数据 (Content-Type: ${contentType})`
       );
     }
 
     const data: DefectResponse = await response.json();
     return data.defects.map(mapDefect);
   } catch (error) {
-    console.error("Failed to fetch defects:", error);
+    console.error("❌ 加载缺陷数据失败:", error);
+    
+    if (error instanceof SyntaxError && error.message.includes("JSON")) {
+      throw new Error("后端返回了无效的响应，请确保后端服务器正在运行");
+    }
+    
     throw error;
   }
 }

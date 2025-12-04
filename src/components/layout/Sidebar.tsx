@@ -1,0 +1,256 @@
+import { Upload, Search, Filter, RotateCcw } from 'lucide-react';
+import type { SteelPlate, ActiveTab } from '../../types/app.types';
+import type { SearchCriteria, FilterCriteria } from '../SearchDialog';
+import { getLevelText } from '../../utils/steelPlates';
+
+interface SidebarProps {
+  isCollapsed: boolean;
+  filteredSteelPlates: SteelPlate[];
+  steelPlates: SteelPlate[];
+  selectedPlateId: string | null;
+  setSelectedPlateId: (id: string | null) => void;
+  isLoadingSteels: boolean;
+  searchCriteria: SearchCriteria;
+  setSearchCriteria: (criteria: SearchCriteria) => void;
+  filterCriteria: FilterCriteria;
+  setFilterCriteria: (criteria: FilterCriteria) => void;
+  setIsSearchDialogOpen: (open: boolean) => void;
+  setIsFilterDialogOpen: (open: boolean) => void;
+  searchButtonRef: React.RefObject<HTMLButtonElement>;
+  filterButtonRef: React.RefObject<HTMLButtonElement>;
+  handleImageUpload: (imageUrl: string) => void;
+  setActiveTab: (tab: ActiveTab) => void;
+}
+
+export const Sidebar: React.FC<SidebarProps> = ({
+  isCollapsed,
+  filteredSteelPlates,
+  steelPlates,
+  selectedPlateId,
+  setSelectedPlateId,
+  isLoadingSteels,
+  searchCriteria,
+  setSearchCriteria,
+  filterCriteria,
+  setFilterCriteria,
+  setIsSearchDialogOpen,
+  setIsFilterDialogOpen,
+  searchButtonRef,
+  filterButtonRef,
+  handleImageUpload,
+  setActiveTab
+}) => {
+  if (isCollapsed) return null;
+
+  const currentPlate = filteredSteelPlates.find(p => p.plateId === selectedPlateId) || 
+                       filteredSteelPlates[0] || 
+                       steelPlates[0];
+
+  return (
+    <div className="flex-1 flex flex-col min-h-0 border-t border-border">
+      {/* 当前钢板详细信息 */}
+      <div className="p-2 bg-muted/10 border-b border-border">
+        <div className="bg-card border border-border/50">
+          <div className="px-2 py-1.5 bg-primary/20 border-b border-border">
+            <h3 className="text-sm font-bold text-primary uppercase tracking-wider">当前钢板信息</h3>
+          </div>
+          {!currentPlate ? (
+            <div className="p-2 text-xs text-center text-muted-foreground">
+              {isLoadingSteels ? '加载中...' : '暂无钢板数据'}
+            </div>
+          ) : (
+            <div className="p-2 text-xs space-y-1">
+              <div className="flex justify-between py-0.5 border-b border-border/30">
+                <span className="text-muted-foreground">流水号</span>
+                <span className="font-mono font-bold">{currentPlate.serialNumber}</span>
+              </div>
+              <div className="flex justify-between py-0.5 border-b border-border/30">
+                <span className="text-muted-foreground">钢板号</span>
+                <span className="font-mono font-bold">{currentPlate.plateId}</span>
+              </div>
+              <div className="flex justify-between py-0.5 border-b border-border/30">
+                <span className="text-muted-foreground">钢种</span>
+                <span className="font-mono font-bold">{currentPlate.steelGrade}</span>
+              </div>
+              <div className="flex justify-between py-0.5 border-b border-border/30">
+                <span className="text-muted-foreground">规格</span>
+                <span className="font-mono font-bold text-[10px]">
+                  {currentPlate.dimensions.length}×{currentPlate.dimensions.width}×{currentPlate.dimensions.thickness}
+                </span>
+              </div>
+              <div className="flex justify-between py-0.5 border-b border-border/30">
+                <span className="text-muted-foreground">时间</span>
+                <span className="font-mono">{currentPlate.timestamp.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
+              <div className="flex justify-between py-0.5 border-b border-border/30">
+                <span className="text-muted-foreground">等级</span>
+                <span className={`px-1.5 py-0.5 rounded-sm border ${
+                  currentPlate.level === 'A' ? 'bg-green-500/10 border-green-500/30 text-green-400' :
+                  currentPlate.level === 'B' ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' :
+                  currentPlate.level === 'C' ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' :
+                  'bg-red-500/10 border-red-500/30 text-red-400'
+                }`}>{getLevelText(currentPlate.level)}</span>
+              </div>
+              <div className="flex justify-between py-0.5">
+                <span className="text-muted-foreground">缺陷数</span>
+                <span className="font-mono font-bold text-red-400">{currentPlate.defectCount}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      
+      <div className="p-2 bg-muted/20 flex items-center justify-between gap-2">
+        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          钢板记录 
+          <span className="ml-1 text-[9px] text-primary">
+            {(Object.keys(searchCriteria).length > 0 || filterCriteria.levels.length > 0) 
+              ? `(${filteredSteelPlates.length}/${steelPlates.length})`
+              : `(${steelPlates.length})`
+            }
+          </span>
+        </h3>
+        <div className="flex items-center gap-1">
+          <button 
+            ref={searchButtonRef}
+            onClick={() => setIsSearchDialogOpen(true)}
+            className={`p-1 hover:bg-accent/50 border transition-colors rounded ${
+              Object.keys(searchCriteria).length > 0 
+                ? 'bg-primary/20 border-primary/50 text-primary' 
+                : 'border-border/50 bg-card/50 text-muted-foreground'
+            }`}
+            title="查询"
+          >
+            <Search className="w-3.5 h-3.5" />
+          </button>
+          <button 
+            ref={filterButtonRef}
+            onClick={() => setIsFilterDialogOpen(true)}
+            className={`p-1 hover:bg-accent/50 border transition-colors rounded ${
+              filterCriteria.levels.length > 0 
+                ? 'bg-primary/20 border-primary/50 text-primary' 
+                : 'border-border/50 bg-card/50 text-muted-foreground'
+            }`}
+            title="筛选"
+          >
+            <Filter className="w-3.5 h-3.5" />
+          </button>
+          <button 
+            onClick={() => {
+              setSearchCriteria({});
+              setFilterCriteria({ levels: [] });
+            }}
+            className="p-1 hover:bg-accent/50 border border-border/50 bg-card/50 text-muted-foreground transition-colors rounded"
+            title="刷新/重置"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+      <div className="flex-1 overflow-auto p-2 space-y-1">
+        {filteredSteelPlates.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <p className="text-xs">没有找到匹配的钢板记录</p>
+            <button
+              onClick={() => {
+                setSearchCriteria({});
+                setFilterCriteria({ levels: [] });
+              }}
+              className="mt-2 text-[10px] text-primary hover:underline"
+            >
+              清除筛选条件
+            </button>
+          </div>
+        ) : (
+          filteredSteelPlates.map((plate) => (
+          <div 
+            key={plate.plateId}
+            onClick={() => setSelectedPlateId(plate.plateId)}
+            className={`p-1.5 border transition-all cursor-pointer ${
+              selectedPlateId === plate.plateId 
+                ? 'bg-primary/20 border-primary shadow-lg shadow-primary/20' 
+                : 'bg-card/50 border-border/50 hover:bg-accent/30 hover:border-border'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-1 mb-0.5">
+              <span className="text-[9px] font-mono text-muted-foreground">
+                {plate.serialNumber}
+              </span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-sm border ${
+                plate.level === 'A' ? 'bg-green-500/10 border-green-500/30 text-green-400' :
+                plate.level === 'B' ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' :
+                plate.level === 'C' ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' :
+                'bg-red-500/10 border-red-500/30 text-red-400'
+              }`}>
+                {getLevelText(plate.level)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-1">
+              <span className={`text-xs font-mono font-bold ${selectedPlateId === plate.plateId ? 'text-primary-foreground' : ''}`}>
+                {plate.plateId}
+              </span>
+              <span className="text-[9px] font-mono text-muted-foreground">
+                {plate.steelGrade}
+              </span>
+            </div>
+            <div className="text-[9px] text-muted-foreground font-mono mt-0.5">
+              {plate.dimensions.length}×{plate.dimensions.width}×{plate.dimensions.thickness}
+            </div>
+          </div>
+          ))
+        )}
+      </div>
+      
+      {/* 上传按钮区域 - 底部固定 */}
+      <div className="p-2 bg-muted/20 border-t border-border space-y-1 shrink-0">
+        <label className="block">
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                  const imageUrl = event.target?.result as string;
+                  handleImageUpload(imageUrl);
+                  setActiveTab('defects'); // 切换到缺陷界面
+                };
+                reader.readAsDataURL(file);
+              }
+            }}
+          />
+          <div className="flex items-center justify-center gap-1.5 px-3 py-2 bg-primary hover:bg-primary/80 text-primary-foreground text-xs font-bold cursor-pointer border border-primary/50 transition-colors">
+            <Upload className="w-3.5 h-3.5" />
+            上传缺陷图像
+          </div>
+        </label>
+        
+        <label className="block">
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                  const imageUrl = event.target?.result as string;
+                  handleImageUpload(imageUrl);
+                  setActiveTab('images'); // 切换到图像界面
+                };
+                reader.readAsDataURL(file);
+              }
+            }}
+          />
+          <div className="flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold cursor-pointer border border-blue-500/50 transition-colors">
+            <Upload className="w-3.5 h-3.5" />
+            上传钢板图像
+          </div>
+        </label>
+      </div>
+    </div>
+  );
+};

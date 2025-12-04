@@ -9,6 +9,8 @@ import { SearchDialog, SearchCriteria } from './components/SearchDialog';
 import { FilterDialog, FilterCriteria } from './components/FilterDialog';
 import { SystemDiagnosticDialog } from './components/SystemDiagnosticDialog';
 import { ModeSwitch } from './components/ModeSwitch';
+import { BackendErrorPanel } from './components/BackendErrorPanel';
+import { DefectImageView } from './components/DefectImageView';
 // 引入 API 客户端和环境配置
 import { env } from './src/config/env';
 import { listSteels, getDefects } from './src/api/client';
@@ -38,7 +40,8 @@ import {
   Upload,
   Search,
   Filter,
-  RotateCcw
+  RotateCcw,
+  MoreVertical
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -59,6 +62,7 @@ export interface Defect {
   height: number;
   confidence: number;
   surface: 'top' | 'bottom'; // 钢板表面：上表面或下表面
+  imageIndex?: number; // 图像索引（从API获取）
 }
 
 export interface DetectionRecord {
@@ -104,7 +108,10 @@ export default function App() {
   const [surfaceFilter, setSurfaceFilter] = useState<'all' | 'top' | 'bottom'>('all');
   const [plateDefects, setPlateDefects] = useState<Defect[]>([]); // 当前选中钢板的缺陷
   const [isLoadingDefects, setIsLoadingDefects] = useState(false);
+  const [selectedDefectId, setSelectedDefectId] = useState<string | null>(null); // 选中的缺陷ID
+  const [imageViewMode, setImageViewMode] = useState<'full' | 'single'>('full'); // 图像显示模式：大图/单缺陷
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+  const [manualConfirmStatus, setManualConfirmStatus] = useState<'unprocessed' | 'ignore' | 'A' | 'B' | 'C' | 'D' | null>(null); // 人工确认状态
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
   const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
   const [isDiagnosticDialogOpen, setIsDiagnosticDialogOpen] = useState(false);
@@ -142,7 +149,7 @@ export default function App() {
   }, [theme]);
   
   // 缺陷类型过滤
-  const defectTypes = ['纵向裂纹', '横向裂纹', '异物压入', '孔洞', '辊印', '压氧', '边裂', '划伤'];
+  const defectTypes = ['纵向裂纹', '横向裂��', '异物压入', '孔洞', '辊印', '压氧', '边裂', '划伤'];
   const [selectedDefectTypes, setSelectedDefectTypes] = useState<string[]>(defectTypes);
   
   // 缺陷类型颜色映射
@@ -162,41 +169,70 @@ export default function App() {
   const [isLoadingSteels, setIsLoadingSteels] = useState(false);
   const [steelsLoadError, setSteelsLoadError] = useState<string | null>(null);
 
-  // 加载钢板列表
-  useEffect(() => {
-    const loadSteelPlates = async () => {
-      setIsLoadingSteels(true);
-      setSteelsLoadError(null);
+  // 加载钢板列表的函数（提取出来以便重用）
+  const loadSteelPlates = async () => {
+    setIsLoadingSteels(true);
+    setSteelsLoadError(null);
+    
+    try {
+      const items: SteelItem[] = await listSteels(50);
       
-      try {
-        const items: SteelItem[] = await listSteels(50);
+      // 将 API 返回的 SteelItem 转换为 SteelPlate 格式
+      const mapped: SteelPlate[] = items.map(item => ({
+        serialNumber: item.serialNumber,
+        plateId: item.plateId,
+        steelGrade: item.steelGrade,
+        dimensions: item.dimensions,
+        timestamp: item.timestamp,
+        level: item.level,
+        defectCount: item.defectCount,
+      }));
+      
+      setSteelPlates(mapped);
+      console.log(`✅ 成功加载 ${mapped.length} 条钢板记录 (${env.getMode()} 模式)`);
+      
+      // 🔧 开发模式：自动选择第一个钢板并初始化历史记录
+      if (env.isDevelopment() && mapped.length > 0 && !selectedPlateId) {
+        const firstPlate = mapped[0];
+        setSelectedPlateId(firstPlate.plateId);
+        console.log(`🎯 开发模式：自动选择钢板 ${firstPlate.plateId}`);
         
-        // 将 API 返回的 SteelItem 转换为 SteelPlate 格式
-        const mapped: SteelPlate[] = items.map(item => ({
-          serialNumber: item.serialNumber,
-          plateId: item.plateId,
-          steelGrade: item.steelGrade,
-          dimensions: item.dimensions,
-          timestamp: item.timestamp,
-          level: item.level,
-          defectCount: item.defectCount,
-        }));
-        
-        setSteelPlates(mapped);
-        console.log(`✅ 成功加载 ${mapped.length} 条钢板记录 (${env.getMode()} 模式)`);
-      } catch (error) {
-        console.error('❌ 加载钢板列表失败:', error);
-        setSteelsLoadError(error instanceof Error ? error.message : '加载失败');
-        
-        // 生产模式失败时使用空数组，开发模式已经在 mock 层处理
-        if (env.isProduction()) {
-          setSteelPlates([]);
+        // 如果 history 为空，为前几个钢板创建模拟历史记录
+        if (history.length === 0) {
+          const mockHistory = mapped.slice(0, 5).map((plate, index) => {
+            const defects = generateRandomDefects();
+            const status = defects.length === 0 ? 'pass' : 
+                          defects.some(d => d.severity === 'high') ? 'fail' : 'warning';
+            
+            return {
+              id: `${plate.plateId}-${Date.now() - index * 1000}`,
+              defectImageUrl: `https://images.unsplash.com/photo-1755377205509-866d6e727ee6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400`,
+              fullImageUrl: `https://images.unsplash.com/photo-1755377205509-866d6e727ee6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=1200`,
+              timestamp: new Date(Date.now() - index * 3600000),
+              defects,
+              status
+            } as DetectionRecord;
+          });
+          
+          setHistory(mockHistory);
+          console.log(`🎨 开发模式：初始化 ${mockHistory.length} 条模拟历史记录`);
         }
-      } finally {
-        setIsLoadingSteels(false);
       }
-    };
+    } catch (error) {
+      console.error('❌ 加载钢板列表失败:', error);
+      setSteelsLoadError(error instanceof Error ? error.message : '加载失败');
+      
+      // 生产模式失败时使用空数组，开发模式已经在 mock 层处理
+      if (env.isProduction()) {
+        setSteelPlates([]);
+      }
+    } finally {
+      setIsLoadingSteels(false);
+    }
+  };
 
+  // 初始加载钢板列表
+  useEffect(() => {
     loadSteelPlates();
 
     // 监听模式切换事件，重新加载数据
@@ -265,8 +301,8 @@ export default function App() {
         
         // 将 DefectItem 转换为 Defect 格式
         const mapped: Defect[] = defectItems.map(item => ({
-          id: item.defectId,
-          type: item.defectType,
+          id: item.id,
+          type: item.type,
           severity: item.severity,
           x: item.x,
           y: item.y,
@@ -274,6 +310,7 @@ export default function App() {
           height: item.height,
           confidence: item.confidence,
           surface: item.surface,
+          imageIndex: item.imageIndex,
         }));
         
         setPlateDefects(mapped);
@@ -359,9 +396,9 @@ export default function App() {
     <div className={`h-screen w-screen bg-background text-foreground flex flex-col overflow-hidden selection:bg-primary selection:text-primary-foreground font-mono ${theme === 'dark' ? 'dark' : ''}`}>
       {/* Custom Window Title Bar - 仅桌面端显示 */}
       {!isMobileDevice && (
-      <div className="h-10 bg-muted border-b border-border flex items-center justify-between px-4 select-none shrink-0">
-        {/* Left: Menu and Tab Buttons */}
-        <div className="flex items-center gap-3">
+        <div className="h-10 bg-muted border-b border-border flex items-center justify-between px-4 select-none shrink-0">
+          {/* Left: Menu and Tab Buttons */}
+          <div className="flex items-center gap-3">
           <button 
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
             className="p-1 hover:bg-accent hover:text-accent-foreground rounded-sm transition-colors"
@@ -412,21 +449,21 @@ export default function App() {
             <Images className="w-3.5 h-3.5" />
             图像
           </button>
-        </div>
+          </div>
 
-        {/* Center: App Title - 仅在桌面大屏显示 */}
-        <div className="hidden xl:flex items-center gap-2 flex-1 justify-center px-4">
-          <Scan className="w-5 h-5 text-primary" />
-          <span className="text-sm font-medium tracking-wider">STEEL-EYE PRO v2.0.1</span>
-        </div>
+          {/* Center: App Title - 仅在桌面大屏显示 */}
+          <div className="hidden xl:flex items-center gap-2 flex-1 justify-center px-4">
+            <Scan className="w-5 h-5 text-primary" />
+            <span className="text-sm font-medium tracking-wider">STEEL-EYE PRO v2.0.1</span>
+          </div>
 
-        {/* Right: Status and Window Controls */}
-        <div className="flex items-center gap-4">
-          {/* 钢板导航 */}
-          {filteredSteelPlates.length > 0 && (
-            <div className="flex items-center gap-2 px-2 py-1 bg-background/50 border border-border rounded">
-              <button
-                onClick={() => {
+          {/* Right: Status and Window Controls */}
+          <div className="flex items-center gap-4">
+            {/* 钢板导航 */}
+            {filteredSteelPlates.length > 0 && (
+              <div className="flex items-center gap-2 px-2 py-1 bg-background/50 border border-border rounded">
+                <button
+                  onClick={() => {
                   if (filteredSteelPlates.length === 0) return;
                   const currentIndex = filteredSteelPlates.findIndex(p => p.plateId === selectedPlateId);
                   const prevIndex = currentIndex > 0 ? currentIndex - 1 : filteredSteelPlates.length - 1;
@@ -436,39 +473,39 @@ export default function App() {
                 className="p-0.5 hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors rounded"
                 title="上一块钢板"
                 disabled={filteredSteelPlates.length === 0}
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <span className="text-xs font-mono font-bold text-foreground px-1">
-                {(() => {
-                  const currentPlate = filteredSteelPlates.find(p => p.plateId === selectedPlateId) || filteredSteelPlates[0];
-                  return currentPlate?.plateId || '-';
-                })()}
-              </span>
-              <button
-                onClick={() => {
-                  if (filteredSteelPlates.length === 0) return;
-                  const currentIndex = filteredSteelPlates.findIndex(p => p.plateId === selectedPlateId);
-                  const nextIndex = currentIndex < filteredSteelPlates.length - 1 ? currentIndex + 1 : 0;
-                  const nextPlate = filteredSteelPlates[nextIndex];
-                  if (nextPlate) setSelectedPlateId(nextPlate.plateId);
-                }}
-                className="p-0.5 hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors rounded"
-                title="下一块钢板"
-                disabled={filteredSteelPlates.length === 0}
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-xs font-mono font-bold text-foreground px-1">
+                  {(() => {
+                    const currentPlate = filteredSteelPlates.find(p => p.plateId === selectedPlateId) || filteredSteelPlates[0];
+                    return currentPlate?.plateId || '-';
+                  })()}
+                </span>
+                <button
+                  onClick={() => {
+                    if (filteredSteelPlates.length === 0) return;
+                    const currentIndex = filteredSteelPlates.findIndex(p => p.plateId === selectedPlateId);
+                    const nextIndex = currentIndex < filteredSteelPlates.length - 1 ? currentIndex + 1 : 0;
+                    const nextPlate = filteredSteelPlates[nextIndex];
+                    if (nextPlate) setSelectedPlateId(nextPlate.plateId);
+                  }}
+                  className="p-0.5 hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors rounded"
+                  title="下一块钢板"
+                  disabled={filteredSteelPlates.length === 0}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+            <div className="flex items-center gap-1 px-3 py-1 bg-background/50 border border-border rounded text-xs text-muted-foreground">
+              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+              SYSTEM READY
             </div>
-          )}
-          <div className="flex items-center gap-1 px-3 py-1 bg-background/50 border border-border rounded text-xs text-muted-foreground">
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-            SYSTEM READY
-          </div>
-          
-          {/* 表面切换 - 缺陷和图像界面都显示 */}
-          {(activeTab === 'defects' || activeTab === 'images') && (
-            <div className="flex items-center gap-1 bg-background/50 border border-border rounded-sm p-0.5">
+            
+            {/* 表面切换 - 缺陷和图像界面都显示 */}
+            {(activeTab === 'defects' || activeTab === 'images') && (
+              <div className="flex items-center gap-1 bg-background/50 border border-border rounded-sm p-0.5">
               <button
                 onClick={() => setSurfaceFilter('top')}
                 className={`px-2 py-1 text-xs font-bold rounded-sm transition-colors ${
@@ -499,51 +536,51 @@ export default function App() {
               >
                 全部
               </button>
-            </div>
-          )}
-          
-          <div className="flex items-center gap-2">
-            {/* 功能按钮 */}
-            <button 
-              onClick={() => {
-                setActiveTab('reports');
-                setShowPlatesPanel(false);
-              }}
-              className="p-1.5 hover:bg-white/10 rounded transition-colors"
-              title="报表"
-            >
-              <BarChart3 className="w-4 h-4" />
-            </button>
-            <button 
-              ref={diagnosticButtonRef}
-              onClick={() => setIsDiagnosticDialogOpen(true)}
-              className="p-1.5 hover:bg-white/10 rounded transition-colors"
-              title="监控诊断"
-            >
-              <Activity className="w-4 h-4" />
-            </button>
-            <button 
-              onClick={() => {
-                setActiveTab('settings');
-                setShowPlatesPanel(false);
-              }}
-              className="p-1.5 hover:bg-white/10 rounded transition-colors"
-              title="系统设置"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
+              </div>
+            )}
             
-            <div className="w-px h-4 bg-border mx-1 hidden xl:block"></div>
+            <div className="flex items-center gap-2">
+              {/* 功能按钮 */}
+              <button 
+                onClick={() => {
+                  setActiveTab('reports');
+                  setShowPlatesPanel(false);
+                }}
+                className="p-1.5 hover:bg-white/10 rounded transition-colors"
+                title="报表"
+              >
+                <BarChart3 className="w-4 h-4" />
+              </button>
+              <button 
+                ref={diagnosticButtonRef}
+                onClick={() => setIsDiagnosticDialogOpen(true)}
+                className="p-1.5 hover:bg-white/10 rounded transition-colors"
+                title="监控诊断"
+              >
+                <Activity className="w-4 h-4" />
+              </button>
+              <button 
+                onClick={() => {
+                  setActiveTab('settings');
+                  setShowPlatesPanel(false);
+                }}
+                className="p-1.5 hover:bg-white/10 rounded transition-colors"
+                title="系统设置"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
             
-            {/* 窗口控制按钮 - 仅桌面版本显示 */}
-            <div className="hidden xl:flex items-center gap-2">
-              <button className="p-1.5 hover:bg-white/10 rounded"><Minus className="w-4 h-4" /></button>
-              <button className="p-1.5 hover:bg-white/10 rounded"><Maximize2 className="w-4 h-4" /></button>
-              <button className="p-1.5 hover:bg-red-500/80 rounded"><X className="w-4 h-4" /></button>
+              <div className="w-px h-4 bg-border mx-1 hidden xl:block"></div>
+              
+              {/* 窗口控制按钮 - 仅桌面版本显示 */}
+              <div className="hidden xl:flex items-center gap-2">
+                <button className="p-1.5 hover:bg-white/10 rounded"><Minus className="w-4 h-4" /></button>
+                <button className="p-1.5 hover:bg-white/10 rounded"><Maximize2 className="w-4 h-4" /></button>
+                <button className="p-1.5 hover:bg-red-500/80 rounded"><X className="w-4 h-4" /></button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
       )}
       
       {/* 手机模式：顶部导航栏 */}
@@ -891,82 +928,84 @@ export default function App() {
 
         {/* Main Content Area */}
         <div className="flex-1 bg-background/50 flex flex-col min-w-0 overflow-hidden">
-          {/* Toolbar - 仅桌面端显示 */}
-          {!isMobileDevice && (
-          <div className="h-12 border-b border-border flex items-center justify-between px-4 bg-card/50 shrink-0">
-            <h2 className="font-medium text-lg tracking-tight">
-              {/* 移除文字显示 */}
-            </h2>
-            <div className="flex items-center gap-3">
-              {/* 缺陷类型过滤器 */}
-              {activeTab === 'defects' && (
-                <>
-                  {/* 缺陷类型复选框 */}
-                  <div className="flex items-center gap-2">
-                    {defectTypes.map((type) => {
-                      const count = (detectionResult?.defects || []).filter(d => d.type === type).length;
-                      const isSelected = selectedDefectTypes.includes(type);
-                      const colors = defectColors[type];
-                      
-                      // 从 Tailwind 颜色类中提取实际颜色值
-                      const accentColorMap: { [key: string]: string } = {
-                        '纵向裂纹': '#ef4444',
-                        '横向裂纹': '#f97316',
-                        '异物压入': '#eab308',
-                        '孔洞': '#22c55e',
-                        '辊印': '#06b6d4',
-                        '压氧': '#3b82f6',
-                        '边裂': '#a855f7',
-                        '划伤': '#ec4899',
-                      };
-                      
-                      return (
-                        <label
-                          key={type}
-                          className="flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity"
-                          title={`${type}: ${count}个`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => {
-                              setSelectedDefectTypes(prev => 
-                                prev.includes(type) 
-                                  ? prev.filter(t => t !== type)
-                                  : [...prev, type]
-                              );
-                            }}
-                            style={{ accentColor: accentColorMap[type] }}
-                            className="w-3.5 h-3.5 cursor-pointer"
-                          />
-                          <span className="text-xs font-medium text-foreground">
-                            {type}({count})
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                  
-                  <div className="w-px h-6 bg-border mx-1"></div>
-                  
-                  {/* 快捷按钮 */}
-                  <button
-                    onClick={() => setSelectedDefectTypes(defectTypes)}
-                    className="px-3 py-1 text-xs font-bold bg-primary hover:bg-primary/80 text-white border border-primary transition-colors"
-                  >
-                    全选
-                  </button>
-                  <button
-                    onClick={() => setSelectedDefectTypes([])}
-                    className="px-3 py-1 text-xs font-bold bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-600 transition-colors"
-                  >
-                    清
-                  </button>
-                </>
-              )}
-            </div>
+          {/* Toolbar - 缺陷类型过滤器 */}
+          <div className="border-b border-border relative sm:px-4 sm:py-2 bg-card/50 shrink-0 px-[5px] py-[3px]">
+            {/* 缺陷类型过滤器 */}
+            {(activeTab === 'defects' || activeTab === 'images') && (
+              <>
+                {/* 缺陷类型复选框 - 左侧，为右侧按钮留出空间 */}
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap pr-10 sm:pr-12">
+                  {defectTypes.map((type) => {
+                    const count = (detectionResult?.defects || []).filter(d => d.type === type).length;
+                    const isSelected = selectedDefectTypes.includes(type);
+                    const colors = defectColors[type];
+                    
+                    // 从 Tailwind 颜色类中提取实际颜色值
+                    const accentColorMap: { [key: string]: string } = {
+                      '纵向裂纹': '#ef4444',
+                      '横向裂纹': '#f97316',
+                      '异物压入': '#eab308',
+                      '孔洞': '#22c55e',
+                      '辊印': '#06b6d4',
+                      '压氧': '#3b82f6',
+                      '边裂': '#a855f7',
+                      '划伤': '#ec4899',
+                    };
+                    
+                    return (
+                      <label
+                        key={type}
+                        className="flex items-center gap-0.5 sm:gap-1 cursor-pointer hover:opacity-80 transition-opacity"
+                        title={`${type}: ${count}个`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => {
+                            setSelectedDefectTypes(prev => 
+                              prev.includes(type) 
+                                ? prev.filter(t => t !== type)
+                                : [...prev, type]
+                            );
+                          }}
+                          style={{ accentColor: accentColorMap[type] }}
+                          className="w-3 h-3 sm:w-3.5 sm:h-3.5 cursor-pointer"
+                        />
+                        <span className="text-[10px] sm:text-xs font-medium text-foreground whitespace-nowrap">
+                          {type}({count})
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+                
+                {/* 快捷操作菜单 - 固定在右上角 */}
+                <div className="absolute top-2 right-2 sm:right-4">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="p-1.5 hover:bg-accent rounded transition-colors">
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setSelectedDefectTypes(defectTypes)}>
+                        全选
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setSelectedDefectTypes([])}>
+                        全不选
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => {
+                        const unselected = defectTypes.filter(type => !selectedDefectTypes.includes(type));
+                        setSelectedDefectTypes(unselected);
+                      }}>
+                        反选
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </>
+            )}
           </div>
-          )}
 
           {/* Scrollable Content */}
           <div className={`flex-1 overflow-auto ${isMobileDevice ? 'p-2' : 'p-4'}`}>
@@ -1097,7 +1136,7 @@ export default function App() {
                         }}
                         className="mt-4 px-4 py-2 text-xs text-primary hover:underline"
                       >
-                        清除筛选条件
+                        清除筛���条件
                       </button>
                     </div>
                   ) : (
@@ -1166,17 +1205,143 @@ export default function App() {
             
             {/* 正常内容（非钢板面板时） */}
             {!showPlatesPanel && activeTab === 'defects' && (
-              <div className={`h-full flex flex-col ${isMobileDevice ? 'gap-2' : 'space-y-4'}`}>
-                <div className={`grid grid-cols-1 gap-4 flex-1 min-h-0 ${!isMobileDevice && 'lg:grid-cols-3'}`}>
+              <div className="h-full flex flex-col space-y-4">
+                {/* ========== 统一使用桌面版布局 ========== */}
+                <div className={`grid grid-cols-1 gap-4 flex-1 min-h-0 lg:grid-cols-3`}>
                   {/* Left: Viewport */}
-                  <div className={`flex flex-col gap-4 ${!isMobileDevice && 'lg:col-span-2'}`}>
+                  <div className={`flex flex-col gap-4 lg:col-span-2`}>
                     <div className="flex-1 bg-card border border-border p-1 relative min-h-[300px] flex flex-col">
-                      {!isMobileDevice && (
-                      <div className="absolute top-0 left-0 px-2 py-1 bg-primary text-primary-foreground text-xs font-bold z-10">
-                        CAM-01 LIVE FEED
+                      {/* 顶部标签 */}
+                      <div className="absolute top-0 left-0 right-0 px-2 py-1 bg-gradient-to-r from-primary to-primary/80 text-primary-foreground text-xs font-bold z-10 flex items-center justify-between gap-2">
+                        {/* 左侧：大图/缺陷 视图切换 + 确认状态显示 */}
+                        <div className="flex items-center gap-2">
+                          {/* 视图切换 */}
+                          <div className="flex items-center gap-1 bg-black/20 rounded p-0.5">
+                            <button
+                              onClick={() => setImageViewMode('full')}
+                              className={`px-2 py-0.5 text-[10px] rounded transition-colors ${
+                                imageViewMode === 'full'
+                                  ? 'bg-white text-primary'
+                                  : 'text-white/70 hover:text-white'
+                              }`}
+                            >
+                              大图
+                            </button>
+                            <button
+                              onClick={() => setImageViewMode('single')}
+                              className={`px-2 py-0.5 text-[10px] rounded transition-colors ${
+                                imageViewMode === 'single'
+                                  ? 'bg-white text-primary'
+                                  : 'text-white/70 hover:text-white'
+                              }`}
+                            >
+                              缺陷
+                            </button>
+                          </div>
+                          
+                          {/* 确认状态显示 */}
+                          {manualConfirmStatus && (
+                            <div className="flex items-center gap-1 bg-black/30 rounded px-2 py-0.5 border border-white/20">
+                              <span 
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  manualConfirmStatus === 'unprocessed' ? 'bg-gray-400' :
+                                  manualConfirmStatus === 'ignore' ? 'bg-blue-400' :
+                                  manualConfirmStatus === 'A' ? 'bg-green-500' :
+                                  manualConfirmStatus === 'B' ? 'bg-blue-500' :
+                                  manualConfirmStatus === 'C' ? 'bg-yellow-500' :
+                                  'bg-red-500'
+                                }`}
+                              />
+                              <span className="text-[10px] text-white/90">
+                                {manualConfirmStatus === 'unprocessed' ? '未处理' :
+                                 manualConfirmStatus === 'ignore' ? '不处理' :
+                                 manualConfirmStatus === 'A' ? '一等品' :
+                                 manualConfirmStatus === 'B' ? '二等品' :
+                                 manualConfirmStatus === 'C' ? '三等品' :
+                                 '等外品'}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* 中间：钢板号 */}
+                        <span className="text-[10px] opacity-80 flex-1 text-center truncate">
+                          {selectedPlateId ? `钢板: ${selectedPlateId}` : '未选择'}
+                        </span>
+                        
+                        {/* 右侧：人工确认标记菜单 */}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button className={`p-1 hover:bg-white/20 rounded transition-colors relative ${
+                              manualConfirmStatus ? 'ring-2 ring-white/30' : ''
+                            }`}>
+                              <Menu className="w-4 h-4" />
+                              {/* 状态指示器 */}
+                              {manualConfirmStatus && (
+                                <span 
+                                  className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border border-white ${
+                                    manualConfirmStatus === 'unprocessed' ? 'bg-gray-400' :
+                                    manualConfirmStatus === 'ignore' ? 'bg-blue-400' :
+                                    manualConfirmStatus === 'A' ? 'bg-green-500' :
+                                    manualConfirmStatus === 'B' ? 'bg-blue-500' :
+                                    manualConfirmStatus === 'C' ? 'bg-yellow-500' :
+                                    'bg-red-500'
+                                  }`}
+                                />
+                              )}
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-36">
+                            <DropdownMenuLabel className="text-xs">人工确认</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              className="text-xs cursor-pointer"
+                              onClick={() => setManualConfirmStatus('unprocessed')}
+                            >
+                              <span className="w-2 h-2 rounded-full bg-gray-400 mr-2"></span>
+                              未处理
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              className="text-xs cursor-pointer"
+                              onClick={() => setManualConfirmStatus('ignore')}
+                            >
+                              <span className="w-2 h-2 rounded-full bg-blue-400 mr-2"></span>
+                              不处理
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              className="text-xs cursor-pointer"
+                              onClick={() => setManualConfirmStatus('A')}
+                            >
+                              <span className="w-2 h-2 rounded-full bg-green-500 mr-2"></span>
+                              一等品
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              className="text-xs cursor-pointer"
+                              onClick={() => setManualConfirmStatus('B')}
+                            >
+                              <span className="w-2 h-2 rounded-full bg-blue-500 mr-2"></span>
+                              二等品
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              className="text-xs cursor-pointer"
+                              onClick={() => setManualConfirmStatus('C')}
+                            >
+                              <span className="w-2 h-2 rounded-full bg-yellow-500 mr-2"></span>
+                              三等品
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              className="text-xs cursor-pointer"
+                              onClick={() => setManualConfirmStatus('D')}
+                            >
+                              <span className="w-2 h-2 rounded-full bg-red-500 mr-2"></span>
+                              等外品
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
-                      )}
                       
+                      {/* 图像区域 */}
                       <div className="flex-1 bg-black/40 flex items-center justify-center overflow-hidden border border-border/20 relative">
                         {!currentImage ? (
                           <div className="w-full h-full flex items-center justify-center p-8">
@@ -1184,29 +1349,28 @@ export default function App() {
                           </div>
                         ) : (
                           <div className="relative w-full h-full flex items-center justify-center bg-zinc-950">
-                             <DetectionResult
-                                imageUrl={currentImage}
-                                defects={detectionResult?.defects || []}
-                                isDetecting={isDetecting}
-                              />
-                              <button
-                                onClick={() => {
-                                  setCurrentImage(null);
-                                  setDetectionResult(null);
-                                }}
-                                className="absolute top-4 right-4 px-3 py-1.5 bg-destructive/90 hover:bg-destructive text-white text-xs rounded border border-white/10 backdrop-blur-md transition-colors z-20"
-                              >
-                                CLOSE FEED
-                              </button>
+                            <DetectionResult
+                              imageUrl={currentImage}
+                              defects={detectionResult?.defects || []}
+                              isDetecting={isDetecting}
+                            />
+                            <button
+                              onClick={() => {
+                                setCurrentImage(null);
+                                setDetectionResult(null);
+                              }}
+                              className="absolute top-4 right-4 px-3 py-1.5 bg-destructive/90 hover:bg-destructive text-white text-xs rounded border border-white/10 backdrop-blur-md transition-colors z-20"
+                            >
+                              CLOSE FEED
+                            </button>
                           </div>
                         )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Right: Logs/List - 手机模式下隐藏 */}
-                  {!isMobileDevice && (
-                    <div className="lg:col-span-1 flex flex-col bg-card border border-border">
+                  {/* Right: Logs/List */}
+                  <div className="lg:col-span-1 flex flex-col bg-card border border-border">
                       <div className="p-2 border-b border-border bg-muted/20">
                         {/* 视图切换 */}
                         <div className="flex items-center gap-1 bg-background border border-border rounded-sm p-0.5">
@@ -1250,218 +1414,446 @@ export default function App() {
                         })()}
                       </div>
                     </div>
+                  </div>
+                </div>
+            )}
+
+            {!showPlatesPanel && activeTab === 'images' && (
+              <div className="h-full flex flex-col bg-card border border-border">
+                {/* 图像显示区域 */}
+                <div className="flex-1 relative min-h-0 bg-black/40">
+                  {(() => {
+                    // 优先显示上传的图像
+                    if (currentImage) {
+                      return (
+                        <DetectionResult
+                          imageUrl={currentImage}
+                          defects={(detectionResult?.defects || []).filter(d => 
+                            (surfaceFilter === 'all' || d.surface === surfaceFilter) &&
+                            selectedDefectTypes.includes(d.type)
+                          )}
+                          isDetecting={isDetecting}
+                        />
+                      );
+                    }
+                    
+                    // 根据选中的钢板ID查找对应的历史记录
+                    if (selectedPlateId) {
+                      const plateRecord = history.find(h => h.id.includes(selectedPlateId));
+                      
+                      if (plateRecord) {
+                        return (
+                          <DetectionResult
+                            imageUrl={plateRecord.fullImageUrl}
+                            defects={plateRecord.defects.filter(d => 
+                              (surfaceFilter === 'all' || d.surface === surfaceFilter) &&
+                              selectedDefectTypes.includes(d.type)
+                            )}
+                            isDetecting={false}
+                          />
+                        );
+                      }
+                    }
+                    
+                    // 无选中钢板时的提示
+                    return (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
+                        <Database className="w-16 h-16 mb-4 opacity-50" />
+                        <p className="text-sm mb-2">请选择要查看的钢板</p>
+                        <p className="text-xs opacity-70">点击左上角数据库图标打开钢板列表</p>
+                        <p className="text-xs opacity-70 mt-1">或使用顶部工具栏上传新图像</p>
+                      </div>
+                    );
+                  })()}
+                </div>
+                
+                {/* 底部信息栏 */}
+                {(currentImage || selectedPlateId) && (() => {
+                  const plateRecord = selectedPlateId ? history.find(h => h.id.includes(selectedPlateId)) : null;
+                  const showInfo = currentImage || plateRecord;
+                  
+                  if (!showInfo) return null;
+                  
+                  return (
+                    <div className="p-3 border-t border-border bg-muted/20 shrink-0">
+                      <div className="grid grid-cols-5 gap-4 text-xs">
+                        <div>
+                          <p className="text-muted-foreground mb-1">钢板号</p>
+                          <p className="font-mono truncate">
+                            {currentImage ? (selectedPlateId || '上��图像') : plateRecord?.id}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground mb-1">检测时间</p>
+                          <p className="font-mono text-[10px]">
+                            {currentImage ? new Date().toLocaleString('zh-CN') : plateRecord?.timestamp.toLocaleString('zh-CN')}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground mb-1">状态</p>
+                          <span className={`text-xs px-1.5 py-0.5 border inline-block ${
+                            currentImage 
+                              ? 'text-blue-500 border-blue-500/30 bg-blue-500/10'
+                              : plateRecord?.status === 'pass' ? 'text-green-500 border-green-500/30 bg-green-500/10' : 
+                              plateRecord?.status === 'fail' ? 'text-red-500 border-red-500/30 bg-red-500/10' : 
+                              'text-yellow-500 border-yellow-500/30 bg-yellow-500/10'
+                          }`}>
+                            {currentImage ? '已上传' : plateRecord?.status === 'pass' ? '合格' : plateRecord?.status === 'fail' ? '不合格' : '待检'}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground mb-1">缺陷总数</p>
+                          <p className="font-mono">
+                            {currentImage ? (detectionResult?.defects || []).length : plateRecord?.defects.length || 0}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground mb-1">当前过滤</p>
+                          <p className="font-mono text-[10px]">
+                            {surfaceFilter === 'all' ? '全部表面' : surfaceFilter === 'top' ? '上表面' : '下表面'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {!showPlatesPanel && activeTab === 'reports' && (
+              <DefectReport data={getDefectStats()} steelPlates={steelPlates} />
+            )}
+
+            {!showPlatesPanel && activeTab === 'plates' && (
+              <div className="h-full flex flex-col bg-background">
+                {/* 手机模式：顶部搜索栏 */}
+                {isMobileDevice && (
+                  <div className="p-3 bg-card border-b border-border shrink-0">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <input
+                          type="text"
+                          placeholder="搜索钢板号、流水号..."
+                          className="w-full pl-10 pr-4 py-2.5 bg-muted border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setSearchCriteria({
+                              plateId: value,
+                              serialNumber: value
+                            });
+                          }}
+                        />
+                      </div>
+                      <button
+                        onClick={() => setIsFilterDialogOpen(true)}
+                        className={`p-2.5 rounded-lg border transition-colors ${
+                          filterCriteria.levels.length > 0
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-muted border-border text-muted-foreground'
+                        }`}
+                      >
+                        <Filter className="w-5 h-5" />
+                      </button>
+                    </div>
+                    
+                    {/* 筛选标��显示 */}
+                    {(Object.keys(searchCriteria).length > 0 || filterCriteria.levels.length > 0) && (
+                      <div className="flex items-center gap-2 mt-3 flex-wrap">
+                        {filterCriteria.levels.map(level => (
+                          <span key={level} className="px-2 py-1 bg-primary/20 text-primary text-xs rounded-full border border-primary/30">
+                            {getLevelText(level)}
+                          </span>
+                        ))}
+                        <button
+                          onClick={() => {
+                            setSearchCriteria({});
+                            setFilterCriteria({ levels: [] });
+                          }}
+                          className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+                        >
+                          清除筛选
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* 钢板列表 */}
+                <div className="flex-1 overflow-auto">
+                  {/* 统计信息 */}
+                  <div className={`bg-card border-b border-border ${isMobileDevice ? 'p-3' : 'p-4'}`}>
+                    <div className="grid grid-cols-4 gap-4">
+                      <div className="text-center">
+                        <p className={`${isMobileDevice ? 'text-xl' : 'text-2xl'} font-bold text-primary`}>{filteredSteelPlates.length}</p>
+                        <p className="text-xs text-muted-foreground mt-1">总数</p>
+                      </div>
+                      <div className="text-center">
+                        <p className={`${isMobileDevice ? 'text-xl' : 'text-2xl'} font-bold text-green-500`}>
+                          {filteredSteelPlates.filter(p => p.level === 'A').length}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">一等品</p>
+                      </div>
+                      <div className="text-center">
+                        <p className={`${isMobileDevice ? 'text-xl' : 'text-2xl'} font-bold text-yellow-500`}>
+                          {filteredSteelPlates.filter(p => p.level === 'B' || p.level === 'C').length}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">合格品</p>
+                      </div>
+                      <div className="text-center">
+                        <p className={`${isMobileDevice ? 'text-xl' : 'text-2xl'} font-bold text-red-500`}>
+                          {filteredSteelPlates.filter(p => p.level === 'D').length}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">等外品</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* 钢板列表项 */}
+                  {filteredSteelPlates.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                      <Database className="w-16 h-16 mb-4 opacity-50" />
+                      <p className="text-sm">没有找到匹配的钢板记录</p>
+                      <button
+                        onClick={() => {
+                          setSearchCriteria({});
+                          setFilterCriteria({ levels: [] });
+                        }}
+                        className="mt-4 px-4 py-2 text-xs text-primary hover:underline"
+                      >
+                        清除筛选条件
+                      </button>
+                    </div>
+                  ) : (
+                    <div className={`${isMobileDevice ? 'p-2' : 'p-4'} space-y-2`}>
+                      {filteredSteelPlates.map((plate) => (
+                        <div
+                          key={plate.plateId}
+                          onClick={() => {
+                            setSelectedPlateId(plate.plateId);
+                            if (isMobileDevice) {
+                              // 手机模式下点击后关闭钢板面板
+                              setShowPlatesPanel(false);
+                            }
+                          }}
+                          className={`bg-card border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md ${
+                            selectedPlateId === plate.plateId
+                              ? 'border-primary shadow-lg shadow-primary/20'
+                              : 'border-border hover:border-primary/50'
+                          }`}
+                        >
+                          {/* 头部：流水号和等级 */}
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="text-xs font-mono text-muted-foreground">
+                              NO.{plate.serialNumber}
+                            </span>
+                            <span className={`px-2 py-1 rounded text-xs font-medium border ${
+                              plate.level === 'A' ? 'bg-green-500/10 border-green-500/30 text-green-400' :
+                              plate.level === 'B' ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' :
+                              plate.level === 'C' ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' :
+                              'bg-red-500/10 border-red-500/30 text-red-400'
+                            }`}>
+                              {getLevelText(plate.level)}
+                            </span>
+                          </div>
+                          
+                          {/* 主要信息 */}
+                          <div className="space-y-2">
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-lg font-mono font-bold text-foreground">{plate.plateId}</span>
+                              <span className="text-sm font-mono text-muted-foreground">{plate.steelGrade}</span>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              <div className="flex items-center gap-1 text-muted-foreground">
+                                <span className="font-medium">规格:</span>
+                                <span className="font-mono">
+                                  {plate.dimensions.length}×{plate.dimensions.width}×{plate.dimensions.thickness}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1 text-muted-foreground">
+                                <span className="font-medium">缺陷:</span>
+                                <span className={`font-mono ${plate.defectCount > 5 ? 'text-red-400' : 'text-foreground'}`}>
+                                  {plate.defectCount}
+                                </span>
+                              </div>
+                            </div>
+                            
+                            <div className="text-xs text-muted-foreground font-mono">
+                              {plate.timestamp.toLocaleString('zh-CN')}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>
             )}
 
-            {!showPlatesPanel && activeTab === 'images' && (
-              <div className="h-full relative">
-                {/* 移动设备：不再显示抽屉 */}
-                {false && isMobileDevice && (
-                  <div 
-                    className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity duration-300 ${
-                      isMobileHistorySidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
-                    }`}
-                    onClick={() => setIsMobileHistorySidebarOpen(false)}
-                  />
-                )}
+            {!showPlatesPanel && activeTab === 'settings' && (
+              <div className="max-w-2xl mx-auto space-y-6 p-8 border border-border bg-card mt-8">
+                <div className="pb-4 border-b border-border">
+                  <h3 className="text-lg font-medium">SYSTEM CONFIGURATION</h3>
+                  <p className="text-sm text-muted-foreground">Manage detection parameters and device settings</p>
+                </div>
                 
-                {/* 移动设备：不再显示抽屉 */}
-                {false && isMobileDevice && (
-                  <div className={`
-                    fixed top-0 left-0 h-full z-50 
-                    transition-all duration-300 ease-out 
-                    w-80 max-w-[85vw] 
-                    shadow-2xl 
-                    bg-card border-r border-border
-                    flex flex-col
-                    ${isMobileHistorySidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-                  `}>
-                    <div className="p-3 border-b border-border bg-muted/20 flex items-center justify-between">
-                      <h3 className="font-medium text-sm"></h3>
-                      <div className="flex items-center gap-2">
-                        <button className="px-2 py-1 bg-primary text-primary-foreground text-xs rounded-sm hover:bg-primary/80">EXPORT</button>
-                        <button 
-                          onClick={() => setIsMobileHistorySidebarOpen(false)}
-                          className="p-1 hover:bg-accent rounded"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="flex-1 overflow-auto p-2 space-y-2">
-                      {history.length === 0 ? (
-                        <p className="text-muted-foreground text-xs p-4 text-center">NO RECORDS</p>
-                      ) : (
-                        history.map((record) => (
-                          <div 
-                            key={record.id} 
-                            onClick={() => {
-                              setSelectedHistoryImage(record);
-                              setIsMobileHistorySidebarOpen(false);
-                            }}
-                            className={`flex items-center gap-3 p-2 border cursor-pointer transition-all ${
-                              selectedHistoryImage?.id === record.id
-                                ? 'bg-primary/20 border-primary shadow-lg shadow-primary/20'
-                                : 'border-border bg-muted/10 hover:bg-muted/30 hover:border-border'
-                            }`}
-                          >
-                            <div className="w-12 h-12 bg-black/50 border border-border shrink-0 overflow-hidden flex items-center justify-center">
-                              <img src={record.fullImageUrl} alt="" className="w-full h-full object-cover opacity-80" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <p className="font-mono text-xs truncate">{record.id}</p>
-                                <span className={`text-[10px] px-1 py-0.5 border shrink-0 ${
-                                  record.status === 'pass' ? 'text-green-500 border-green-500/30 bg-green-500/10' : 
-                                  record.status === 'fail' ? 'text-red-500 border-red-500/30 bg-red-500/10' : 
-                                  'text-yellow-500 border-yellow-500/30 bg-yellow-500/10'
-                                }`}>
-                                  {record.status.toUpperCase()}
-                                </span>
-                              </div>
-                              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                                <span className="font-mono">{record.timestamp.toLocaleTimeString()}</span>
-                                <span>缺陷: {record.defects.length}</span>
-                              </div>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                )}
+                {/* API 模式切换 */}
+                <ModeSwitch />
                 
-                {/* 桌面端：左侧历史记录列表（正常布局） */}
-                {!isMobileDevice && (
-                  <div className="absolute top-0 left-0 bottom-0 w-96 bg-card border-r border-border flex flex-col z-10">
-                    <div className="p-3 border-b border-border bg-muted/20 flex items-center justify-between">
-                      <h3 className="font-medium text-sm"></h3>
-                      <button className="px-2 py-1 bg-primary text-primary-foreground text-xs rounded-sm hover:bg-primary/80">EXPORT</button>
-                    </div>
-                    <div className="flex-1 overflow-auto p-2 space-y-2">
-                      {history.length === 0 ? (
-                        <p className="text-muted-foreground text-xs p-4 text-center">NO RECORDS</p>
-                      ) : (
-                        history.map((record) => (
-                          <div 
-                            key={record.id} 
-                            onClick={() => setSelectedHistoryImage(record)}
-                            className={`flex items-center gap-3 p-2 border cursor-pointer transition-all ${
-                              selectedHistoryImage?.id === record.id
-                                ? 'bg-primary/20 border-primary shadow-lg shadow-primary/20'
-                                : 'border-border bg-muted/10 hover:bg-muted/30 hover:border-border'
-                            }`}
-                          >
-                            <div className="w-12 h-12 bg-black/50 border border-border shrink-0 overflow-hidden flex items-center justify-center">
-                              <img src={record.fullImageUrl} alt="" className="w-full h-full object-cover opacity-80" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <p className="font-mono text-xs truncate">{record.id}</p>
-                                <span className={`text-[10px] px-1 py-0.5 border shrink-0 ${
-                                  record.status === 'pass' ? 'text-green-500 border-green-500/30 bg-green-500/10' : 
-                                  record.status === 'fail' ? 'text-red-500 border-red-500/30 bg-red-500/10' : 
-                                  'text-yellow-500 border-yellow-500/30 bg-yellow-500/10'
-                                }`}>
-                                  {record.status.toUpperCase()}
-                                </span>
-                              </div>
-                              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                                <span className="font-mono">{record.timestamp.toLocaleTimeString()}</span>
-                                <span>缺陷: {record.defects.length}</span>
-                              </div>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
+                <div className="space-y-4">
+                  {/* 主题设置 */}
+                  <div className="grid grid-cols-2 items-center gap-4">
+                     <label className="text-sm font-medium">THEME / 主题</label>
+                     <div className="flex items-center gap-2 bg-background border border-border rounded-sm p-1">
+                       <button
+                         onClick={() => setTheme('light')}
+                         className={`flex-1 px-3 py-1.5 text-xs rounded-sm transition-colors flex items-center justify-center gap-1.5 ${
+                           theme === 'light'
+                             ? 'bg-primary text-primary-foreground'
+                             : 'text-muted-foreground hover:text-foreground'
+                         }`}
+                       >
+                         <Sun className="w-3.5 h-3.5" />
+                         LIGHT
+                       </button>
+                       <button
+                         onClick={() => setTheme('dark')}
+                         className={`flex-1 px-3 py-1.5 text-xs rounded-sm transition-colors flex items-center justify-center gap-1.5 ${
+                           theme === 'dark'
+                             ? 'bg-primary text-primary-foreground'
+                             : 'text-muted-foreground hover:text-foreground'
+                         }`}
+                       >
+                         <Moon className="w-3.5 h-3.5" />
+                         DARK
+                       </button>
+                     </div>
                   </div>
-                )}
+                  
+                  <div className="grid grid-cols-2 items-center gap-4">
+                     <label className="text-sm font-medium">DETECTION THRESHOLD</label>
+                     <input type="range" className="w-full accent-primary" />
+                  </div>
+                  <div className="grid grid-cols-2 items-center gap-4">
+                     <label className="text-sm font-medium">CAMERA EXPOSURE</label>
+                     <input type="range" className="w-full accent-primary" />
+                  </div>
+                  <div className="grid grid-cols-2 items-center gap-4">
+                     <label className="text-sm font-medium">AUTO-ARCHIVE LOGS</label>
+                     <div className="flex items-center gap-2">
+                       <input type="checkbox" checked readOnly className="accent-primary w-4 h-4" />
+                       <span className="text-sm text-muted-foreground">ENABLED</span>
+                     </div>
+                  </div>
+                </div>
 
-                {/* 图像查看器（移动端全宽，桌面端左侧留出空间） */}
-                <div className={`h-full bg-card flex flex-col ${!isMobileDevice ? 'ml-96 border border-border' : ''}`}>
-                  {!isMobileDevice && (
-                  <div className="p-3 border-b border-border bg-muted/20 flex items-center justify-between">
-                    <h3 className="font-medium text-sm"></h3>
-                  </div>
-                  )}
-                  <div className="flex-1 relative min-h-0">
-                    {(() => {
-                      // 手机模式：显示当前钢板的fullImageUrl（如果有历史记录）
-                      if (isMobileDevice) {
-                        const currentPlateRecords = history.filter(h => h.id.includes(selectedPlateId || ''));
-                        const imageToShow = currentPlateRecords[0] || history[0];
-                        
-                        if (!imageToShow) {
-                          return (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
-                              <Images className="w-16 h-16 mb-4 opacity-50" />
-                              <p className="text-sm">暂无图像数据</p>
-                            </div>
-                          );
-                        }
-                        
+                <div className="pt-4 border-t border-border flex justify-end gap-2">
+                  <button className="px-4 py-2 border border-border hover:bg-accent text-sm transition-colors">RESET</button>
+                  <button className="px-4 py-2 bg-primary text-primary-foreground text-sm hover:bg-primary/90 transition-colors">SAVE CHANGES</button>
+                </div>
+              </div>
+            )}
+
+            {!showPlatesPanel && activeTab === 'images' && (
+              <div className="h-full flex flex-col bg-card border border-border">
+                {/* 图像显示区域 */}
+                <div className="flex-1 relative min-h-0 bg-black/40">
+                  {(() => {
+                    // 优先显示上传的图像
+                    if (currentImage) {
+                      return (
+                        <DetectionResult
+                          imageUrl={currentImage}
+                          defects={(detectionResult?.defects || []).filter(d => 
+                            (surfaceFilter === 'all' || d.surface === surfaceFilter) &&
+                            selectedDefectTypes.includes(d.type)
+                          )}
+                          isDetecting={isDetecting}
+                        />
+                      );
+                    }
+                    
+                    // 根据选中的钢板ID查找对应的历史记录
+                    if (selectedPlateId) {
+                      const plateRecord = history.find(h => h.id.includes(selectedPlateId));
+                      
+                      if (plateRecord) {
                         return (
                           <DetectionResult
-                            imageUrl={imageToShow.fullImageUrl}
-                            defects={imageToShow.defects.filter(d => surfaceFilter === 'all' || d.surface === surfaceFilter)}
+                            imageUrl={plateRecord.fullImageUrl}
+                            defects={plateRecord.defects.filter(d => 
+                              (surfaceFilter === 'all' || d.surface === surfaceFilter) &&
+                              selectedDefectTypes.includes(d.type)
+                            )}
                             isDetecting={false}
                           />
                         );
                       }
-                      
-                      // 桌面模式：显示选中的历史图像
-                      if (!selectedHistoryImage) {
-                        return (
-                          <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
-                            <Images className="w-16 h-16 mb-4 opacity-50" />
-                            <p className="text-sm">SELECT AN IMAGE FROM HISTORY</p>
-                          </div>
-                        );
-                      }
-                      
-                      return (
-                        <DetectionResult
-                          imageUrl={selectedHistoryImage.fullImageUrl}
-                          defects={selectedHistoryImage.defects}
-                          isDetecting={false}
-                        />
-                      );
-                    })()}
-                  </div>
+                    }
+                    
+                    // 无选中钢板时的���示
+                    return (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
+                        <Database className="w-16 h-16 mb-4 opacity-50" />
+                        <p className="text-sm mb-2">请选择要查看的钢板</p>
+                        <p className="text-xs opacity-70">点击左上角数据库图标打开钢板列表</p>
+                        <p className="text-xs opacity-70 mt-1">或使用顶部工具栏上传新图像</p>
+                      </div>
+                    );
+                  })()}
+                </div>
+                
+                {/* 底部信息栏 */}
+                {(currentImage || selectedPlateId) && (() => {
+                  const plateRecord = selectedPlateId ? history.find(h => h.id.includes(selectedPlateId)) : null;
+                  const showInfo = currentImage || plateRecord;
                   
-                  {/* 底部信息栏（仅桌面模式） */}
-                  {!isMobileDevice && selectedHistoryImage && (
-                    <div className="p-3 border-t border-border bg-muted/20">
-                      <div className="grid grid-cols-4 gap-4 text-xs">
+                  if (!showInfo) return null;
+                  
+                  return (
+                    <div className="p-3 border-t border-border bg-muted/20 shrink-0">
+                      <div className="grid grid-cols-5 gap-4 text-xs">
                         <div>
-                          <p className="text-muted-foreground mb-1">ID</p>
-                          <p className="font-mono truncate">{selectedHistoryImage.id}</p>
+                          <p className="text-muted-foreground mb-1">钢板号</p>
+                          <p className="font-mono truncate">
+                            {currentImage ? (selectedPlateId || '上传图像') : plateRecord?.id}
+                          </p>
                         </div>
                         <div>
-                          <p className="text-muted-foreground mb-1">TIMESTAMP</p>
-                          <p className="font-mono text-[10px]">{selectedHistoryImage.timestamp.toLocaleString()}</p>
+                          <p className="text-muted-foreground mb-1">检测时间</p>
+                          <p className="font-mono text-[10px]">
+                            {currentImage ? new Date().toLocaleString('zh-CN') : plateRecord?.timestamp.toLocaleString('zh-CN')}
+                          </p>
                         </div>
                         <div>
-                          <p className="text-muted-foreground mb-1">STATUS</p>
-                          <span className={`text-xs px-1.5 py-0.5 border ${
-                            selectedHistoryImage.status === 'pass' ? 'text-green-500 border-green-500/30 bg-green-500/10' : 
-                            selectedHistoryImage.status === 'fail' ? 'text-red-500 border-red-500/30 bg-red-500/10' : 
-                            'text-yellow-500 border-yellow-500/30 bg-yellow-500/10'
+                          <p className="text-muted-foreground mb-1">状态</p>
+                          <span className={`text-xs px-1.5 py-0.5 border inline-block ${
+                            currentImage 
+                              ? 'text-blue-500 border-blue-500/30 bg-blue-500/10'
+                              : plateRecord?.status === 'pass' ? 'text-green-500 border-green-500/30 bg-green-500/10' : 
+                              plateRecord?.status === 'fail' ? 'text-red-500 border-red-500/30 bg-red-500/10' : 
+                              'text-yellow-500 border-yellow-500/30 bg-yellow-500/10'
                           }`}>
-                            {selectedHistoryImage.status.toUpperCase()}
+                            {currentImage ? '已上传' : plateRecord?.status === 'pass' ? '合格' : plateRecord?.status === 'fail' ? '不合格' : '待检'}
                           </span>
                         </div>
                         <div>
-                          <p className="text-muted-foreground mb-1">DEFECTS</p>
-                          <p className="font-mono">{selectedHistoryImage.defects.length}</p>
+                          <p className="text-muted-foreground mb-1">缺陷总数</p>
+                          <p className="font-mono">
+                            {currentImage ? (detectionResult?.defects || []).length : plateRecord?.defects.length || 0}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground mb-1">当前过滤</p>
+                          <p className="font-mono text-[10px]">
+                            {surfaceFilter === 'all' ? '全部表面' : surfaceFilter === 'top' ? '上表面' : '下表面'}
+                          </p>
                         </div>
                       </div>
                     </div>
-                  )}
-                </div>
+                  );
+                })()}
               </div>
             )}
 
