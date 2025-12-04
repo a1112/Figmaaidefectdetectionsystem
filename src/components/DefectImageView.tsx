@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { env } from '../src/config/env';
-import type { SteelPlate, Defect } from '../types/app.types';
+import type { SteelPlate, Defect } from '../App';
 
 interface DefectImageViewProps {
   selectedPlate: SteelPlate | undefined;

@@ -1,17 +1,15 @@
 // 应用核心类型定义
 
-import type { DefectType, Severity, Surface } from '../src/api/types';
-
 export interface Defect {
   id: string;
-  type: DefectType;
-  severity: Severity;
+  type: string;
+  severity: 'low' | 'medium' | 'high';
   x: number;
   y: number;
   width: number;
   height: number;
   confidence: number;
-  surface: Surface; // 钢板表面：上表面或下表面
+  surface: 'top' | 'bottom'; // 钢板表面：上表面或下表面
   imageIndex?: number; // 图像索引（从API获取）
 }
 

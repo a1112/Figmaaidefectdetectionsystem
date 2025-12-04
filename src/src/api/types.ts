@@ -50,18 +50,15 @@ export interface SteelListResponse {
 /**
  * 缺陷类型枚举
  */
-export const DEFECT_TYPES = [
-  '纵向裂纹',
-  '横向裂纹',
-  '异物压入',
-  '孔洞',
-  '辊印',
-  '压氧',
-  '边裂',
-  '划伤',
-] as const;
-
-export type DefectType = (typeof DEFECT_TYPES)[number];
+export type DefectType = 
+  | '纵向裂纹'
+  | '横向裂纹'
+  | '异物压入'
+  | '孔洞'
+  | '辊印'
+  | '压氧'
+  | '边裂'
+  | '划伤';
 
 /**
  * 表面类型
@@ -113,30 +110,6 @@ export interface DefectResponse {
   defects: DefectItemRaw[];
   total_count: number;
 }
-
-// ==================== 缺陷字典类型 ====================
-
-export interface DefectClassColor {
-  red: number;
-  green: number;
-  blue: number;
-}
-
-export interface DefectClassItem {
-  class: number;
-  name: string;
-  tag: string;
-  color: DefectClassColor;
-  desc: string;
-  parent: number[];
-}
-
-export interface DefectClassesResponse {
-  num: number;
-  items: DefectClassItem[];
-}
-
-export type DefectClassMap = Record<number, DefectClassItem>;
 
 // ==================== 图像相关类型 ====================
 
