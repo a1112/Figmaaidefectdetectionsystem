@@ -1,6 +1,6 @@
 import { CheckCircle, XCircle, AlertCircle, TrendingUp, Activity } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { DetectionRecord } from '../App';
+import type { DetectionRecord } from '../types/app.types';
 
 interface StatisticsPanelProps {
   history: DetectionRecord[];

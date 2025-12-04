@@ -1,48 +1,18 @@
 import { useState, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 import { Search, Filter, RotateCcw, ChevronUp, ChevronDown, Download } from 'lucide-react';
-
-interface SteelPlate {
-  serialNumber: string;
-  plateId: string;
-  steelGrade: string;
-  dimensions: { length: number; width: number; thickness: number };
-  timestamp: Date;
-  level: 'A' | 'B' | 'C' | 'D';
-  defectCount: number;
-  defects?: { [key: string]: number }; // 各类型缺陷数量
-}
+import type { SteelPlate } from '../types/app.types';
+import { defectTypes, defectAccentColors } from '../utils/defects';
+import { getLevelText } from '../utils/steelPlates';
 
 interface DefectReportProps {
   data: { type: string; count: number }[];
   steelPlates: SteelPlate[];
+  accentColors?: Record<string, string>;
 }
 
-// 等级映射函数
-const getLevelText = (level: 'A' | 'B' | 'C' | 'D'): string => {
-  const levelMap = {
-    'A': '一等品',
-    'B': '二等品',
-    'C': '三等品',
-    'D': '等外品'
-  };
-  return levelMap[level];
-};
-
-export function DefectReport({ data, steelPlates }: DefectReportProps) {
-  const defectColors: { [key: string]: string } = {
-    '纵向裂纹': '#ef4444',
-    '横向裂纹': '#f97316',
-    '异物压入': '#f59e0b',
-    '孔洞': '#eab308',
-    '辊印': '#84cc16',
-    '压氧': '#22c55e',
-    '边裂': '#14b8a6',
-    '划伤': '#06b6d4',
-  };
-
-  const defectTypes = ['纵向裂纹', '横向裂纹', '异物压入', '孔洞', '辊印', '压氧', '边裂', '划伤'];
-
+export function DefectReport({ data, steelPlates, accentColors }: DefectReportProps) {
+  const getColor = (type: string) => (accentColors?.[type] ?? defectAccentColors[type] ?? '#6366f1');
   // 查询和筛选状态
   const [searchQuery, setSearchQuery] = useState('');
   const [filterLevel, setFilterLevel] = useState<string[]>([]);
@@ -181,7 +151,7 @@ export function DefectReport({ data, steelPlates }: DefectReportProps) {
               />
               <Bar dataKey="count" name="数量">
                 {data.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={defectColors[entry.type] || '#6366f1'} />
+                  <Cell key={`cell-${index}`} fill={getColor(entry.type)} />
                 ))}
               </Bar>
             </BarChart>
@@ -200,7 +170,7 @@ export function DefectReport({ data, steelPlates }: DefectReportProps) {
                 <div className="flex items-center gap-3">
                   <div 
                     className="w-3 h-3 rounded-sm" 
-                    style={{ backgroundColor: defectColors[item.type] || '#6366f1' }}
+                    style={{ backgroundColor: getColor(item.type) }}
                   ></div>
                   <span className="text-sm font-mono">{item.type}</span>
                 </div>
@@ -211,7 +181,7 @@ export function DefectReport({ data, steelPlates }: DefectReportProps) {
                       className="h-full" 
                       style={{ 
                         width: `${(item.count / Math.max(...data.map(d => d.count))) * 100}%`,
-                        backgroundColor: defectColors[item.type] || '#6366f1'
+                        backgroundColor: getColor(item.type)
                       }}
                     ></div>
                   </div>
@@ -448,7 +418,7 @@ export function DefectReport({ data, steelPlates }: DefectReportProps) {
                         key={type} 
                         className="px-3 py-2 text-center font-mono border-r border-border"
                         style={{ 
-                          backgroundColor: plate.defects?.[type] ? `${defectColors[type]}15` : 'transparent'
+                          backgroundColor: plate.defects?.[type] ? `${getColor(type)}15` : 'transparent'
                         }}
                       >
                         {plate.defects?.[type] || 0}

@@ -1,5 +1,5 @@
 import { AlertTriangle, Circle, Target } from 'lucide-react';
-import { Defect } from '../App';
+import type { Defect } from '../types/app.types';
 
 interface DefectListProps {
   defects: Defect[];

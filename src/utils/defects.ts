@@ -1,9 +1,23 @@
 // 缺陷相关工具函数
 
 import type { Defect } from '../types/app.types';
+import { DEFECT_TYPES } from '../src/api/types';
+import { generateMockDefects } from '../src/api/mock';
 
-// 缺陷类型列表
-export const defectTypes = ['纵向裂纹', '横向裂纹', '异物压入', '孔洞', '辊印', '压氧', '边裂', '划伤'];
+// 缺陷类型列表（统一从 API 类型导出）
+export const defectTypes = [...DEFECT_TYPES];
+
+// 缺陷类型对应的强调色（用于复选框等组件）
+export const defectAccentColors: Record<string, string> = {
+  '纵向裂纹': '#ef4444',
+  '横向裂纹': '#f97316',
+  '异物压入': '#eab308',
+  '孔洞': '#22c55e',
+  '辊印': '#06b6d4',
+  '压氧': '#3b82f6',
+  '边裂': '#a855f7',
+  '划伤': '#ec4899',
+};
 
 // 缺陷类型颜色映射
 export const defectColors: { 
@@ -84,18 +98,9 @@ export const defectColors: {
 
 // 生成随机缺陷数据（用于开发模式）
 export const generateRandomDefects = (): Defect[] => {
-  const severities: ('low' | 'medium' | 'high')[] = ['low', 'medium', 'high'];
-  const numDefects = Math.floor(Math.random() * 8) + 4; // 4-11个缺陷，增加测试数据
-  
-  return Array.from({ length: numDefects }, (_, i) => ({
-    id: `defect-${Date.now()}-${i}`,
-    type: defectTypes[Math.floor(Math.random() * defectTypes.length)],
-    severity: severities[Math.floor(Math.random() * severities.length)],
-    x: Math.random() * 80 + 5,  // 5-85范围，避免边缘
-    y: Math.random() * 80 + 5,  // 5-85范围，避免边缘
-    width: Math.random() * 8 + 3,  // 3-11大小
-    height: Math.random() * 8 + 3, // 3-11大小
-    confidence: Math.random() * 0.25 + 0.7, // 70-95%置信度
-    surface: Math.random() < 0.5 ? 'top' : 'bottom'
+  // 使用 API 层的 mock 生成逻辑，确保字段与接口保持一致
+  return generateMockDefects(Date.now()).map(defect => ({
+    ...defect,
+    imageIndex: defect.imageIndex ?? 0,
   }));
 };

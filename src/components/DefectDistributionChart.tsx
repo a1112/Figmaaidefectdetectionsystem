@@ -1,4 +1,4 @@
-import { Defect } from '../App';
+import type { Defect } from '../types/app.types';
 
 interface DefectDistributionChartProps {
   defects: Defect[];

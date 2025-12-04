@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { Loader2, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
-import { Defect } from '../App';
+import type { Defect } from '../types/app.types';
 
 interface DetectionResultProps {
   imageUrl: string;

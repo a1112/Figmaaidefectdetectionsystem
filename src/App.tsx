@@ -13,8 +13,11 @@ import { BackendErrorPanel } from './components/BackendErrorPanel';
 import { DefectImageView } from './components/DefectImageView';
 // 引入 API 客户端和环境配置
 import { env } from './src/config/env';
-import { listSteels, getDefects } from './src/api/client';
-import type { SteelItem, DefectItem } from './src/api/types';
+import { listSteels, getDefects, getDefectClasses } from './src/api/client';
+import type { SteelItem, DefectItem, DefectClassItem } from './src/api/types';
+import type { Defect, DetectionRecord, SteelPlate } from './types/app.types';
+import { defectTypes, defectColors, defectAccentColors, generateRandomDefects } from './utils/defects';
+import { getLevelText } from './utils/steelPlates';
 import { 
   LayoutDashboard, 
   FileImage, 
@@ -52,49 +55,6 @@ import {
   DropdownMenuLabel,
 } from "./components/ui/dropdown-menu";
 
-export interface Defect {
-  id: string;
-  type: string;
-  severity: 'low' | 'medium' | 'high';
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  confidence: number;
-  surface: 'top' | 'bottom'; // 钢板表面：上表面或下表面
-  imageIndex?: number; // 图像索引（从API获取）
-}
-
-export interface DetectionRecord {
-  id: string;
-  defectImageUrl: string; // 缺陷图像（单个缺陷特写）
-  fullImageUrl: string; // 完整钢板图像
-  timestamp: Date;
-  defects: Defect[];
-  status: 'pass' | 'warning' | 'fail';
-}
-
-export interface SteelPlate {
-  serialNumber: string; // 流水号
-  plateId: string; // 8位钢板号
-  steelGrade: string; // 5位钢种
-  dimensions: { length: number; width: number; thickness: number }; // 规格（长×宽×厚，单位：mm）
-  timestamp: Date;
-  level: 'A' | 'B' | 'C' | 'D'; // 质量级别
-  defectCount: number; // 缺陷数量
-}
-
-// 等级映射函数
-const getLevelText = (level: 'A' | 'B' | 'C' | 'D'): string => {
-  const levelMap = {
-    'A': '一等品',
-    'B': '二等品',
-    'C': '三等品',
-    'D': '等外品'
-  };
-  return levelMap[level];
-};
-
 export default function App() {
   const [currentImage, setCurrentImage] = useState<string | null>(null);
   const [isDetecting, setIsDetecting] = useState(false);
@@ -117,6 +77,10 @@ export default function App() {
   const [isDiagnosticDialogOpen, setIsDiagnosticDialogOpen] = useState(false);
   const [searchCriteria, setSearchCriteria] = useState<SearchCriteria>({});
   const [filterCriteria, setFilterCriteria] = useState<FilterCriteria>({ levels: [] });
+  const [availableDefectTypes, setAvailableDefectTypes] = useState<string[]>(defectTypes);
+  const [defectColorMap, setDefectColorMap] = useState(defectColors);
+  const [defectAccentMap, setDefectAccentMap] = useState(defectAccentColors);
+  const [defectClasses, setDefectClasses] = useState<DefectClassItem[] | null>(null);
   const searchButtonRef = useRef<HTMLButtonElement>(null);
   const filterButtonRef = useRef<HTMLButtonElement>(null);
   const diagnosticButtonRef = useRef<HTMLButtonElement>(null);
@@ -147,22 +111,49 @@ export default function App() {
       document.documentElement.classList.remove('dark');
     }
   }, [theme]);
+
+  // 加载缺陷字典（确保 /api/defect-classes 调用）
+  useEffect(() => {
+    let cancelled = false;
+    const loadDefectClasses = async () => {
+      try {
+        const res = await getDefectClasses();
+        if (cancelled) return;
+        setDefectClasses(res.items);
+
+        const names = res.items
+          .map(item => item.desc || item.name || item.tag)
+          .filter((name): name is string => Boolean(name));
+
+        if (names.length > 0) {
+          setAvailableDefectTypes(names);
+          setSelectedDefectTypes(prev => {
+            const filtered = prev.filter(name => names.includes(name));
+            return filtered.length > 0 ? filtered : names;
+          });
+          const toHex = (num: number) => num.toString(16).padStart(2, '0');
+          const accentMap = { ...defectAccentColors };
+          res.items.forEach(item => {
+            const key = item.desc || item.name || item.tag;
+            if (!key) return;
+            const { red, green, blue } = item.color;
+            accentMap[key] = `#${toHex(red)}${toHex(green)}${toHex(blue)}`;
+          });
+          setDefectAccentMap(accentMap);
+        }
+      } catch (error) {
+        console.warn('⚠️ 加载缺陷字典失败:', error);
+      }
+    };
+
+    loadDefectClasses();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   
   // 缺陷类型过滤
-  const defectTypes = ['纵向裂纹', '横向裂��', '异物压入', '孔洞', '辊印', '压氧', '边裂', '划伤'];
   const [selectedDefectTypes, setSelectedDefectTypes] = useState<string[]>(defectTypes);
-  
-  // 缺陷类型颜色映射
-  const defectColors: { [key: string]: { bg: string; border: string; text: string; activeBg: string; activeBorder: string; activeText: string } } = {
-    '纵向裂纹': { bg: 'bg-red-500/10', border: 'border-red-500/40', text: 'text-red-400', activeBg: 'bg-red-500', activeBorder: 'border-red-500', activeText: 'text-white' },
-    '横向裂纹': { bg: 'bg-orange-500/10', border: 'border-orange-500/40', text: 'text-orange-400', activeBg: 'bg-orange-500', activeBorder: 'border-orange-500', activeText: 'text-white' },
-    '异物压入': { bg: 'bg-yellow-500/10', border: 'border-yellow-500/40', text: 'text-yellow-400', activeBg: 'bg-yellow-500', activeBorder: 'border-yellow-500', activeText: 'text-white' },
-    '孔洞': { bg: 'bg-green-500/10', border: 'border-green-500/40', text: 'text-green-400', activeBg: 'bg-green-500', activeBorder: 'border-green-500', activeText: 'text-white' },
-    '辊印': { bg: 'bg-cyan-500/10', border: 'border-cyan-500/40', text: 'text-cyan-400', activeBg: 'bg-cyan-500', activeBorder: 'border-cyan-500', activeText: 'text-white' },
-    '压氧': { bg: 'bg-blue-500/10', border: 'border-blue-500/40', text: 'text-blue-400', activeBg: 'bg-blue-500', activeBorder: 'border-blue-500', activeText: 'text-white' },
-    '边裂': { bg: 'bg-purple-500/10', border: 'border-purple-500/40', text: 'text-purple-400', activeBg: 'bg-purple-500', activeBorder: 'border-purple-500', activeText: 'text-white' },
-    '划伤': { bg: 'bg-pink-500/10', border: 'border-pink-500/40', text: 'text-pink-400', activeBg: 'bg-pink-500', activeBorder: 'border-pink-500', activeText: 'text-white' }
-  };
 
   // 钢板记录数据（从 API 或本地模拟数据加载）
   const [steelPlates, setSteelPlates] = useState<SteelPlate[]>([]);
@@ -355,28 +346,11 @@ export default function App() {
     }, 2000);
   };
 
-  const generateRandomDefects = (): Defect[] => {
-    const severities: ('low' | 'medium' | 'high')[] = ['low', 'medium', 'high'];
-    const numDefects = Math.floor(Math.random() * 8) + 4; // 4-11个缺陷，增加测试数据
-    
-    return Array.from({ length: numDefects }, (_, i) => ({
-      id: `defect-${Date.now()}-${i}`,
-      type: defectTypes[Math.floor(Math.random() * defectTypes.length)],
-      severity: severities[Math.floor(Math.random() * severities.length)],
-      x: Math.random() * 80 + 5,  // 5-85范围，避免边缘
-      y: Math.random() * 80 + 5,  // 5-85范围，避免边缘
-      width: Math.random() * 8 + 3,  // 3-11大小
-      height: Math.random() * 8 + 3, // 3-11大小
-      confidence: Math.random() * 0.25 + 0.7, // 70-95%置信度
-      surface: Math.random() < 0.5 ? 'top' : 'bottom'
-    }));
-  };
-
   // 生成缺陷统计数据
   const getDefectStats = () => {
     const stats: { [key: string]: number } = {};
     
-    defectTypes.forEach(type => { stats[type] = 0; });
+    availableDefectTypes.forEach(type => { stats[type] = 0; });
     
     history.forEach(record => {
       record.defects.forEach(defect => {
@@ -386,7 +360,7 @@ export default function App() {
       });
     });
     
-    return defectTypes.map(type => ({
+    return availableDefectTypes.map(type => ({
       type,
       count: stats[type] || Math.floor(Math.random() * 20) + 5 // 如果没有数据,使用模拟数据
     }));
@@ -935,22 +909,10 @@ export default function App() {
               <>
                 {/* 缺陷类型复选框 - 左侧，为右侧按钮留出空间 */}
                 <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap pr-10 sm:pr-12">
-                  {defectTypes.map((type) => {
+                  {availableDefectTypes.map((type) => {
                     const count = (detectionResult?.defects || []).filter(d => d.type === type).length;
                     const isSelected = selectedDefectTypes.includes(type);
-                    const colors = defectColors[type];
-                    
-                    // 从 Tailwind 颜色类中提取实际颜色值
-                    const accentColorMap: { [key: string]: string } = {
-                      '纵向裂纹': '#ef4444',
-                      '横向裂纹': '#f97316',
-                      '异物压入': '#eab308',
-                      '孔洞': '#22c55e',
-                      '辊印': '#06b6d4',
-                      '压氧': '#3b82f6',
-                      '边裂': '#a855f7',
-                      '划伤': '#ec4899',
-                    };
+                    const colors = defectColorMap[type];
                     
                     return (
                       <label
@@ -968,7 +930,7 @@ export default function App() {
                                 : [...prev, type]
                             );
                           }}
-                          style={{ accentColor: accentColorMap[type] }}
+                          style={{ accentColor: defectAccentMap[type] || '#3b82f6' }}
                           className="w-3 h-3 sm:w-3.5 sm:h-3.5 cursor-pointer"
                         />
                         <span className="text-[10px] sm:text-xs font-medium text-foreground whitespace-nowrap">
@@ -988,14 +950,14 @@ export default function App() {
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setSelectedDefectTypes(defectTypes)}>
+                      <DropdownMenuItem onClick={() => setSelectedDefectTypes(availableDefectTypes)}>
                         全选
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setSelectedDefectTypes([])}>
                         全不选
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => {
-                        const unselected = defectTypes.filter(type => !selectedDefectTypes.includes(type));
+                        const unselected = availableDefectTypes.filter(type => !selectedDefectTypes.includes(type));
                         setSelectedDefectTypes(unselected);
                       }}>
                         反选
@@ -1407,9 +1369,9 @@ export default function App() {
                             selectedDefectTypes.includes(d.type)
                           );
                           return defectLogView === 'list' ? (
-                            <DefectList defects={filteredDefects} isDetecting={isDetecting} surface={surfaceFilter} defectColors={defectColors} />
+                            <DefectList defects={filteredDefects} isDetecting={isDetecting} surface={surfaceFilter} defectColors={defectColorMap} />
                           ) : (
-                            <DefectDistributionChart defects={filteredDefects} surface={surfaceFilter} defectColors={defectColors} />
+                            <DefectDistributionChart defects={filteredDefects} surface={surfaceFilter} defectColors={defectColorMap} />
                           );
                         })()}
                       </div>
@@ -1521,7 +1483,7 @@ export default function App() {
             )}
 
             {!showPlatesPanel && activeTab === 'reports' && (
-              <DefectReport data={getDefectStats()} steelPlates={steelPlates} />
+              <DefectReport data={getDefectStats()} steelPlates={steelPlates} accentColors={defectAccentMap} />
             )}
 
             {!showPlatesPanel && activeTab === 'plates' && (
@@ -1858,7 +1820,7 @@ export default function App() {
             )}
 
             {!showPlatesPanel && activeTab === 'reports' && (
-              <DefectReport data={getDefectStats()} steelPlates={steelPlates} />
+              <DefectReport data={getDefectStats()} steelPlates={steelPlates} accentColors={defectAccentMap} />
             )}
 
             {!showPlatesPanel && activeTab === 'plates' && (

@@ -10,6 +10,7 @@ import type {
   HealthResponse,
   SteelItem,
   DefectItem,
+  DefectClassesResponse,
   Surface,
   mapSteelItem,
   mapDefectItem,
@@ -211,4 +212,29 @@ export function getApiStatus(): {
         : "生产模式 - 连接真实后端",
     baseUrl: env.getApiBaseUrl() || "Mock Data",
   };
+}
+
+/**
+ * 获取缺陷字典
+ */
+export async function getDefectClasses(): Promise<DefectClassesResponse> {
+  if (env.isDevelopment()) {
+    return mock.mockGetDefectClasses();
+  }
+
+  const baseUrl = env.getApiBaseUrl();
+  const url = `${baseUrl}/defect-classes`;
+  console.log(`🌐 [生产模式] 请求缺陷字典: ${url}`);
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`加载缺陷字典失败: ${response.status} ${response.statusText}`);
+  }
+
+  const contentType = response.headers.get("content-type");
+  if (!contentType || !contentType.includes("application/json")) {
+    throw new Error(`缺陷字典接口返回非 JSON 数据 (Content-Type: ${contentType})`);
+  }
+
+  return response.json() as Promise<DefectClassesResponse>;
 }

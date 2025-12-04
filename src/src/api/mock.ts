@@ -8,25 +8,29 @@ import type {
   DefectResponse, 
   HealthResponse,
   DefectItemRaw,
+  DefectItem,
   SteelItemRaw,
   Severity,
-  Surface 
+  Surface,
+  DefectClassesResponse,
+  DefectClassItem,
 } from './types';
-
-// 缺陷类型列表
-const defectTypes = [
-  '纵向裂纹',
-  '横向裂纹',
-  '异物压入',
-  '孔洞',
-  '辊印',
-  '压氧',
-  '边裂',
-  '划伤'
-];
+import { DEFECT_TYPES, mapDefectItem } from './types';
 
 // 钢种列表
 const steelGrades = ['Q235B', 'Q345B', 'Q420C', '16MnR', '45#钢'];
+
+const defectClassItems: DefectClassItem[] = [
+  { class: 0, name: 'noclass', tag: 'N0', color: { red: 0, green: 255, blue: 64 }, desc: '未命名', parent: [] },
+  { class: 1, name: 'verCrack', tag: 'L0', color: { red: 174, green: 0, blue: 0 }, desc: '纵向裂纹', parent: [] },
+  { class: 2, name: 'horCrack', tag: 'L1', color: { red: 128, green: 64, blue: 64 }, desc: '横向裂纹', parent: [] },
+  { class: 3, name: 'foreignPress', tag: 'F0', color: { red: 204, green: 102, blue: 0 }, desc: '异物压入', parent: [] },
+  { class: 4, name: 'hole', tag: 'H0', color: { red: 0, green: 128, blue: 255 }, desc: '孔洞', parent: [] },
+  { class: 5, name: 'roller', tag: 'R0', color: { red: 0, green: 204, blue: 255 }, desc: '辊印', parent: [] },
+  { class: 6, name: 'oxygen', tag: 'O0', color: { red: 32, green: 64, blue: 192 }, desc: '压氧', parent: [] },
+  { class: 7, name: 'edgeCrack', tag: 'E0', color: { red: 128, green: 0, blue: 128 }, desc: '边裂', parent: [] },
+  { class: 8, name: 'scratch', tag: 'S0', color: { red: 255, green: 64, blue: 160 }, desc: '划伤', parent: [] },
+];
 
 /**
  * 生成随机钢板数据
@@ -51,13 +55,13 @@ function generateMockSteel(seqNo: number): SteelItemRaw {
 /**
  * 生成随机缺陷数据
  */
-function generateMockDefect(seqNo: number, index: number): DefectItemRaw {
+export function generateMockDefect(seqNo: number, index: number): DefectItemRaw {
   const severities: Severity[] = ['low', 'medium', 'high'];
   const surfaces: Surface[] = ['top', 'bottom'];
   
   return {
     defect_id: `D${seqNo}-${index}`,
-    defect_type: defectTypes[Math.floor(Math.random() * defectTypes.length)],
+    defect_type: DEFECT_TYPES[Math.floor(Math.random() * DEFECT_TYPES.length)],
     severity: severities[Math.floor(Math.random() * severities.length)],
     x: Math.random() * 80 + 5,  // 5-85%
     y: Math.random() * 80 + 5,  // 5-85%
@@ -67,6 +71,24 @@ function generateMockDefect(seqNo: number, index: number): DefectItemRaw {
     surface: surfaces[Math.floor(Math.random() * surfaces.length)],
     image_index: Math.floor(Math.random() * 5), // 0-4
   };
+}
+
+function generateMockDefectList(seqNo: number, defectCount?: number): DefectItemRaw[] {
+  const count = defectCount ?? Math.floor(Math.random() * 12) + 3;
+  const defects: DefectItemRaw[] = [];
+
+  for (let i = 0; i < count; i++) {
+    defects.push(generateMockDefect(seqNo, i));
+  }
+
+  return defects;
+}
+
+/**
+ * 生成缺陷列表（前端映射格式）
+ */
+export function generateMockDefects(seqNo: number, defectCount?: number): DefectItem[] {
+  return generateMockDefectList(seqNo, defectCount).map(mapDefectItem);
 }
 
 /**
@@ -94,17 +116,12 @@ export async function mockGetDefects(seqNo: number): Promise<DefectResponse> {
   // 模拟网络延迟
   await new Promise(resolve => setTimeout(resolve, 200 + Math.random() * 150));
   
-  const defectCount = Math.floor(Math.random() * 12) + 3; // 3-14个缺陷
-  const defects: DefectItemRaw[] = [];
-  
-  for (let i = 0; i < defectCount; i++) {
-    defects.push(generateMockDefect(seqNo, i));
-  }
+  const defects: DefectItemRaw[] = generateMockDefectList(seqNo);
   
   return {
     seq_no: seqNo,
     defects,
-    total_count: defectCount,
+    total_count: defects.length,
   };
 }
 
@@ -143,5 +160,16 @@ export async function mockHealthCheck(): Promise<HealthResponse> {
       connected: true,
       latency_ms: Math.random() * 10 + 5,
     },
+  };
+}
+
+/**
+ * Mock: 缺陷字典
+ */
+export async function mockGetDefectClasses(): Promise<DefectClassesResponse> {
+  await new Promise(resolve => setTimeout(resolve, 120));
+  return {
+    num: defectClassItems.length,
+    items: defectClassItems,
   };
 }
