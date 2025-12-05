@@ -12,7 +12,7 @@ import { BackendErrorPanel } from './components/BackendErrorPanel';
 import { DefectImageView } from './components/DefectImageView';
 // 引入 API 客户端和环境配置
 import { env } from './src/config/env';
-import { listSteels, searchSteels, getDefectsRaw, getDefectClasses, getTileImageUrl } from './src/api/client';
+import { listSteels, searchSteels, getDefectsRaw, getTileImageUrl, getGlobalMeta } from './src/api/client';
 import type { SteelItem, DefectItem, DefectClassItem, SurfaceImageInfo } from './src/api/types';
 import type { Defect, DetectionRecord, SteelPlate } from './types/app.types';
 import { defectTypes, defectColors, defectAccentColors, generateRandomDefects } from './utils/defects';
@@ -127,18 +127,21 @@ export default function App() {
     }
   }, [theme]);
 
-  // 加载缺陷字典（确保 /api/defect-classes 调用）
+  // 加载全局 Meta（包含缺陷字典与瓦片配置），在页面刷新时调用一次
   useEffect(() => {
     let cancelled = false;
-    const loadDefectClasses = async () => {
+    const loadGlobalMeta = async () => {
       try {
-        const res = await getDefectClasses();
+        const res = await getGlobalMeta();
         if (cancelled) return;
-        setDefectClasses(res.items);
 
-        const names = res.items
-          .map(item => item.desc || item.name || item.tag)
-          .filter((name): name is string => Boolean(name));
+        const defectPayload = res.defect_classes;
+        const items = defectPayload?.items ?? [];
+        setDefectClasses(items);
+
+        const names = items
+          .map((item: any) => item.desc || item.name || item.tag)
+          .filter((name: any): name is string => Boolean(name));
 
         if (names.length > 0) {
           setAvailableDefectTypes(names);
@@ -148,7 +151,7 @@ export default function App() {
           });
           const toHex = (num: number) => num.toString(16).padStart(2, '0');
           const accentMap = { ...defectAccentColors };
-          res.items.forEach(item => {
+          items.forEach((item: any) => {
             const key = item.desc || item.name || item.tag;
             if (!key) return;
             const { red, green, blue } = item.color;
@@ -156,12 +159,14 @@ export default function App() {
           });
           setDefectAccentMap(accentMap);
         }
+
+        // 目前 tile 配置仅由后端告知最大层级和默认瓦片尺寸，前端内部逻辑已保持一致。
       } catch (error) {
-        console.warn('⚠️ 加载缺陷字典失败:', error);
+        console.warn('⚠️ 加载全局 Meta 失败:', error);
       }
     };
 
-    loadDefectClasses();
+    loadGlobalMeta();
     return () => {
       cancelled = true;
     };

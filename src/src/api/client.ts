@@ -246,6 +246,39 @@ export function getTileImageUrl(params: {
 }
 
 /**
+ * 获取全局 Meta 信息（缺陷字典 + 瓦片配置等）
+ * 用于页面刷新时一次性加载全局配置，避免单独再调 defect-classes。
+ */
+export async function getGlobalMeta(): Promise<{
+  defect_classes: any;
+  tile: { max_level: number; min_level: number; default_tile_size: number };
+}> {
+  if (env.isDevelopment()) {
+    // 开发模式：沿用原有 mock 行为，这里简单返回空对象占位
+    return {
+      defect_classes: {},
+      tile: { max_level: 2, min_level: 0, default_tile_size: 1024 },
+    };
+  }
+
+  const baseUrl = env.getApiBaseUrl();
+  const url = `${baseUrl}/ui/meta`;
+  console.log(`🌐 [生产模式] 请求全局 Meta: ${url}`);
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`加载全局 Meta 失败: ${response.status} ${response.statusText}`);
+  }
+
+  const contentType = response.headers.get("content-type");
+  if (!contentType || !contentType.includes("application/json")) {
+    throw new Error(`全局 Meta 接口返回非 JSON 数据 (Content-Type: ${contentType})`);
+  }
+
+  return response.json();
+}
+
+/**
  * 健康检查
  */
 export async function healthCheck(): Promise<HealthResponse> {

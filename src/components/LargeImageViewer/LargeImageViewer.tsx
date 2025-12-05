@@ -143,8 +143,8 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
     return () => resizeObserver.disconnect();
   }, []);
 
-  // Interactions
-  const handleWheel = useCallback((e: React.WheelEvent) => {
+  // Interactions - 使用原生 wheel 事件避免被动监听限制
+  const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
     const { minScale, maxScale } = getConstraints();
     const current = transform.current;
@@ -170,6 +170,18 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
     transform.current = { x: newX, y: newY, scale: newScale };
     setTick(t => t + 1);
   }, [getConstraints]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const wheelHandler = (event: WheelEvent) => {
+      handleWheel(event);
+    };
+    canvas.addEventListener('wheel', wheelHandler, { passive: false });
+    return () => {
+      canvas.removeEventListener('wheel', wheelHandler);
+    };
+  }, [handleWheel]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     isDragging.current = true;
@@ -268,7 +280,6 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
       <canvas
         ref={canvasRef}
         className="block touch-none cursor-move"
-        onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}

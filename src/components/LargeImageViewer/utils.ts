@@ -20,8 +20,8 @@ export const getVisibleTiles = (
   imageSize: Size,
   currentScale: number,
 ): Tile[] => {
-  // 根据缩放比计算 LOD 等级，并限制在 0~4 级之间，避免过多层级
-  const maxLevel = 4;
+  // 根据缩放比计算 LOD 等级，并限制在 0~2 级之间，仅保留 L0/L1/L2
+  const maxLevel = 2;
   let level = Math.floor(Math.log2(1 / currentScale));
   if (level < 0) {
     level = 0;
