@@ -10,7 +10,6 @@ import type {
   HealthResponse,
   SteelItem,
   DefectItem,
-  DefectClassesResponse,
   Surface,
 } from "./types";
 import * as mock from "./mock";
@@ -218,6 +217,32 @@ export async function getFrameImage(
   // 生产模式：返回真实 API 图像 URL
   const baseUrl = env.getApiBaseUrl();
   return `${baseUrl}/images/frame?surface=${surface}&seq_no=${seqNo}&image_index=${imageIndex}`;
+}
+
+/**
+ * 获取瓦片图像 URL（用于长带拼接图的分块加载）
+ */
+export function getTileImageUrl(params: {
+  surface: Surface;
+  seqNo: number;
+  level?: number;
+  tileX: number;
+  tileY: number;
+  tileSize?: number;
+  fmt?: string;
+}): string {
+  const { surface, seqNo, level = 0, tileX, tileY, tileSize = 1024, fmt = "JPEG" } = params;
+  const baseUrl = env.getApiBaseUrl();
+  return (
+    `${baseUrl}/images/tile` +
+    `?surface=${surface}` +
+    `&seq_no=${seqNo}` +
+    `&level=${level}` +
+    `&tile_x=${tileX}` +
+    `&tile_y=${tileY}` +
+    `&tile_size=${tileSize}` +
+    `&fmt=${fmt}`
+  );
 }
 
 /**

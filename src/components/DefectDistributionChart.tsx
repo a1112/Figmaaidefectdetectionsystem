@@ -1,5 +1,6 @@
 import type { Defect } from '../types/app.types';
-import type { SurfaceImageInfo } from '../src/api/types';
+import type { SurfaceImageInfo, Surface } from '../src/api/types';
+import { getTileImageUrl } from '../src/api/client';
 
 interface DefectDistributionChartProps {
   defects: Defect[];
@@ -8,6 +9,7 @@ interface DefectDistributionChartProps {
   surfaceImageInfo?: SurfaceImageInfo[] | null;
   selectedDefectId?: string | null;
   onDefectSelect?: (id: string | null) => void;
+  seqNo?: number;
 }
 
 export function DefectDistributionChart({
@@ -52,6 +54,16 @@ export function DefectDistributionChart({
   // 钢板缩略显示尺寸
   const plateWidth = 360;
   const plateHeight = 160;
+
+  const chooseTileLevel = (worldHeight: number, targetDisplayHeight: number): number => {
+    if (worldHeight <= 0 || targetDisplayHeight <= 0) {
+      return 0;
+    }
+    const ratio = worldHeight / (targetDisplayHeight * 4);
+    const raw = Math.log2(Math.max(1, ratio));
+    const level = Math.ceil(raw);
+    return Math.min(8, Math.max(0, level));
+  };
 
   const hasMeta =
     !!surfaceImageInfo &&
@@ -146,22 +158,75 @@ export function DefectDistributionChart({
     return { x: displayX, y: displayY, w: displayWidth, h: displayHeight };
   };
 
-  const renderPlate = (surf: 'top' | 'bottom', containerHeight: number) => {
+  const renderPlate = (surf: Surface, containerHeight: number) => {
     const perSurfaceHeight = containerHeight;
     const title =
       surf === 'top' ? 'TOP SURFACE' : surf === 'bottom' ? 'BOTTOM SURFACE' : 'SURFACE';
     const meta = findMetaForSurface(surf);
     const plateDefects = filteredDefects.filter(d => d.surface === surf);
 
+    const tileImages: JSX.Element[] = [];
+
+    if (meta && typeof (seqNo as number | undefined) === 'number') {
+      const worldWidth = meta.image_width;
+      const worldHeight = meta.frame_count * meta.image_height;
+      const level = chooseTileLevel(worldHeight, perSurfaceHeight);
+      const scaledWidth = worldWidth / (2 ** level);
+      const scaledHeight = worldHeight / (2 ** level);
+      const tileSize = 512;
+      const tilesX = Math.max(1, Math.ceil(scaledWidth / tileSize));
+      const tilesY = Math.max(1, Math.ceil(scaledHeight / tileSize));
+
+      const scaleX = plateWidth / scaledWidth;
+      const scaleY = perSurfaceHeight / scaledHeight;
+
+      for (let tileY = 0; tileY < tilesY; tileY += 1) {
+        for (let tileX = 0; tileX < tilesX; tileX += 1) {
+          const url = getTileImageUrl({
+            surface: surf,
+            seqNo: seqNo as number,
+            level,
+            tileX,
+            tileY,
+            tileSize,
+          });
+
+          const left = tileX * tileSize * scaleX;
+          const top = tileY * tileSize * scaleY;
+          const width = tileSize * scaleX;
+          const height = tileSize * scaleY;
+
+          tileImages.push(
+            <img
+              key={`tile-${surf}-${tileX}-${tileY}`}
+              src={url}
+              alt="mosaic-tile"
+              className="absolute"
+              style={{
+                left,
+                top,
+                width,
+                height,
+                objectFit: 'fill',
+              }}
+            />,
+          );
+        }
+      }
+    }
+
     return (
       <div
         key={surf}
-        className="relative border-2 border-foreground/60 bg-muted/5"
+        className="relative border-2 border-foreground/60 bg-muted/5 overflow-hidden"
         style={{ width: plateWidth, height: perSurfaceHeight }}
       >
         <div className="absolute -top-4 left-0 right-0 text-center text-[10px] text-muted-foreground/50 font-mono">
           {title}
         </div>
+
+        {/* 瓦片背景 */}
+        {tileImages}
 
         {/* 参考网格 */}
         <div className="absolute inset-0 opacity-10">

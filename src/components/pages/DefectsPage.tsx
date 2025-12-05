@@ -204,6 +204,7 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
                   imageViewMode={imageViewMode}
                   selectedDefectId={selectedDefectId}
                   onDefectSelect={setSelectedDefectId}
+                  surfaceImageInfo={surfaceImageInfo}
                 />
               ) : (
                 <div className="text-xs text-muted-foreground">
@@ -221,6 +222,7 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
               surfaceImageInfo={surfaceImageInfo}
               selectedDefectId={selectedDefectId}
               onDefectSelect={setSelectedDefectId}
+              seqNo={selectedPlate ? parseInt(selectedPlate.serialNumber, 10) : undefined}
             />
           </div>
         </div>

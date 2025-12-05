@@ -12,7 +12,7 @@ import { BackendErrorPanel } from './components/BackendErrorPanel';
 import { DefectImageView } from './components/DefectImageView';
 // 引入 API 客户端和环境配置
 import { env } from './src/config/env';
-import { listSteels, searchSteels, getDefectsRaw, getDefectClasses } from './src/api/client';
+import { listSteels, searchSteels, getDefectsRaw, getDefectClasses, getTileImageUrl } from './src/api/client';
 import type { SteelItem, DefectItem, DefectClassItem, SurfaceImageInfo } from './src/api/types';
 import type { Defect, DetectionRecord, SteelPlate } from './types/app.types';
 import { defectTypes, defectColors, defectAccentColors, generateRandomDefects } from './utils/defects';
@@ -62,12 +62,18 @@ import { ReportsPage } from './components/pages/ReportsPage';
 import { SettingsPage } from './components/pages/SettingsPage';
 import { DefectsPage } from './components/pages/DefectsPage';
 import { ImagesPage } from './components/pages/ImagesPage';
+import { LargeImageViewer } from './components/LargeImageViewer/LargeImageViewer';
+import type { Tile } from './components/LargeImageViewer/utils';
+
+// 简单的瓦片图像缓存，避免重复加载同一瓦片
+const tileImageCache = new Map<string, HTMLImageElement>();
+const tileImageLoading = new Set<string>();
 
 export default function App() {
   const [currentImage, setCurrentImage] = useState<string | null>(null);
   const [isDetecting, setIsDetecting] = useState(false);
   const [detectionResult, setDetectionResult] = useState<DetectionRecord | null>(null);
-  const [history, setHistory] = useState<DetectionRecord[]>([]);
+    const [history, setHistory] = useState<DetectionRecord[]>([]);
   const [activeTab, setActiveTab] = useState<'defects' | 'images' | 'plates' | 'reports' | 'settings'>('defects');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [showPlatesPanel, setShowPlatesPanel] = useState(false); // 手机模式：是否显示钢板面板
@@ -111,7 +117,7 @@ export default function App() {
     window.addEventListener('resize', checkMobileDevice);
     return () => window.removeEventListener('resize', checkMobileDevice);
   }, []);
-  
+
   // 应用主题到 document.documentElement
   useEffect(() => {
     if (theme === 'dark') {
@@ -333,30 +339,30 @@ export default function App() {
     return true;
   });
 
-  // 当选中钢板时，加载该钢板的缺陷数据
-  useEffect(() => {
-    if (!selectedPlateId) {
+    // 当选中钢板时，加载该钢板的缺陷数据
+    useEffect(() => {
+      if (!selectedPlateId) {
         setPlateDefects([]);
         setSurfaceImageInfo(null);
         setDetectionResult(null);
         return;
-    }
+      }
 
-    const loadPlateDefects = async () => {
-      setIsLoadingDefects(true);
-      
-      try {
-        // 从 plateId 中提取 seq_no（去除前导零）
-        const selectedPlate = steelPlates.find(p => p.plateId === selectedPlateId);
-        if (!selectedPlate) {
-          console.warn('未找到选中的钢板:', selectedPlateId);
-          setPlateDefects([]);
-          setSelectedPlateId(null);
-          setDetectionResult(null);
-          return;
-        }
+      const loadPlateDefects = async () => {
+        setIsLoadingDefects(true);
 
-        const seqNo = parseInt(selectedPlate.serialNumber, 10);
+        try {
+          // 从 plateId 中提取 seq_no（去除前导零）
+          const selectedPlate = steelPlates.find(p => p.plateId === selectedPlateId);
+          if (!selectedPlate) {
+            console.warn('未找到选中的钢板:', selectedPlateId);
+            setPlateDefects([]);
+            setSelectedPlateId(null);
+            setDetectionResult(null);
+            return;
+          }
+
+          const seqNo = parseInt(selectedPlate.serialNumber, 10);
           console.log(`🔍 加载钢板 ${selectedPlateId} (seq_no: ${seqNo}) 的缺陷数据...`);
 
           const response = await getDefectsRaw(seqNo);
@@ -378,10 +384,10 @@ export default function App() {
             id: item.id,
             type: item.type,
             severity: item.severity,
-          x: item.x,
-          y: item.y,
-          width: item.width,
-          height: item.height,
+            x: item.x,
+            y: item.y,
+            width: item.width,
+            height: item.height,
             confidence: item.confidence,
             surface: item.surface,
             imageIndex: item.imageIndex,
@@ -394,13 +400,57 @@ export default function App() {
           console.error('❌ 加载缺陷数据失败:', error);
           setPlateDefects([]);
           setSurfaceImageInfo(null);
-      } finally {
-        setIsLoadingDefects(false);
-      }
-    };
+        } finally {
+          setIsLoadingDefects(false);
+        }
+      };
 
-    loadPlateDefects();
-  }, [selectedPlateId, steelPlates]);
+      loadPlateDefects();
+    }, [selectedPlateId, steelPlates]);
+
+    // 预取前后卷的缺陷数据和首块瓦片，以加速分布图加载
+    useEffect(() => {
+      if (!selectedPlateId || steelPlates.length === 0) {
+        return;
+      }
+
+      const index = steelPlates.findIndex(p => p.plateId === selectedPlateId);
+      if (index === -1) {
+        return;
+      }
+
+      const neighbors: SteelPlate[] = [];
+      if (index > 0) {
+        neighbors.push(steelPlates[index - 1]);
+      }
+      if (index < steelPlates.length - 1) {
+        neighbors.push(steelPlates[index + 1]);
+      }
+
+      neighbors.forEach(plate => {
+        const seqNo = parseInt(plate.serialNumber, 10);
+        getDefectsRaw(seqNo)
+          .then(response => {
+            // 使用返回的 surface_images 预热每个表面的第一块瓦片
+            const metas = response.surface_images ?? [];
+            metas.forEach(meta => {
+              const url = getTileImageUrl({
+                surface: meta.surface,
+                seqNo,
+                level: 0,
+                tileX: 0,
+                tileY: 0,
+                tileSize: 512,
+              });
+              const img = new Image();
+              img.src = url;
+            });
+          })
+          .catch(() => {
+            // 预取失败忽略，不影响主流程
+          });
+      });
+    }, [selectedPlateId, steelPlates]);
 
   const handleImageUpload = (imageUrl: string) => {
     setCurrentImage(imageUrl);
@@ -948,104 +998,182 @@ export default function App() {
                 </div>
             )}
 
-            {!showPlatesPanel && activeTab === 'images' && false && (
-              <div className="flex-1 min-h-0 flex flex-col bg-card border border-border">
-                {/* 图像显示区域 */}
-                <div className="flex-1 relative min-h-0 bg-black/40">
+            {/* 图像 Tab：使用 LargeImageViewer 作为长带地图视图容器 */}
+            {!showPlatesPanel && activeTab === 'images' && (
+              <div className="h-full flex flex-col gap-2">
+                <div className="text-xs text-muted-foreground">
+                  钢板长带虚拟图像（滚轮缩放，拖动平移）
+                </div>
+                <div className="flex-1 min-h-0 bg-card border border-border relative">
                   {(() => {
-                    // 优先显示上传的图像
-                    if (currentImage) {
+                    const selectedPlate = selectedPlateId
+                      ? steelPlates.find(p => p.plateId === selectedPlateId)
+                      : undefined;
+                    if (!selectedPlate) {
                       return (
-                        <DetectionResult
-                          imageUrl={currentImage}
-                          defects={filteredDefectsByControls}
-                          isDetecting={isDetecting}
-                        />
+                        <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
+                          请选择左侧钢板以查看长带图像
+                        </div>
                       );
                     }
-                    
-                    // 根据选中的钢板ID查找对应的历史记录
-                    if (selectedPlateId) {
-                      const plateRecord = history.find(h => h.id.includes(selectedPlateId));
-                      
-                      if (plateRecord) {
-                        return (
-                          <DetectionResult
-                            imageUrl={plateRecord.fullImageUrl}
-                            defects={plateRecord.defects.filter(d => 
-                              (surfaceFilter === 'all' || d.surface === surfaceFilter) &&
-                              selectedDefectTypes.includes(d.type)
-                            )}
-                            isDetecting={false}
-                          />
-                        );
-                      }
+                    if (!surfaceImageInfo || surfaceImageInfo.length === 0) {
+                      return (
+                        <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
+                          当前钢板尚无图像元数据（surface_images 为空）
+                        </div>
+                      );
                     }
-                    
-                    // 无选中钢板时的提示
+
+                    const topMeta = surfaceImageInfo.find(info => info.surface === 'top');
+                    const bottomMeta = surfaceImageInfo.find(info => info.surface === 'bottom');
+                    if (!topMeta && !bottomMeta) {
+                      return (
+                        <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
+                          当前钢板上下表面都没有图像元数据
+                        </div>
+                      );
+                    }
+
+                    const toRotatedSize = (meta: SurfaceImageInfo | undefined) => {
+                      if (!meta) {
+                        return { width: 0, height: 0 };
+                      }
+                      const imgW = meta.image_width || 1;
+                      const imgH = meta.image_height || 1;
+                      const frameCount = meta.frame_count || 1;
+                      const mosaicW = imgW;
+                      const mosaicH = frameCount * imgH;
+                      // 逆时针 90°：高变宽，宽变高
+                      return { width: mosaicH, height: mosaicW };
+                    };
+
+                    const topRot = toRotatedSize(topMeta);
+                    const bottomRot = toRotatedSize(bottomMeta);
+                    const gap = topRot.height > 0 && bottomRot.height > 0 ? 100 : 0;
+
+                    const worldLength = Math.max(topRot.width, bottomRot.width);
+                    const worldWidth = topRot.height + bottomRot.height + gap;
+
+                    if (worldLength <= 0 || worldWidth <= 0) {
+                      return (
+                        <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
+                          图像尺寸为 0，无法构建长带视图
+                        </div>
+                      );
+                    }
+
+                    const seqNo = Number(selectedPlate.serialNumber);
+                    const baseTileSize = 1024;
+
+                    const renderTile = (
+                      ctx: CanvasRenderingContext2D,
+                      tile: Tile,
+                      tileSize: number,
+                      scale: number
+                    ) => {
+                      const virtualTileSize = tileSize * Math.pow(2, tile.level);
+
+                      // 计算瓦片中心的世界坐标，用于判断所在表面或间隙
+                      const centerY = tile.y + tile.height / 2;
+
+                      let surface: 'top' | 'bottom' | null = null;
+                      let yOffset = 0;
+                      let surfaceWidth = 0;
+                      let surfaceHeight = 0;
+
+                      if (centerY < topRot.height && topRot.height > 0) {
+                        surface = 'top';
+                        yOffset = 0;
+                        surfaceWidth = topRot.width;
+                        surfaceHeight = topRot.height;
+                      } else if (centerY >= topRot.height + gap && bottomRot.height > 0) {
+                        surface = 'bottom';
+                        yOffset = topRot.height + gap;
+                        surfaceWidth = bottomRot.width;
+                        surfaceHeight = bottomRot.height;
+                      } else {
+                        // 间隙区域：仅绘制占位网格，不请求后端瓦片
+                        ctx.fillStyle = '#f4f4f4';
+                        ctx.fillRect(tile.x, tile.y, tile.width, tile.height);
+                        ctx.strokeStyle = '#ddd';
+                        ctx.lineWidth = 1 / scale;
+                        ctx.strokeRect(tile.x, tile.y, tile.width, tile.height);
+                        return;
+                      }
+
+                      // 超出该表面有效宽高的瓦片不请求（避免加载多余图像）
+                      if (tile.x >= surfaceWidth) {
+                        return;
+                      }
+
+                      const mosaicY = tile.y - yOffset;
+                      if (mosaicY >= surfaceHeight || mosaicY + tile.height <= 0) {
+                        return;
+                      }
+
+                      const tileX = Math.floor(tile.x / virtualTileSize);
+                      const tileY = Math.floor(mosaicY / virtualTileSize);
+
+                      if (tileX < 0 || tileY < 0) {
+                        return;
+                      }
+
+                      const url = getTileImageUrl({
+                        surface,
+                        seqNo,
+                        level: tile.level,
+                        tileX,
+                        tileY,
+                        tileSize,
+                        fmt: 'JPEG',
+                      });
+
+                      const cacheKey = `${surface}-${seqNo}-${tile.level}-${tileX}-${tileY}-${tileSize}`;
+                      const cached = tileImageCache.get(cacheKey);
+
+                      if (cached && cached.complete) {
+                        ctx.drawImage(cached, tile.x, tile.y, tile.width, tile.height);
+
+                        // 绘制瓦片边框用于调试
+                        ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+                        ctx.lineWidth = 1 / scale;
+                        ctx.strokeRect(tile.x, tile.y, tile.width, tile.height);
+                        return;
+                      }
+
+                      if (!tileImageLoading.has(cacheKey)) {
+                        tileImageLoading.add(cacheKey);
+                        const img = new Image();
+                        img.src = url;
+                        img.onload = () => {
+                          tileImageCache.set(cacheKey, img);
+                          tileImageLoading.delete(cacheKey);
+                        };
+                        img.onerror = () => {
+                          tileImageLoading.delete(cacheKey);
+                        };
+                      }
+
+                      // 尚未加载完成时，绘制占位网格
+                      ctx.fillStyle = '#ffffff';
+                      ctx.fillRect(tile.x, tile.y, tile.width, tile.height);
+
+                      ctx.strokeStyle = '#ccc';
+                      ctx.lineWidth = 1 / scale;
+                      ctx.strokeRect(tile.x, tile.y, tile.width, tile.height);
+                    };
+
                     return (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
-                        <Database className="w-16 h-16 mb-4 opacity-50" />
-                        <p className="text-sm mb-2">请选择要查看的钢板</p>
-                        <p className="text-xs opacity-70">点击左上角数据库图标打开钢板列表</p>
-                        <p className="text-xs opacity-70 mt-1">或使用顶部工具栏上传新图像</p>
-                      </div>
+                      <LargeImageViewer
+                        imageWidth={worldLength}
+                        imageHeight={worldWidth}
+                        tileSize={baseTileSize}
+                        className="bg-slate-50"
+                        renderTile={renderTile}
+                      />
                     );
                   })()}
                 </div>
-                
-                {/* 底部信息栏 */}
-                {(currentImage || selectedPlateId) && (() => {
-                  const plateRecord = selectedPlateId ? history.find(h => h.id.includes(selectedPlateId)) : null;
-                  const showInfo = currentImage || plateRecord;
-                  
-                  if (!showInfo) return null;
-                  
-                  return (
-                    <div className="p-3 border-t border-border bg-muted/20 shrink-0">
-                      <div className="grid grid-cols-5 gap-4 text-xs">
-                        <div>
-                          <p className="text-muted-foreground mb-1">钢板号</p>
-                          <p className="font-mono truncate">
-                            {currentImage ? (selectedPlateId || '上��图像') : plateRecord?.id}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground mb-1">检测时间</p>
-                          <p className="font-mono text-[10px]">
-                            {currentImage ? new Date().toLocaleString('zh-CN') : plateRecord?.timestamp.toLocaleString('zh-CN')}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground mb-1">状态</p>
-                          <span className={`text-xs px-1.5 py-0.5 border inline-block ${
-                            currentImage 
-                              ? 'text-blue-500 border-blue-500/30 bg-blue-500/10'
-                              : plateRecord?.status === 'pass' ? 'text-green-500 border-green-500/30 bg-green-500/10' : 
-                              plateRecord?.status === 'fail' ? 'text-red-500 border-red-500/30 bg-red-500/10' : 
-                              'text-yellow-500 border-yellow-500/30 bg-yellow-500/10'
-                          }`}>
-                            {currentImage ? '已上传' : plateRecord?.status === 'pass' ? '合格' : plateRecord?.status === 'fail' ? '不合格' : '待检'}
-                          </span>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground mb-1">缺陷总数</p>
-                          <p className="font-mono">
-                            {currentImage || detectionResult
-                              ? activeDefects.length
-                              : (plateDefects.length || plateRecord?.defects.length || 0)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground mb-1">当前过滤</p>
-                          <p className="font-mono text-[10px]">
-                            {surfaceFilter === 'all' ? '全部表面' : surfaceFilter === 'top' ? '上表面' : '下表面'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
               </div>
             )}
 
