@@ -12,8 +12,8 @@ import { BackendErrorPanel } from './components/BackendErrorPanel';
 import { DefectImageView } from './components/DefectImageView';
 // 引入 API 客户端和环境配置
 import { env } from './src/config/env';
-import { listSteels, searchSteels, getDefects, getDefectClasses } from './src/api/client';
-import type { SteelItem, DefectItem, DefectClassItem } from './src/api/types';
+import { listSteels, searchSteels, getDefectsRaw, getDefectClasses } from './src/api/client';
+import type { SteelItem, DefectItem, DefectClassItem, SurfaceImageInfo } from './src/api/types';
 import type { Defect, DetectionRecord, SteelPlate } from './types/app.types';
 import { defectTypes, defectColors, defectAccentColors, generateRandomDefects } from './utils/defects';
 import { getLevelText } from './utils/steelPlates';
@@ -176,6 +176,7 @@ export default function App() {
   const [steelPlates, setSteelPlates] = useState<SteelPlate[]>([]);
   const [isLoadingSteels, setIsLoadingSteels] = useState(false);
   const [steelsLoadError, setSteelsLoadError] = useState<string | null>(null);
+  const [surfaceImageInfo, setSurfaceImageInfo] = useState<SurfaceImageInfo[] | null>(null);
 
   // 加载钢板列表的函数（提取出来以便重用）
   const loadSteelPlates = async (
@@ -335,9 +336,10 @@ export default function App() {
   // 当选中钢板时，加载该钢板的缺陷数据
   useEffect(() => {
     if (!selectedPlateId) {
-      setPlateDefects([]);
-      setDetectionResult(null);
-      return;
+        setPlateDefects([]);
+        setSurfaceImageInfo(null);
+        setDetectionResult(null);
+        return;
     }
 
     const loadPlateDefects = async () => {
@@ -355,29 +357,43 @@ export default function App() {
         }
 
         const seqNo = parseInt(selectedPlate.serialNumber, 10);
-        console.log(`🔍 加载钢板 ${selectedPlateId} (seq_no: ${seqNo}) 的缺陷数据...`);
-        
-        const defectItems: DefectItem[] = await getDefects(seqNo);
-        
-        // 将 DefectItem 转换为 Defect 格式
-        const mapped: Defect[] = defectItems.map(item => ({
-          id: item.id,
-          type: item.type,
-          severity: item.severity,
+          console.log(`🔍 加载钢板 ${selectedPlateId} (seq_no: ${seqNo}) 的缺陷数据...`);
+
+          const response = await getDefectsRaw(seqNo);
+          const defectItems: DefectItem[] = response.defects.map(item => ({
+            id: item.defect_id,
+            type: item.defect_type as any,
+            severity: item.severity,
+            x: item.x,
+            y: item.y,
+            width: item.width,
+            height: item.height,
+            confidence: item.confidence,
+            surface: item.surface,
+            imageIndex: item.image_index,
+          }));
+
+          // 将 DefectItem 转换为 Defect 格式
+          const mapped: Defect[] = defectItems.map(item => ({
+            id: item.id,
+            type: item.type,
+            severity: item.severity,
           x: item.x,
           y: item.y,
           width: item.width,
           height: item.height,
-          confidence: item.confidence,
-          surface: item.surface,
-          imageIndex: item.imageIndex,
-        }));
-        
-        setPlateDefects(mapped);
-        console.log(`✅ 成功加载 ${mapped.length} 个缺陷 (${env.getMode()} 模式)`);
-      } catch (error) {
-        console.error('❌ 加载缺陷数据失败:', error);
-        setPlateDefects([]);
+            confidence: item.confidence,
+            surface: item.surface,
+            imageIndex: item.imageIndex,
+          }));
+
+          setPlateDefects(mapped);
+          setSurfaceImageInfo(response.surface_images ?? null);
+          console.log(`✅ 成功加载 ${mapped.length} 个缺陷 (${env.getMode()} 模式)`);
+        } catch (error) {
+          console.error('❌ 加载缺陷数据失败:', error);
+          setPlateDefects([]);
+          setSurfaceImageInfo(null);
       } finally {
         setIsLoadingDefects(false);
       }
@@ -1034,32 +1050,33 @@ export default function App() {
             )}
 
             {!showPlatesPanel && activeTab === 'defects' && (
-              <DefectsPage
-                isMobileDevice={isMobileDevice}
-                currentImage={currentImage}
-                isDetecting={isDetecting}
-                detectionResult={detectionResult}
-                history={history}
-                steelPlates={steelPlates}
-                filteredSteelPlates={filteredSteelPlates}
-                selectedPlateId={selectedPlateId}
-                plateDefects={plateDefects}
-                surfaceFilter={surfaceFilter}
-                setSurfaceFilter={setSurfaceFilter}
-                availableDefectTypes={availableDefectTypes}
-                selectedDefectTypes={selectedDefectTypes}
-                setSelectedDefectTypes={setSelectedDefectTypes}
-                defectColors={defectColorMap}
-                defectAccentColors={defectAccentMap}
-                imageViewMode={imageViewMode}
-                setImageViewMode={setImageViewMode}
-                manualConfirmStatus={manualConfirmStatus}
-                setManualConfirmStatus={setManualConfirmStatus}
-                selectedDefectId={selectedDefectId}
-                setSelectedDefectId={setSelectedDefectId}
-                searchCriteria={searchCriteria}
-                filterCriteria={filterCriteria}
-              />
+            <DefectsPage
+              isMobileDevice={isMobileDevice}
+              currentImage={currentImage}
+              isDetecting={isDetecting}
+              detectionResult={detectionResult}
+              history={history}
+              steelPlates={steelPlates}
+              filteredSteelPlates={filteredSteelPlates}
+              selectedPlateId={selectedPlateId}
+              plateDefects={plateDefects}
+              surfaceFilter={surfaceFilter}
+              setSurfaceFilter={setSurfaceFilter}
+              availableDefectTypes={availableDefectTypes}
+              selectedDefectTypes={selectedDefectTypes}
+              setSelectedDefectTypes={setSelectedDefectTypes}
+              defectColors={defectColorMap}
+              defectAccentColors={defectAccentMap}
+              imageViewMode={imageViewMode}
+              setImageViewMode={setImageViewMode}
+              manualConfirmStatus={manualConfirmStatus}
+              setManualConfirmStatus={setManualConfirmStatus}
+              selectedDefectId={selectedDefectId}
+              setSelectedDefectId={setSelectedDefectId}
+              searchCriteria={searchCriteria}
+              filterCriteria={filterCriteria}
+              surfaceImageInfo={surfaceImageInfo}
+            />
             )}
 
             {!showPlatesPanel && activeTab === 'reports' && (

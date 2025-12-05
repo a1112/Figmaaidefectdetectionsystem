@@ -10,6 +10,7 @@ import type {
   ImageViewMode,
   ManualConfirmStatus,
 } from '../../types/app.types';
+import type { SurfaceImageInfo } from '../../src/api/types';
 import type { SearchCriteria, FilterCriteria } from '../SearchDialog';
 
 interface DefectsPageProps {
@@ -22,6 +23,7 @@ interface DefectsPageProps {
   filteredSteelPlates: SteelPlate[];
   selectedPlateId: string | null;
   plateDefects: Defect[];
+  surfaceImageInfo: SurfaceImageInfo[] | null;
   surfaceFilter: SurfaceFilter;
   setSurfaceFilter: (filter: SurfaceFilter) => void;
   availableDefectTypes: string[];
@@ -58,6 +60,7 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
   filteredSteelPlates,
   selectedPlateId,
   plateDefects,
+  surfaceImageInfo,
   surfaceFilter,
   setSurfaceFilter,
   availableDefectTypes,
@@ -90,6 +93,11 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
     d => surfaceFilter === 'all' || d.surface === surfaceFilter,
   );
 
+  const selectedDefect =
+    selectedDefectId && filteredDefectsByControls.length > 0
+      ? filteredDefectsByControls.find(d => d.id === selectedDefectId) || null
+      : null;
+
   return (
     <div className="h-full flex flex-col space-y-4">
       {/* 主区域：左侧图像 / 右侧统计+列表 */}
@@ -97,10 +105,10 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
         {/* 左侧：图像区域 */}
         <div className="lg:col-span-2 flex flex-col gap-4 min-h-0">
           <div className="flex-1 bg-card border border-border p-1 relative min-h-[260px] flex flex-col">
-            {/* 顶部标签栏：视图模式 + 人工确认状态 */}
-            <div className="absolute top-0 left-0 right-0 px-2 py-1 bg-gradient-to-r from-primary to-primary/80 text-primary-foreground text-xs font-bold z-10 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1 bg-black/20 rounded p-0.5">
+            {/* 顶部标签栏：视图模式 + 人工确认状态 + 选中缺陷信息 */}
+            <div className="absolute top-0 left-0 right-0 px-2 py-1 bg-gradient-to-r from-primary to-primary/80 text-primary-foreground text-[10px] font-bold z-10 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <div className="flex items-center gap-1 bg-black/20 rounded p-0.5 shrink-0">
                   <button
                     onClick={() => setImageViewMode('full')}
                     className={`px-2 py-0.5 text-[10px] rounded transition-colors ${
@@ -154,6 +162,26 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
                     </span>
                   </div>
                 )}
+
+                {selectedDefect && (
+                  <div className="hidden md:flex flex-col md:flex-row md:items-center gap-1 md:gap-2 bg-black/30 rounded px-2 py-0.5 border border-white/10 text-[10px] font-normal min-w-0">
+                    <span className="font-semibold truncate">
+                      {selectedDefect.type}
+                    </span>
+                    <span className="uppercase text-[9px] px-1.5 py-0.5 rounded bg-primary/90 text-primary-foreground">
+                      {selectedDefect.severity}
+                    </span>
+                    <span className="opacity-80 whitespace-nowrap">
+                      ({selectedDefect.x.toFixed(0)}, {selectedDefect.y.toFixed(0)})
+                    </span>
+                    <span className="opacity-80 whitespace-nowrap">
+                      {selectedDefect.width.toFixed(0)}×{selectedDefect.height.toFixed(0)}
+                    </span>
+                    <span className="opacity-80 whitespace-nowrap">
+                      {Math.round(selectedDefect.confidence * 100)}%
+                    </span>
+                  </div>
+                )}
               </div>
 
               <span className="text-[10px] opacity-80 flex-1 text-center truncate">
@@ -187,9 +215,12 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
 
           <div className="bg-card border border-border p-2">
             <DefectDistributionChart
-              defects={activeDefects}
+              defects={filteredDefectsByControls}
               surface={surfaceFilter}
               defectColors={defectColors}
+              surfaceImageInfo={surfaceImageInfo}
+              selectedDefectId={selectedDefectId}
+              onDefectSelect={setSelectedDefectId}
             />
           </div>
         </div>
@@ -207,6 +238,8 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
                 isDetecting={isDetecting}
                 surface={surfaceFilter}
                 defectColors={defectColors}
+                selectedDefectId={selectedDefectId}
+                onDefectSelect={setSelectedDefectId}
               />
             </div>
           </div>

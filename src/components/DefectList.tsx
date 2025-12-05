@@ -6,9 +6,18 @@ interface DefectListProps {
   isDetecting: boolean;
   surface: 'all' | 'top' | 'bottom';
   defectColors?: { [key: string]: { bg: string; border: string; text: string } };
+  selectedDefectId?: string | null;
+  onDefectSelect?: (id: string | null) => void;
 }
 
-export function DefectList({ defects, isDetecting, surface, defectColors }: DefectListProps) {
+export function DefectList({
+  defects,
+  isDetecting,
+  surface,
+  defectColors,
+  selectedDefectId,
+  onDefectSelect,
+}: DefectListProps) {
   const getSeverityColor = (severity: string) => {
     switch (severity) {
       case 'high':
@@ -80,10 +89,14 @@ export function DefectList({ defects, isDetecting, surface, defectColors }: Defe
         <div className="space-y-1">
           {defects.map((defect, index) => {
             const typeColor = getDefectColor(defect.type);
+            const isSelected = selectedDefectId === defect.id;
             return (
               <div
-                key={defect.id}
-                className="flex items-center gap-2 px-2 py-1.5 border border-border bg-card hover:bg-accent/50 transition-colors text-xs"
+                key={`${defect.id}-${index}`}
+                onClick={() => onDefectSelect?.(defect.id)}
+                className={`flex items-center gap-2 px-2 py-1.5 border bg-card hover:bg-accent/50 transition-colors text-xs cursor-pointer ${
+                  isSelected ? 'border-primary bg-primary/10' : 'border-border'
+                }`}
               >
                 <span className="text-muted-foreground font-mono w-8">#{index + 1}</span>
                 <span className={`font-medium flex-1 ${typeColor.text}`}>{defect.type}</span>

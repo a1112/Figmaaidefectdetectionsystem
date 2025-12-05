@@ -12,16 +12,11 @@ import type {
   DefectItem,
   DefectClassesResponse,
   Surface,
-  mapSteelItem,
-  mapDefectItem,
 } from "./types";
 import * as mock from "./mock";
 
 // 导入映射函数
-import {
-  mapSteelItem as mapSteel,
-  mapDefectItem as mapDefect,
-} from "./types";
+import { mapSteelItem as mapSteel, mapDefectItem as mapDefect } from "./types";
 
 export interface SteelSearchParams {
   limit?: number;
@@ -142,15 +137,26 @@ export async function searchSteels(
 }
 
 /**
- * 获取指定钢板的缺陷列表
+ * 获取指定钢板的缺陷列表（仅缺陷数据，前端 DefectItem）
  */
 export async function getDefects(
   seqNo: number,
 ): Promise<DefectItem[]> {
+  const data = await getDefectsRaw(seqNo);
+  return data.defects.map(mapDefect);
+}
+
+/**
+ * 获取指定钢板的缺陷列表（保留后端原始字段和图像元信息）
+ * 对应后端 /api/ui/defects/{seq_no} 响应。
+ */
+export async function getDefectsRaw(
+  seqNo: number,
+): Promise<DefectResponse> {
   // 开发模式：使用 Mock 数据
   if (env.isDevelopment()) {
     const response = await mock.mockGetDefects(seqNo);
-    return response.defects.map(mapDefect);
+    return response;
   }
 
   // 生产模式：调用真实 API
@@ -180,14 +186,14 @@ export async function getDefects(
     }
 
     const data: DefectResponse = await response.json();
-    return data.defects.map(mapDefect);
+    return data;
   } catch (error) {
     console.error("❌ 加载缺陷数据失败:", error);
     
     if (error instanceof SyntaxError && error.message.includes("JSON")) {
       throw new Error("后端返回了无效的响应，请确保后端服务器正在运行");
     }
-    
+
     throw error;
   }
 }

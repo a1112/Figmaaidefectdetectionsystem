@@ -12,7 +12,7 @@ export interface Defect {
   height: number;
   confidence: number;
   surface: Surface; // 钢板表面：上表面或下表面
-  imageIndex?: number; // 图像索引（从API获取）
+  imageIndex?: number; // 图像索引（从 API 获取，用于分布图定位）
 }
 
 export interface DetectionRecord {

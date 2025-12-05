@@ -111,13 +111,12 @@ export function DefectImageView({
             className="max-w-full max-h-full object-contain"
             onError={() => setImageError('图像加载失败')}
           />
-          {/* TODO: 在图像上绘制缺陷框 */}
           <svg
             className="absolute top-0 left-0 w-full h-full pointer-events-none"
             style={{ mixBlendMode: 'difference' }}
           >
-            {defects.map((defect) => (
-              <g key={defect.id}>
+            {defects.map((defect, index) => (
+              <g key={`${defect.id}-${index}`}>
                 <rect
                   x={`${defect.x}%`}
                   y={`${defect.y}%`}

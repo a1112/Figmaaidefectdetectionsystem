@@ -74,6 +74,16 @@ export type Surface = 'top' | 'bottom';
 export type Severity = 'low' | 'medium' | 'high';
 
 /**
+ * 按表面统计的图像元信息（来自后端 /api/ui/defects）
+ */
+export interface SurfaceImageInfo {
+  surface: Surface;
+  frame_count: number;   // 该表面可用帧数量
+  image_width: number;   // 单帧宽度（像素）
+  image_height: number;  // 单帧高度（像素）
+}
+
+/**
  * 缺陷项（后端返回）
  */
 export interface DefectItemRaw {
@@ -112,6 +122,7 @@ export interface DefectResponse {
   seq_no: number;
   defects: DefectItemRaw[];
   total_count: number;
+  surface_images?: SurfaceImageInfo[];
 }
 
 // ==================== 缺陷字典类型 ====================

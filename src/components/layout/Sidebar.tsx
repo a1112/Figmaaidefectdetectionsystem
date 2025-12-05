@@ -192,9 +192,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           </div>
         ) : (
-          filteredSteelPlates.map((plate) => (
+          filteredSteelPlates.map((plate, index) => (
           <div 
-            key={plate.plateId}
+            key={`${plate.plateId}-${plate.serialNumber}-${index}`}
             onClick={() => setSelectedPlateId(plate.plateId)}
             className={`p-1.5 border transition-all cursor-pointer ${
               selectedPlateId === plate.plateId 

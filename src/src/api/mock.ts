@@ -3,9 +3,9 @@
  * 用于开发模式，模拟后端 API 响应
  */
 
-import type { 
-  SteelListResponse, 
-  DefectResponse, 
+import type {
+  SteelListResponse,
+  DefectResponse,
   HealthResponse,
   DefectItemRaw,
   DefectItem,
@@ -14,6 +14,7 @@ import type {
   Surface,
   DefectClassesResponse,
   DefectClassItem,
+  SurfaceImageInfo,
 } from './types';
 import { DEFECT_TYPES, mapDefectItem } from './types';
 
@@ -117,11 +118,27 @@ export async function mockGetDefects(seqNo: number): Promise<DefectResponse> {
   await new Promise(resolve => setTimeout(resolve, 200 + Math.random() * 150));
   
   const defects: DefectItemRaw[] = generateMockDefectList(seqNo);
-  
+
+  const surfaceImages: SurfaceImageInfo[] = [
+    {
+      surface: 'top',
+      frame_count: 10,
+      image_width: 1024,
+      image_height: 256,
+    },
+    {
+      surface: 'bottom',
+      frame_count: 10,
+      image_width: 1024,
+      image_height: 256,
+    },
+  ];
+
   return {
     seq_no: seqNo,
     defects,
     total_count: defects.length,
+    surface_images: surfaceImages,
   };
 }
 
