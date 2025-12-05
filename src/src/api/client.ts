@@ -23,6 +23,14 @@ import {
   mapDefectItem as mapDefect,
 } from "./types";
 
+export interface SteelSearchParams {
+  limit?: number;
+  serialNumber?: string;
+  plateId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
 /**
  * 获取钢板列表
  */
@@ -91,6 +99,46 @@ export async function listSteels(
     
     throw error;
   }
+}
+
+/**
+ * 查询钢板（专用查询接口）
+ * 期望后端路径: /api/ui/steels/search
+ */
+export async function searchSteels(
+  params: SteelSearchParams,
+): Promise<SteelItem[]> {
+  const { limit = 20, serialNumber, plateId, dateFrom, dateTo } = params;
+
+  // 开发模式：共用 mock
+  if (env.isDevelopment()) {
+    const response = await mock.mockListSteels(limit);
+    return response.steels.map(mapSteel);
+  }
+
+  const query = new URLSearchParams();
+  query.set('limit', limit.toString());
+  if (serialNumber) query.set('seq_no', serialNumber);
+  if (plateId) query.set('steel_no', plateId);
+  if (dateFrom) query.set('date_from', dateFrom);
+  if (dateTo) query.set('date_to', dateTo);
+
+  const baseUrl = env.getApiBaseUrl();
+  const url = `${baseUrl}/ui/steels/search?${query.toString()}`;
+  console.log(`🌐 [生产模式] 查询钢板: ${url}`);
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`查询钢板失败: ${response.status} ${response.statusText}`);
+  }
+
+  const contentType = response.headers.get("content-type");
+  if (!contentType || !contentType.includes("application/json")) {
+    throw new Error(`钢板查询接口返回非 JSON 数据 (Content-Type: ${contentType})`);
+  }
+
+  const data: SteelListResponse = await response.json();
+  return data.steels.map(mapSteel);
 }
 
 /**

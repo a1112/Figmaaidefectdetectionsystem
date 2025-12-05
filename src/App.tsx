@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { UploadZone } from './components/UploadZone';
 import { DetectionResult } from './components/DetectionResult';
-import { StatisticsPanel } from './components/StatisticsPanel';
 import { DefectList } from './components/DefectList';
 import { DefectReport } from './components/DefectReport';
 import { DefectDistributionChart } from './components/DefectDistributionChart';
@@ -13,7 +12,7 @@ import { BackendErrorPanel } from './components/BackendErrorPanel';
 import { DefectImageView } from './components/DefectImageView';
 // 引入 API 客户端和环境配置
 import { env } from './src/config/env';
-import { listSteels, getDefects, getDefectClasses } from './src/api/client';
+import { listSteels, searchSteels, getDefects, getDefectClasses } from './src/api/client';
 import type { SteelItem, DefectItem, DefectClassItem } from './src/api/types';
 import type { Defect, DetectionRecord, SteelPlate } from './types/app.types';
 import { defectTypes, defectColors, defectAccentColors, generateRandomDefects } from './utils/defects';
@@ -54,6 +53,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from "./components/ui/dropdown-menu";
+import { TitleBar } from './components/layout/TitleBar';
+import { MobileNavBar } from './components/layout/MobileNavBar';
+import { Sidebar } from './components/layout/Sidebar';
+import { PlatesPanel } from './components/layout/PlatesPanel';
+import { StatusBar } from './components/layout/StatusBar';
+import { ReportsPage } from './components/pages/ReportsPage';
+import { SettingsPage } from './components/pages/SettingsPage';
+import { DefectsPage } from './components/pages/DefectsPage';
+import { ImagesPage } from './components/pages/ImagesPage';
 
 export default function App() {
   const [currentImage, setCurrentImage] = useState<string | null>(null);
@@ -64,7 +72,6 @@ export default function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [showPlatesPanel, setShowPlatesPanel] = useState(false); // 手机模式：是否显示钢板面板
   const [selectedPlateId, setSelectedPlateId] = useState<string | null>(null);
-  const [defectLogView, setDefectLogView] = useState<'list' | 'chart'>('list');
   const [surfaceFilter, setSurfaceFilter] = useState<'all' | 'top' | 'bottom'>('all');
   const [plateDefects, setPlateDefects] = useState<Defect[]>([]); // 当前选中钢板的缺陷
   const [isLoadingDefects, setIsLoadingDefects] = useState(false);
@@ -81,6 +88,8 @@ export default function App() {
   const [defectColorMap, setDefectColorMap] = useState(defectColors);
   const [defectAccentMap, setDefectAccentMap] = useState(defectAccentColors);
   const [defectClasses, setDefectClasses] = useState<DefectClassItem[] | null>(null);
+  const [steelLimit, setSteelLimit] = useState<number>(50);
+  const [searchLimit, setSearchLimit] = useState<number>(200);
   const searchButtonRef = useRef<HTMLButtonElement>(null);
   const filterButtonRef = useRef<HTMLButtonElement>(null);
   const diagnosticButtonRef = useRef<HTMLButtonElement>(null);
@@ -154,6 +163,14 @@ export default function App() {
   
   // 缺陷类型过滤
   const [selectedDefectTypes, setSelectedDefectTypes] = useState<string[]>(defectTypes);
+  const activeDefects = (currentImage || detectionResult)
+    ? (detectionResult?.defects || [])
+    : plateDefects;
+  const filteredDefectsByControls = activeDefects.filter(
+    (defect) =>
+      (surfaceFilter === 'all' || defect.surface === surfaceFilter) &&
+      selectedDefectTypes.includes(defect.type),
+  );
 
   // 钢板记录数据（从 API 或本地模拟数据加载）
   const [steelPlates, setSteelPlates] = useState<SteelPlate[]>([]);
@@ -161,12 +178,58 @@ export default function App() {
   const [steelsLoadError, setSteelsLoadError] = useState<string | null>(null);
 
   // 加载钢板列表的函数（提取出来以便重用）
-  const loadSteelPlates = async () => {
+  const loadSteelPlates = async (
+    criteria: SearchCriteria = searchCriteria,
+    forceLimit?: number,
+    forceSearch?: boolean,
+  ) => {
     setIsLoadingSteels(true);
     setSteelsLoadError(null);
     
     try {
-      const items: SteelItem[] = await listSteels(50);
+      const hasCriteria = Object.keys(criteria).length > 0;
+      const limitToUse = Math.max(1, Math.min(forceLimit ?? (hasCriteria ? searchLimit : steelLimit), 200));
+      const params = {
+        limit: limitToUse,
+        serialNumber: criteria.serialNumber,
+        plateId: criteria.plateId,
+        dateFrom: criteria.dateFrom,
+        dateTo: criteria.dateTo,
+      };
+
+      const applyCriteriaFilter = (items: SteelItem[]) =>
+        hasCriteria
+          ? items.filter(item => {
+              if (criteria.serialNumber && !item.serialNumber.includes(criteria.serialNumber)) {
+                return false;
+              }
+              if (criteria.plateId && !item.plateId.includes(criteria.plateId)) {
+                return false;
+              }
+              if (criteria.dateFrom && item.timestamp < new Date(criteria.dateFrom)) {
+                return false;
+              }
+              if (criteria.dateTo && item.timestamp > new Date(criteria.dateTo)) {
+                return false;
+              }
+              return true;
+            })
+          : items;
+
+      let items: SteelItem[];
+      const shouldSearch = env.isProduction() && (hasCriteria || forceSearch);
+      if (shouldSearch) {
+        try {
+          items = await searchSteels(params);
+        } catch (err) {
+          console.warn('⚠️ 查询接口不可用，回退到列表接口并前端过滤', err);
+          const fallback = await listSteels(limitToUse);
+          items = applyCriteriaFilter(fallback);
+        }
+      } else {
+        const fallback = await listSteels(limitToUse);
+        items = applyCriteriaFilter(fallback);
+      }
       
       // 将 API 返回的 SteelItem 转换为 SteelPlate 格式
       const mapped: SteelPlate[] = items.map(item => ({
@@ -180,6 +243,12 @@ export default function App() {
       }));
       
       setSteelPlates(mapped);
+      const hasSelection = selectedPlateId && mapped.some(p => p.plateId === selectedPlateId);
+      if (hasCriteria || forceSearch) {
+        setSelectedPlateId(mapped.length > 0 ? mapped[0].plateId : null);
+      } else if (!hasSelection) {
+        setSelectedPlateId(mapped.length > 0 ? mapped[0].plateId : null);
+      }
       console.log(`✅ 成功加载 ${mapped.length} 条钢板记录 (${env.getMode()} 模式)`);
       
       // 🔧 开发模式：自动选择第一个钢板并初始化历史记录
@@ -222,6 +291,19 @@ export default function App() {
     }
   };
 
+  // 查询&刷新封装
+  const handleSearch = (criteria: SearchCriteria) => {
+    setSearchCriteria(criteria);
+    const hasCriteria = Object.keys(criteria).length > 0;
+    loadSteelPlates(criteria, hasCriteria ? searchLimit : steelLimit, true);
+  };
+
+  const handleRefreshSteels = () => {
+    setSearchCriteria({});
+    setFilterCriteria({ levels: [] });
+    loadSteelPlates({}, steelLimit, false);
+  };
+
   // 初始加载钢板列表
   useEffect(() => {
     loadSteelPlates();
@@ -236,23 +318,8 @@ export default function App() {
     return () => window.removeEventListener('app_mode_change', handleModeChange);
   }, []);
 
-  // 筛选和搜索钢板列表
+  // 列表仅应用筛选条件（查询结果已由服务端决定）
   const filteredSteelPlates = steelPlates.filter(plate => {
-    // 搜索条件
-    if (searchCriteria.serialNumber && !plate.serialNumber.includes(searchCriteria.serialNumber)) {
-      return false;
-    }
-    if (searchCriteria.plateId && !plate.plateId.includes(searchCriteria.plateId)) {
-      return false;
-    }
-    if (searchCriteria.dateFrom && plate.timestamp < new Date(searchCriteria.dateFrom)) {
-      return false;
-    }
-    if (searchCriteria.dateTo && plate.timestamp > new Date(searchCriteria.dateTo)) {
-      return false;
-    }
-
-    // 筛选条件
     if (filterCriteria.levels.length > 0 && !filterCriteria.levels.includes(plate.level)) {
       return false;
     }
@@ -262,7 +329,6 @@ export default function App() {
     if (filterCriteria.defectCountMax !== undefined && plate.defectCount > filterCriteria.defectCountMax) {
       return false;
     }
-
     return true;
   });
 
@@ -270,6 +336,7 @@ export default function App() {
   useEffect(() => {
     if (!selectedPlateId) {
       setPlateDefects([]);
+      setDetectionResult(null);
       return;
     }
 
@@ -282,6 +349,8 @@ export default function App() {
         if (!selectedPlate) {
           console.warn('未找到选中的钢板:', selectedPlateId);
           setPlateDefects([]);
+          setSelectedPlateId(null);
+          setDetectionResult(null);
           return;
         }
 
@@ -370,534 +439,57 @@ export default function App() {
     <div className={`h-screen w-screen bg-background text-foreground flex flex-col overflow-hidden selection:bg-primary selection:text-primary-foreground font-mono ${theme === 'dark' ? 'dark' : ''}`}>
       {/* Custom Window Title Bar - 仅桌面端显示 */}
       {!isMobileDevice && (
-        <div className="h-10 bg-muted border-b border-border flex items-center justify-between px-4 select-none shrink-0">
-          {/* Left: Menu and Tab Buttons */}
-          <div className="flex items-center gap-3">
-          <button 
-            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className="p-1 hover:bg-accent hover:text-accent-foreground rounded-sm transition-colors"
-            title={isSidebarCollapsed ? "展开侧栏" : "折叠侧栏"}
-          >
-            {isSidebarCollapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
-          </button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="p-1 hover:bg-accent hover:text-accent-foreground rounded-sm transition-colors focus:outline-none outline-none">
-                <Menu className="w-5 h-5" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56 bg-card border-border text-foreground">
-              <DropdownMenuLabel>Main Menu</DropdownMenuLabel>
-              <DropdownMenuSeparator className="bg-border" />
-              {['FILE', 'VIEW', 'DETECTION', 'TOOLS', 'WINDOW', 'HELP'].map((item) => (
-                <DropdownMenuItem key={item} className="cursor-pointer focus:bg-accent focus:text-accent-foreground text-xs">
-                  {item}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          
-          <div className="w-px h-4 bg-border mx-1"></div>
-
-          {/* Tab Buttons - 缺陷/图像 */}
-          <button 
-            onClick={() => setActiveTab('defects')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors rounded-sm ${
-              activeTab === 'defects'
-                ? 'bg-primary/90 text-primary-foreground border border-primary/50'
-                : 'bg-muted/50 text-muted-foreground hover:bg-accent/50 hover:text-foreground border border-border'
-            }`}
-          >
-            <AlertCircle className="w-3.5 h-3.5" />
-            缺陷
-          </button>
-          
-          <button 
-            onClick={() => setActiveTab('images')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors rounded-sm ${
-              activeTab === 'images'
-                ? 'bg-primary/90 text-primary-foreground border border-primary/50'
-                : 'bg-muted/50 text-muted-foreground hover:bg-accent/50 hover:text-foreground border border-border'
-            }`}
-          >
-            <Images className="w-3.5 h-3.5" />
-            图像
-          </button>
-          </div>
-
-          {/* Center: App Title - 仅在桌面大屏显示 */}
-          <div className="hidden xl:flex items-center gap-2 flex-1 justify-center px-4">
-            <Scan className="w-5 h-5 text-primary" />
-            <span className="text-sm font-medium tracking-wider">STEEL-EYE PRO v2.0.1</span>
-          </div>
-
-          {/* Right: Status and Window Controls */}
-          <div className="flex items-center gap-4">
-            {/* 钢板导航 */}
-            {filteredSteelPlates.length > 0 && (
-              <div className="flex items-center gap-2 px-2 py-1 bg-background/50 border border-border rounded">
-                <button
-                  onClick={() => {
-                  if (filteredSteelPlates.length === 0) return;
-                  const currentIndex = filteredSteelPlates.findIndex(p => p.plateId === selectedPlateId);
-                  const prevIndex = currentIndex > 0 ? currentIndex - 1 : filteredSteelPlates.length - 1;
-                  const prevPlate = filteredSteelPlates[prevIndex];
-                  if (prevPlate) setSelectedPlateId(prevPlate.plateId);
-                }}
-                className="p-0.5 hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors rounded"
-                title="上一块钢板"
-                disabled={filteredSteelPlates.length === 0}
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <span className="text-xs font-mono font-bold text-foreground px-1">
-                  {(() => {
-                    const currentPlate = filteredSteelPlates.find(p => p.plateId === selectedPlateId) || filteredSteelPlates[0];
-                    return currentPlate?.plateId || '-';
-                  })()}
-                </span>
-                <button
-                  onClick={() => {
-                    if (filteredSteelPlates.length === 0) return;
-                    const currentIndex = filteredSteelPlates.findIndex(p => p.plateId === selectedPlateId);
-                    const nextIndex = currentIndex < filteredSteelPlates.length - 1 ? currentIndex + 1 : 0;
-                    const nextPlate = filteredSteelPlates[nextIndex];
-                    if (nextPlate) setSelectedPlateId(nextPlate.plateId);
-                  }}
-                  className="p-0.5 hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors rounded"
-                  title="下一块钢板"
-                  disabled={filteredSteelPlates.length === 0}
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-            <div className="flex items-center gap-1 px-3 py-1 bg-background/50 border border-border rounded text-xs text-muted-foreground">
-              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-              SYSTEM READY
-            </div>
-            
-            {/* 表面切换 - 缺陷和图像界面都显示 */}
-            {(activeTab === 'defects' || activeTab === 'images') && (
-              <div className="flex items-center gap-1 bg-background/50 border border-border rounded-sm p-0.5">
-              <button
-                onClick={() => setSurfaceFilter('top')}
-                className={`px-2 py-1 text-xs font-bold rounded-sm transition-colors ${
-                  surfaceFilter === 'top'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                上表
-              </button>
-              <button
-                onClick={() => setSurfaceFilter('bottom')}
-                className={`px-2 py-1 text-xs font-bold rounded-sm transition-colors ${
-                  surfaceFilter === 'bottom'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                下表
-              </button>
-              <button
-                onClick={() => setSurfaceFilter('all')}
-                className={`px-2 py-1 text-xs font-bold rounded-sm transition-colors ${
-                  surfaceFilter === 'all'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                全部
-              </button>
-              </div>
-            )}
-            
-            <div className="flex items-center gap-2">
-              {/* 功能按钮 */}
-              <button 
-                onClick={() => {
-                  setActiveTab('reports');
-                  setShowPlatesPanel(false);
-                }}
-                className="p-1.5 hover:bg-white/10 rounded transition-colors"
-                title="报表"
-              >
-                <BarChart3 className="w-4 h-4" />
-              </button>
-              <button 
-                ref={diagnosticButtonRef}
-                onClick={() => setIsDiagnosticDialogOpen(true)}
-                className="p-1.5 hover:bg-white/10 rounded transition-colors"
-                title="监控诊断"
-              >
-                <Activity className="w-4 h-4" />
-              </button>
-              <button 
-                onClick={() => {
-                  setActiveTab('settings');
-                  setShowPlatesPanel(false);
-                }}
-                className="p-1.5 hover:bg-white/10 rounded transition-colors"
-                title="系统设置"
-              >
-                <Settings className="w-4 h-4" />
-              </button>
-            
-              <div className="w-px h-4 bg-border mx-1 hidden xl:block"></div>
-              
-              {/* 窗口控制按钮 - 仅桌面版本显示 */}
-              <div className="hidden xl:flex items-center gap-2">
-                <button className="p-1.5 hover:bg-white/10 rounded"><Minus className="w-4 h-4" /></button>
-                <button className="p-1.5 hover:bg-white/10 rounded"><Maximize2 className="w-4 h-4" /></button>
-                <button className="p-1.5 hover:bg-red-500/80 rounded"><X className="w-4 h-4" /></button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <TitleBar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          isSidebarCollapsed={isSidebarCollapsed}
+          setIsSidebarCollapsed={setIsSidebarCollapsed}
+          filteredSteelPlates={filteredSteelPlates}
+          selectedPlateId={selectedPlateId}
+          setSelectedPlateId={setSelectedPlateId}
+          surfaceFilter={surfaceFilter}
+          setSurfaceFilter={setSurfaceFilter}
+          setShowPlatesPanel={setShowPlatesPanel}
+          setIsDiagnosticDialogOpen={setIsDiagnosticDialogOpen}
+          diagnosticButtonRef={diagnosticButtonRef}
+        />
       )}
       
       {/* 手机模式：顶部导航栏 */}
       {isMobileDevice && !showPlatesPanel && (
-        <div className="h-14 bg-card border-b border-border flex items-center justify-between px-2 shrink-0 gap-2">
-          {/* 左侧：钢板列表按钮 */}
-          <button
-            onClick={() => setShowPlatesPanel(true)}
-            className="p-2 bg-[rgba(23,23,23,0)] text-[rgb(0,0,0)] hover:bg-primary/80 rounded shrink-0"
-            title="钢板列表"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          
-          {/* 中间区域：缺陷/图像切换 + 钢板切换 + 表面切换 */}
-          <div className="flex items-center gap-2 flex-1 min-w-0 justify-center">
-            {/* 缺陷/图像切换 */}
-            <button
-              onClick={() => {
-                if (activeTab === 'defects') {
-                  setActiveTab('images');
-                } else if (activeTab === 'images') {
-                  setActiveTab('defects');
-                } else {
-                  setActiveTab('defects');
-                }
-              }}
-              className="flex items-center gap-1 px-2 py-1.5 bg-muted hover:bg-accent border border-border rounded shrink-0 transition-colors"
-              title={activeTab === 'defects' ? '切换到图像' : activeTab === 'images' ? '切换到缺陷' : '缺陷/图像'}
-            >
-              {activeTab === 'defects' ? (
-                <>
-                  <AlertCircle className="w-4 h-4" />
-                  <ChevronRight className="w-3 h-3" />
-                  <Images className="w-4 h-4" />
-                </>
-              ) : (
-                <>
-                  <Images className="w-4 h-4" />
-                  <ChevronRight className="w-3 h-3" />
-                  <AlertCircle className="w-4 h-4" />
-                </>
-              )}
-            </button>
-            
-            {/* 钢板切换 */}
-            {filteredSteelPlates.length > 0 && (
-              <div className="flex items-center gap-1 px-2 py-1 bg-muted border border-border rounded shrink-0">
-                <button
-                  onClick={() => {
-                    if (filteredSteelPlates.length === 0) return;
-                    const currentIndex = filteredSteelPlates.findIndex(p => p.plateId === selectedPlateId);
-                    const prevIndex = currentIndex > 0 ? currentIndex - 1 : filteredSteelPlates.length - 1;
-                    const prevPlate = filteredSteelPlates[prevIndex];
-                    if (prevPlate) setSelectedPlateId(prevPlate.plateId);
-                  }}
-                  className="p-0.5 hover:bg-accent/50 active:bg-accent text-muted-foreground hover:text-foreground transition-colors rounded"
-                  disabled={filteredSteelPlates.length === 0}
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <span className="text-xs font-mono font-bold text-foreground px-1 min-w-[70px] text-center">
-                  {(() => {
-                    const currentPlate = filteredSteelPlates.find(p => p.plateId === selectedPlateId) || filteredSteelPlates[0];
-                    return currentPlate?.plateId || '-';
-                  })()}
-                </span>
-                <button
-                  onClick={() => {
-                    if (filteredSteelPlates.length === 0) return;
-                    const currentIndex = filteredSteelPlates.findIndex(p => p.plateId === selectedPlateId);
-                    const nextIndex = currentIndex < filteredSteelPlates.length - 1 ? currentIndex + 1 : 0;
-                    const nextPlate = filteredSteelPlates[nextIndex];
-                    if (nextPlate) setSelectedPlateId(nextPlate.plateId);
-                  }}
-                  className="p-0.5 hover:bg-accent/50 active:bg-accent text-muted-foreground hover:text-foreground transition-colors rounded"
-                  disabled={filteredSteelPlates.length === 0}
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-            
-            {/* 表面切换（上表/下表/全部） */}
-            {(activeTab === 'defects' || activeTab === 'images') && (
-              <div className="flex items-center gap-1 bg-muted border border-border rounded p-0.5 shrink-0">
-                <button
-                  onClick={() => setSurfaceFilter('top')}
-                  className={`px-2 py-1 text-xs font-bold rounded transition-colors ${
-                    surfaceFilter === 'top'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground'
-                  }`}
-                >
-                  上表
-                </button>
-                <button
-                  onClick={() => setSurfaceFilter('bottom')}
-                  className={`px-2 py-1 text-xs font-bold rounded transition-colors ${
-                    surfaceFilter === 'bottom'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground'
-                  }`}
-                >
-                  下表
-                </button>
-                <button
-                  onClick={() => setSurfaceFilter('all')}
-                  className={`px-2 py-1 text-xs font-bold rounded transition-colors ${
-                    surfaceFilter === 'all'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground'
-                  }`}
-                >
-                  全部
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
+        <MobileNavBar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          filteredSteelPlates={filteredSteelPlates}
+          selectedPlateId={selectedPlateId}
+          setSelectedPlateId={setSelectedPlateId}
+          surfaceFilter={surfaceFilter}
+          setSurfaceFilter={setSurfaceFilter}
+          setShowPlatesPanel={setShowPlatesPanel}
+        />
       )}
       
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar - 仅桌面端显示 */}
         <div className={`${isMobileDevice ? 'hidden' : (isSidebarCollapsed ? 'w-0' : 'w-64')} bg-muted/30 border-r border-border flex flex-col shrink-0 transition-all duration-300 overflow-hidden`}>
-
-          {/* Steel Plates Record List */}
-          {!isSidebarCollapsed && (
-            <div className="flex-1 flex flex-col min-h-0 border-t border-border">
-              {/* 当前钢板详细信息 */}
-              <div className="p-2 bg-muted/10 border-b border-border">
-                <div className="bg-card border border-border/50">
-                  <div className="px-2 py-1.5 bg-primary/20 border-b border-border">
-                    <h3 className="text-sm font-bold text-primary uppercase tracking-wider">当前钢板信息</h3>
-                  </div>
-                  {(() => {
-                    const currentPlate = filteredSteelPlates.find(p => p.plateId === selectedPlateId) || filteredSteelPlates[0] || steelPlates[0];
-                    
-                    // 如果没有钢板数据，显示加载或空状态
-                    if (!currentPlate) {
-                      return (
-                        <div className="p-2 text-xs text-center text-muted-foreground">
-                          {isLoadingSteels ? '加载中...' : '暂无钢板数据'}
-                        </div>
-                      );
-                    }
-                    
-                    return (
-                      <div className="p-2 text-xs space-y-1">
-                        <div className="flex justify-between py-0.5 border-b border-border/30">
-                          <span className="text-muted-foreground">流水号</span>
-                          <span className="font-mono font-bold">{currentPlate.serialNumber}</span>
-                        </div>
-                        <div className="flex justify-between py-0.5 border-b border-border/30">
-                          <span className="text-muted-foreground">钢板号</span>
-                          <span className="font-mono font-bold">{currentPlate.plateId}</span>
-                        </div>
-                        <div className="flex justify-between py-0.5 border-b border-border/30">
-                          <span className="text-muted-foreground">钢种</span>
-                          <span className="font-mono font-bold">{currentPlate.steelGrade}</span>
-                        </div>
-                        <div className="flex justify-between py-0.5 border-b border-border/30">
-                          <span className="text-muted-foreground">规格</span>
-                          <span className="font-mono font-bold text-[10px]">
-                            {currentPlate.dimensions.length}×{currentPlate.dimensions.width}×{currentPlate.dimensions.thickness}
-                          </span>
-                        </div>
-                        <div className="flex justify-between py-0.5 border-b border-border/30">
-                          <span className="text-muted-foreground">时间</span>
-                          <span className="font-mono">{currentPlate.timestamp.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
-                        </div>
-                        <div className="flex justify-between py-0.5 border-b border-border/30">
-                          <span className="text-muted-foreground">等级</span>
-                          <span className={`px-1.5 py-0.5 rounded-sm border ${
-                            currentPlate.level === 'A' ? 'bg-green-500/10 border-green-500/30 text-green-400' :
-                            currentPlate.level === 'B' ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' :
-                            currentPlate.level === 'C' ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' :
-                            'bg-red-500/10 border-red-500/30 text-red-400'
-                          }`}>{getLevelText(currentPlate.level)}</span>
-                        </div>
-                        <div className="flex justify-between py-0.5">
-                          <span className="text-muted-foreground">缺陷数</span>
-                          <span className="font-mono font-bold text-red-400">{currentPlate.defectCount}</span>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
-              
-              <div className="p-2 bg-muted/20 flex items-center justify-between gap-2">
-                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  钢板记录 
-                  <span className="ml-1 text-[9px] text-primary">
-                    {(Object.keys(searchCriteria).length > 0 || filterCriteria.levels.length > 0) 
-                      ? `(${filteredSteelPlates.length}/${steelPlates.length})`
-                      : `(${steelPlates.length})`
-                    }
-                  </span>
-                </h3>
-                <div className="flex items-center gap-1">
-                  <button 
-                    ref={searchButtonRef}
-                    onClick={() => setIsSearchDialogOpen(true)}
-                    className={`p-1 hover:bg-accent/50 border transition-colors rounded ${
-                      Object.keys(searchCriteria).length > 0 
-                        ? 'bg-primary/20 border-primary/50 text-primary' 
-                        : 'border-border/50 bg-card/50 text-muted-foreground'
-                    }`}
-                    title="查询"
-                  >
-                    <Search className="w-3.5 h-3.5" />
-                  </button>
-                  <button 
-                    ref={filterButtonRef}
-                    onClick={() => setIsFilterDialogOpen(true)}
-                    className={`p-1 hover:bg-accent/50 border transition-colors rounded ${
-                      filterCriteria.levels.length > 0 
-                        ? 'bg-primary/20 border-primary/50 text-primary' 
-                        : 'border-border/50 bg-card/50 text-muted-foreground'
-                    }`}
-                    title="筛选"
-                  >
-                    <Filter className="w-3.5 h-3.5" />
-                  </button>
-                  <button 
-                    onClick={() => {
-                      setSearchCriteria({});
-                      setFilterCriteria({ levels: [] });
-                    }}
-                    className="p-1 hover:bg-accent/50 border border-border/50 bg-card/50 text-muted-foreground transition-colors rounded"
-                    title="刷新/重置"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-              <div className="flex-1 overflow-auto p-2 space-y-1">
-                {filteredSteelPlates.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <p className="text-xs">没有找到��配的钢板记录</p>
-                    <button
-                      onClick={() => {
-                        setSearchCriteria({});
-                        setFilterCriteria({ levels: [] });
-                      }}
-                      className="mt-2 text-[10px] text-primary hover:underline"
-                    >
-                      清除筛选条件
-                    </button>
-                  </div>
-                ) : (
-                  filteredSteelPlates.map((plate) => (
-                  <div 
-                    key={plate.plateId}
-                    onClick={() => setSelectedPlateId(plate.plateId)}
-                    className={`p-1.5 border transition-all cursor-pointer ${
-                      selectedPlateId === plate.plateId 
-                        ? 'bg-primary/20 border-primary shadow-lg shadow-primary/20' 
-                        : 'bg-card/50 border-border/50 hover:bg-accent/30 hover:border-border'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-1 mb-0.5">
-                      <span className="text-[9px] font-mono text-muted-foreground">
-                        {plate.serialNumber}
-                      </span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-sm border ${
-                        plate.level === 'A' ? 'bg-green-500/10 border-green-500/30 text-green-400' :
-                        plate.level === 'B' ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' :
-                        plate.level === 'C' ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' :
-                        'bg-red-500/10 border-red-500/30 text-red-400'
-                      }`}>
-                        {getLevelText(plate.level)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between gap-1">
-                      <span className={`text-xs font-mono font-bold ${selectedPlateId === plate.plateId ? 'text-primary-foreground' : ''}`}>
-                        {plate.plateId}
-                      </span>
-                      <span className="text-[9px] font-mono text-muted-foreground">
-                        {plate.steelGrade}
-                      </span>
-                    </div>
-                    <div className="text-[9px] text-muted-foreground font-mono mt-0.5">
-                      {plate.dimensions.length}×{plate.dimensions.width}×{plate.dimensions.thickness}
-                    </div>
-                  </div>
-                  ))
-                )}
-              </div>
-              
-              {/* 上传按钮区域 - 底部固定 */}
-              <div className="p-2 bg-muted/20 border-t border-border space-y-1 shrink-0">
-                <label className="block">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onload = (event) => {
-                          const imageUrl = event.target?.result as string;
-                          handleImageUpload(imageUrl);
-                          setActiveTab('defects'); // 切换到缺陷界面
-                        };
-                        reader.readAsDataURL(file);
-                      }
-                    }}
-                  />
-                  <div className="flex items-center justify-center gap-1.5 px-3 py-2 bg-primary hover:bg-primary/80 text-primary-foreground text-xs font-bold cursor-pointer border border-primary/50 transition-colors">
-                    <Upload className="w-3.5 h-3.5" />
-                    上传缺陷图像
-                  </div>
-                </label>
-                
-                <label className="block">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onload = (event) => {
-                          const imageUrl = event.target?.result as string;
-                          handleImageUpload(imageUrl);
-                          setActiveTab('images'); // 切换到图像界面
-                        };
-                        reader.readAsDataURL(file);
-                      }
-                    }}
-                  />
-                  <div className="flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold cursor-pointer border border-blue-500/50 transition-colors">
-                    <Upload className="w-3.5 h-3.5" />
-                    上传钢板图像
-                  </div>
-                </label>
-              </div>
-            </div>
-          )}
+          <Sidebar
+            isCollapsed={isSidebarCollapsed}
+            filteredSteelPlates={filteredSteelPlates}
+            steelPlates={steelPlates}
+            selectedPlateId={selectedPlateId}
+            setSelectedPlateId={setSelectedPlateId}
+            isLoadingSteels={isLoadingSteels}
+            searchCriteria={searchCriteria}
+            setSearchCriteria={setSearchCriteria}
+            filterCriteria={filterCriteria}
+            setFilterCriteria={setFilterCriteria}
+            setIsSearchDialogOpen={setIsSearchDialogOpen}
+            setIsFilterDialogOpen={setIsFilterDialogOpen}
+            searchButtonRef={searchButtonRef}
+            filterButtonRef={filterButtonRef}
+            handleImageUpload={handleImageUpload}
+            setActiveTab={setActiveTab}
+          />
         </div>
 
         {/* Main Content Area */}
@@ -910,7 +502,7 @@ export default function App() {
                 {/* 缺陷类型复选框 - 左侧，为右侧按钮留出空间 */}
                 <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap pr-10 sm:pr-12">
                   {availableDefectTypes.map((type) => {
-                    const count = (detectionResult?.defects || []).filter(d => d.type === type).length;
+                    const count = activeDefects.filter(d => d.type === type).length;
                     const isSelected = selectedDefectTypes.includes(type);
                     const colors = defectColorMap[type];
                     
@@ -970,10 +562,11 @@ export default function App() {
           </div>
 
           {/* Scrollable Content */}
-          <div className={`flex-1 overflow-auto ${isMobileDevice ? 'p-2' : 'p-4'}`}>
-            {/* 钢板面板（桌面和手机模式） */}
-            {showPlatesPanel && (
-              <div className={`h-full flex flex-col bg-background ${isMobileDevice ? '-m-2' : '-m-4'}`}>
+          <div className={`flex-1 min-h-0 overflow-auto ${isMobileDevice ? 'p-2' : 'p-4'}`}>
+
+              {/* 钢板面板（桌面和手机模式） */}
+              {showPlatesPanel && (
+                <div className={`flex-1 min-h-0 flex flex-col bg-background ${isMobileDevice ? '-m-2' : '-m-4'}`}>
                 {/* 顶部搜索栏 */}
                 <div className={`bg-card border-b border-border shrink-0 ${isMobileDevice ? 'p-3' : 'p-4'}`}>
                   <div className="flex items-center gap-2">
@@ -1057,7 +650,7 @@ export default function App() {
                 </div>
                 
                 {/* 钢板列表 */}
-                <div className="flex-1 overflow-auto">
+                <div className="flex-1 min-h-0 overflow-auto">
                   {/* 统计信息 */}
                   <div className={`bg-card border-b border-border ${isMobileDevice ? 'p-3' : 'p-4'}`}>
                     <div className="grid grid-cols-4 gap-4">
@@ -1166,7 +759,7 @@ export default function App() {
             )}
             
             {/* 正常内容（非钢板面板时） */}
-            {!showPlatesPanel && activeTab === 'defects' && (
+            {!showPlatesPanel && activeTab === 'defects' && false && (
               <div className="h-full flex flex-col space-y-4">
                 {/* ========== 统一使用桌面版布局 ========== */}
                 <div className={`grid grid-cols-1 gap-4 flex-1 min-h-0 lg:grid-cols-3`}>
@@ -1313,7 +906,7 @@ export default function App() {
                           <div className="relative w-full h-full flex items-center justify-center bg-zinc-950">
                             <DetectionResult
                               imageUrl={currentImage}
-                              defects={detectionResult?.defects || []}
+                              defects={filteredDefectsByControls}
                               isDetecting={isDetecting}
                             />
                             <button
@@ -1333,55 +926,14 @@ export default function App() {
 
                   {/* Right: Logs/List */}
                   <div className="lg:col-span-1 flex flex-col bg-card border border-border">
-                      <div className="p-2 border-b border-border bg-muted/20">
-                        {/* 视图切换 */}
-                        <div className="flex items-center gap-1 bg-background border border-border rounded-sm p-0.5">
-                          <button
-                            onClick={() => setDefectLogView('list')}
-                            className={`flex-1 px-2 py-1 text-[10px] rounded-sm transition-colors flex items-center justify-center gap-1 ${
-                              defectLogView === 'list'
-                                ? 'bg-primary text-primary-foreground'
-                                : 'text-muted-foreground hover:text-foreground'
-                            }`}
-                            title="列表视图"
-                          >
-                            <List className="w-3 h-3" />
-                            列表
-                          </button>
-                          <button
-                            onClick={() => setDefectLogView('chart')}
-                            className={`flex-1 px-2 py-1 text-[10px] rounded-sm transition-colors flex items-center justify-center gap-1 ${
-                              defectLogView === 'chart'
-                                ? 'bg-primary text-primary-foreground'
-                                : 'text-muted-foreground hover:text-foreground'
-                            }`}
-                            title="分布图"
-                          >
-                            <PieChart className="w-3 h-3" />
-                            分布图
-                          </button>
-                        </div>
-                      </div>
-                      <div className="flex-1 overflow-auto p-2">
-                        {(() => {
-                          const filteredDefects = (detectionResult?.defects || []).filter(d => 
-                            (surfaceFilter === 'all' || d.surface === surfaceFilter) &&
-                            selectedDefectTypes.includes(d.type)
-                          );
-                          return defectLogView === 'list' ? (
-                            <DefectList defects={filteredDefects} isDetecting={isDetecting} surface={surfaceFilter} defectColors={defectColorMap} />
-                          ) : (
-                            <DefectDistributionChart defects={filteredDefects} surface={surfaceFilter} defectColors={defectColorMap} />
-                          );
-                        })()}
-                      </div>
+                      {/* legacy list/chart toggle block removed */}
                     </div>
                   </div>
                 </div>
             )}
 
-            {!showPlatesPanel && activeTab === 'images' && (
-              <div className="h-full flex flex-col bg-card border border-border">
+            {!showPlatesPanel && activeTab === 'images' && false && (
+              <div className="flex-1 min-h-0 flex flex-col bg-card border border-border">
                 {/* 图像显示区域 */}
                 <div className="flex-1 relative min-h-0 bg-black/40">
                   {(() => {
@@ -1390,10 +942,7 @@ export default function App() {
                       return (
                         <DetectionResult
                           imageUrl={currentImage}
-                          defects={(detectionResult?.defects || []).filter(d => 
-                            (surfaceFilter === 'all' || d.surface === surfaceFilter) &&
-                            selectedDefectTypes.includes(d.type)
-                          )}
+                          defects={filteredDefectsByControls}
                           isDetecting={isDetecting}
                         />
                       );
@@ -1466,7 +1015,9 @@ export default function App() {
                         <div>
                           <p className="text-muted-foreground mb-1">缺陷总数</p>
                           <p className="font-mono">
-                            {currentImage ? (detectionResult?.defects || []).length : plateRecord?.defects.length || 0}
+                            {currentImage || detectionResult
+                              ? activeDefects.length
+                              : (plateDefects.length || plateRecord?.defects.length || 0)}
                           </p>
                         </div>
                         <div>
@@ -1480,6 +1031,35 @@ export default function App() {
                   );
                 })()}
               </div>
+            )}
+
+            {!showPlatesPanel && activeTab === 'defects' && (
+              <DefectsPage
+                isMobileDevice={isMobileDevice}
+                currentImage={currentImage}
+                isDetecting={isDetecting}
+                detectionResult={detectionResult}
+                history={history}
+                steelPlates={steelPlates}
+                filteredSteelPlates={filteredSteelPlates}
+                selectedPlateId={selectedPlateId}
+                plateDefects={plateDefects}
+                surfaceFilter={surfaceFilter}
+                setSurfaceFilter={setSurfaceFilter}
+                availableDefectTypes={availableDefectTypes}
+                selectedDefectTypes={selectedDefectTypes}
+                setSelectedDefectTypes={setSelectedDefectTypes}
+                defectColors={defectColorMap}
+                defectAccentColors={defectAccentMap}
+                imageViewMode={imageViewMode}
+                setImageViewMode={setImageViewMode}
+                manualConfirmStatus={manualConfirmStatus}
+                setManualConfirmStatus={setManualConfirmStatus}
+                selectedDefectId={selectedDefectId}
+                setSelectedDefectId={setSelectedDefectId}
+                searchCriteria={searchCriteria}
+                filterCriteria={filterCriteria}
+              />
             )}
 
             {!showPlatesPanel && activeTab === 'reports' && (
@@ -1542,7 +1122,7 @@ export default function App() {
                 )}
                 
                 {/* 钢板列表 */}
-                <div className="flex-1 overflow-auto">
+                <div className="flex-1 min-h-0 overflow-auto">
                   {/* 统计信息 */}
                   <div className={`bg-card border-b border-border ${isMobileDevice ? 'p-3' : 'p-4'}`}>
                     <div className="grid grid-cols-4 gap-4">
@@ -1717,7 +1297,7 @@ export default function App() {
               </div>
             )}
 
-            {!showPlatesPanel && activeTab === 'images' && (
+            {!showPlatesPanel && activeTab === 'images' && false && (
               <div className="h-full flex flex-col bg-card border border-border">
                 {/* 图像显示区域 */}
                 <div className="flex-1 relative min-h-0 bg-black/40">
@@ -1727,10 +1307,7 @@ export default function App() {
                       return (
                         <DetectionResult
                           imageUrl={currentImage}
-                          defects={(detectionResult?.defects || []).filter(d => 
-                            (surfaceFilter === 'all' || d.surface === surfaceFilter) &&
-                            selectedDefectTypes.includes(d.type)
-                          )}
+                          defects={filteredDefectsByControls}
                           isDetecting={isDetecting}
                         />
                       );
@@ -1803,7 +1380,9 @@ export default function App() {
                         <div>
                           <p className="text-muted-foreground mb-1">缺陷总数</p>
                           <p className="font-mono">
-                            {currentImage ? (detectionResult?.defects || []).length : plateRecord?.defects.length || 0}
+                            {currentImage || detectionResult
+                              ? activeDefects.length
+                              : (plateDefects.length || plateRecord?.defects.length || 0)}
                           </p>
                         </div>
                         <div>
@@ -1879,7 +1458,7 @@ export default function App() {
                 )}
                 
                 {/* 钢板列表 */}
-                <div className="flex-1 overflow-auto">
+                <div className="flex-1 min-h-0 overflow-auto">
                   {/* 统计信息 */}
                   <div className={`bg-card border-b border-border ${isMobileDevice ? 'p-3' : 'p-4'}`}>
                     <div className="grid grid-cols-4 gap-4">
@@ -2118,7 +1697,7 @@ export default function App() {
       <SearchDialog 
         isOpen={isSearchDialogOpen}
         onClose={() => setIsSearchDialogOpen(false)}
-        onSearch={setSearchCriteria}
+        onSearch={handleSearch}
         triggerRef={searchButtonRef}
       />
       <FilterDialog 

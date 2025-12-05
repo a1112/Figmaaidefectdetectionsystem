@@ -48,25 +48,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <div className="flex-1 flex flex-col min-h-0 border-t border-border">
-      {/* 当前钢板详细信息 */}
+      {/* 当前钢板信息 + 统计 */}
       <div className="p-2 bg-muted/10 border-b border-border">
         <div className="bg-card border border-border/50">
-          <div className="px-2 py-1.5 bg-primary/20 border-b border-border">
-            <h3 className="text-sm font-bold text-primary uppercase tracking-wider">当前钢板信息</h3>
-          </div>
           {!currentPlate ? (
             <div className="p-2 text-xs text-center text-muted-foreground">
               {isLoadingSteels ? '加载中...' : '暂无钢板数据'}
             </div>
           ) : (
             <div className="p-2 text-xs space-y-1">
+              {/* 当前板号 */}
+              <div className="flex justify-between items-center py-0.5 border-b border-border/30">
+                <span className="text-muted-foreground">当前板号</span>
+                <span className="font-mono font-bold text-sm">{currentPlate.plateId}</span>
+              </div>
               <div className="flex justify-between py-0.5 border-b border-border/30">
                 <span className="text-muted-foreground">流水号</span>
                 <span className="font-mono font-bold">{currentPlate.serialNumber}</span>
-              </div>
-              <div className="flex justify-between py-0.5 border-b border-border/30">
-                <span className="text-muted-foreground">钢板号</span>
-                <span className="font-mono font-bold">{currentPlate.plateId}</span>
               </div>
               <div className="flex justify-between py-0.5 border-b border-border/30">
                 <span className="text-muted-foreground">钢种</span>
@@ -97,6 +95,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* 钢板质量统计概览：总数 / 一等品 / 合格品 / 等外品 */}
+      <div className="px-2 pt-2 pb-1 bg-muted/10 border-b border-border">
+        <div className="bg-card border border-border p-2">
+          <div className="grid grid-cols-4 gap-2">
+            <div className="text-center">
+              <p className="text-xl font-bold text-primary">
+                {filteredSteelPlates.length}
+              </p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">总数</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xl font-bold text-green-500">
+                {filteredSteelPlates.filter(p => p.level === 'A').length}
+              </p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">一等品</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xl font-bold text-yellow-500">
+                {filteredSteelPlates.filter(p => p.level === 'B' || p.level === 'C').length}
+              </p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">合格品</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xl font-bold text-red-500">
+                {filteredSteelPlates.filter(p => p.level === 'D').length}
+              </p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">等外品</p>
+            </div>
+          </div>
         </div>
       </div>
       
