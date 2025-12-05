@@ -19,15 +19,21 @@ export const getVisibleTiles = (
   tileSize: number,
   imageSize: Size,
   currentScale: number,
+  forcedLevel?: number,
 ): Tile[] => {
   // 根据缩放比计算 LOD 等级，并限制在 0~2 级之间，仅保留 L0/L1/L2
   const maxLevel = 2;
-  let level = Math.floor(Math.log2(1 / currentScale));
-  if (level < 0) {
-    level = 0;
-  }
-  if (level > maxLevel) {
-    level = maxLevel;
+  let level: number;
+  if (typeof forcedLevel === 'number') {
+    level = Math.min(Math.max(forcedLevel, 0), maxLevel);
+  } else {
+    level = Math.floor(Math.log2(1 / currentScale));
+    if (level < 0) {
+      level = 0;
+    }
+    if (level > maxLevel) {
+      level = maxLevel;
+    }
   }
 
   const virtualTileSize = tileSize * Math.pow(2, level);

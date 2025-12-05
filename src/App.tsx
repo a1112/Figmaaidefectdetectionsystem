@@ -106,6 +106,16 @@ export default function App() {
   // 移动设备侧边栏状态
   const [isMobileHistorySidebarOpen, setIsMobileHistorySidebarOpen] = useState(false);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
+
+  // 图像 Tab：瓦片 LOD 双层控制
+  const [preferredTileLevel, setPreferredTileLevel] = useState(0);
+  const [activeTileLevel, setActiveTileLevel] = useState(0);
+  useEffect(() => {
+    const id = setTimeout(() => {
+      setActiveTileLevel(preferredTileLevel);
+    }, 200);
+    return () => clearTimeout(id);
+  }, [preferredTileLevel]);
   
   // 检测移动设备
   useEffect(() => {
@@ -1123,6 +1133,20 @@ export default function App() {
                         return;
                       }
 
+                       // 进一步按照后端的马赛克高度裁剪 tileY，避免请求超出范围导致 404
+                       const metaForSurface = surface === 'top' ? topMeta : bottomMeta;
+                       if (!metaForSurface) {
+                         return;
+                       }
+                       // 与后端 get_tile 中的计算保持一致：
+                       // rotated_h = first.width -> mosaic_height = rotated_h
+                       const rotatedH = metaForSurface.image_width || 1;
+                       const mosaicHeightBackend = rotatedH;
+                       const maxTileYBackend = Math.ceil(mosaicHeightBackend / virtualTileSize);
+                       if (tileY >= maxTileYBackend) {
+                         return;
+                       }
+
                       const url = getTileImageUrl({
                         surface,
                         seqNo,
@@ -1174,6 +1198,8 @@ export default function App() {
                         imageHeight={worldWidth}
                         tileSize={baseTileSize}
                         className="bg-slate-50"
+                        fixedLevel={activeTileLevel}
+                        onPreferredLevelChange={setPreferredTileLevel}
                         renderTile={renderTile}
                       />
                     );

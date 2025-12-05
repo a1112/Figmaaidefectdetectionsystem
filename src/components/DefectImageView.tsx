@@ -24,6 +24,7 @@ export function DefectImageView({
   onDefectSelect,
   surfaceImageInfo,
 }: DefectImageViewProps) {
+  const fullViewContainerRef = useRef<HTMLDivElement | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [isLoadingImage, setIsLoadingImage] = useState(false);
@@ -56,8 +57,28 @@ export function DefectImageView({
     const ratio = worldHeight / (targetDisplayHeight * 4);
     const raw = Math.log2(Math.max(1, ratio));
     const level = Math.ceil(raw);
-    return Math.min(8, Math.max(0, level));
+    // 后端当前仅支持 0,1,2 级瓦片；这里做一次硬性裁剪，避免 level=3/4 导致 422
+    const maxLevel = 2;
+    return Math.min(maxLevel, Math.max(0, level));
   };
+
+  // 独立的滚轮缩放处理：使用原生事件避免 React passive wheel 限制
+  useEffect(() => {
+    const el = fullViewContainerRef.current;
+    if (!el) return;
+    const handleWheelNative = (event: WheelEvent) => {
+      event.preventDefault();
+      const delta = event.deltaY < 0 ? 0.1 : -0.1;
+      setZoom(prev => {
+        const next = Math.min(4, Math.max(0.5, prev + delta));
+        return Number(next.toFixed(2));
+      });
+    };
+    el.addEventListener('wheel', handleWheelNative, { passive: false });
+    return () => {
+      el.removeEventListener('wheel', handleWheelNative);
+    };
+  }, []);
 
   // 获取当前选中的缺陷
   const selectedDefect = selectedDefectId ? defects.find(d => d.id === selectedDefectId) : null;
@@ -151,15 +172,8 @@ export function DefectImageView({
       {imageViewMode === 'full' ? (
         // 大图模式：使用瓦片视图 + 简单缩放/拖动，类似地图
         <div
+          ref={fullViewContainerRef}
           className="relative w-full h-full overflow-hidden bg-black"
-          onWheel={event => {
-            event.preventDefault();
-            const delta = event.deltaY < 0 ? 0.1 : -0.1;
-            setZoom(prev => {
-              const next = Math.min(4, Math.max(0.5, prev + delta));
-              return Number(next.toFixed(2));
-            });
-          }}
           onMouseDown={event => {
             isPanningRef.current = true;
             lastPosRef.current = { x: event.clientX, y: event.clientY };

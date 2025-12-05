@@ -6,6 +6,14 @@ interface LargeImageViewerProps {
   imageHeight: number;
   tileSize?: number;
   className?: string;
+  /**
+   * 固定瓦片等级（0/1/2）；如果不传则根据缩放自动计算
+   */
+  fixedLevel?: number;
+  /**
+   * 当根据缩放计算出的推荐瓦片等级发生变化时回调（用于上层实现“双图层”或延迟切换 LOD）
+   */
+  onPreferredLevelChange?: (level: number) => void;
   renderTile?: (
     ctx: CanvasRenderingContext2D,
     tile: Tile,
@@ -19,10 +27,14 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
   imageHeight,
   tileSize = 256,
   className,
+  fixedLevel,
+  onPreferredLevelChange,
   renderTile,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  // 双 canvas：底层保留上一轮内容，顶层用于当前绘制（便于后续扩展双 LOD 图层）
+  const backCanvasRef = useRef<HTMLCanvasElement>(null);
+  const frontCanvasRef = useRef<HTMLCanvasElement>(null);
   
   // State stored in refs for high-performance animation loop without re-renders
   const transform = useRef({ x: 0, y: 0, scale: 1 });
@@ -34,6 +46,8 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
   
   // Force render for UI overlays (like zoom level text)
   const [, setTick] = useState(0);
+
+  const lastPreferredLevelRef = useRef<number | null>(null);
 
   // Calculate constraints
   const getConstraints = useCallback(() => {
@@ -47,15 +61,24 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
 
   // Main Draw Function
   const draw = useCallback(() => {
-    const canvas = canvasRef.current;
+    const canvas = frontCanvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx || containerSize.width === 0) return;
 
+    // 透明背景：仅清除内容，不填充底色，让父容器背景透出
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#e5e5e5';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const { x, y, scale } = transform.current;
+
+    // 计算推荐等级（用于通知上层）
+    const maxLevel = 2;
+    let preferredLevel = Math.floor(Math.log2(1 / scale));
+    if (preferredLevel < 0) preferredLevel = 0;
+    if (preferredLevel > maxLevel) preferredLevel = maxLevel;
+    if (onPreferredLevelChange && lastPreferredLevelRef.current !== preferredLevel) {
+      lastPreferredLevelRef.current = preferredLevel;
+      onPreferredLevelChange(preferredLevel);
+    }
 
     const visibleRect = {
       x: -x / scale,
@@ -72,7 +95,13 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
     ctx.lineWidth = 2 / scale;
     ctx.strokeRect(0, 0, imageWidth, imageHeight);
 
-    const tiles = getVisibleTiles(visibleRect, tileSize, { width: imageWidth, height: imageHeight }, scale);
+    const tiles = getVisibleTiles(
+      visibleRect,
+      tileSize,
+      { width: imageWidth, height: imageHeight },
+      scale,
+      fixedLevel,
+    );
 
     tiles.forEach(tile => {
       if (renderTile) {
@@ -133,9 +162,13 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
           width: entry.contentRect.width,
           height: entry.contentRect.height,
         });
-        if (canvasRef.current) {
-          canvasRef.current.width = entry.contentRect.width;
-          canvasRef.current.height = entry.contentRect.height;
+        if (backCanvasRef.current) {
+          backCanvasRef.current.width = entry.contentRect.width;
+          backCanvasRef.current.height = entry.contentRect.height;
+        }
+        if (frontCanvasRef.current) {
+          frontCanvasRef.current.width = entry.contentRect.width;
+          frontCanvasRef.current.height = entry.contentRect.height;
         }
       }
     });
@@ -155,7 +188,7 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
 
     const newScale = clamp(current.scale * factor, minScale, maxScale);
 
-    const rect = canvasRef.current?.getBoundingClientRect();
+    const rect = frontCanvasRef.current?.getBoundingClientRect();
     if (!rect) return;
 
     const mouseX = e.clientX - rect.left;
@@ -172,7 +205,7 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
   }, [getConstraints]);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
+    const canvas = frontCanvasRef.current;
     if (!canvas) return;
     const wheelHandler = (event: WheelEvent) => {
       handleWheel(event);
@@ -222,7 +255,7 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
     } else if (e.touches.length === 2) {
       isDragging.current = false;
       lastTouchDistance.current = getTouchDistance(e.touches);
-      const rect = canvasRef.current?.getBoundingClientRect();
+      const rect = frontCanvasRef.current?.getBoundingClientRect();
       if (rect) {
         const center = getTouchCenter(e.touches);
         lastTouchCenter.current = { x: center.x - rect.left, y: center.y - rect.top };
@@ -239,7 +272,7 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
       transform.current.y += dy;
     } else if (e.touches.length === 2) {
       const dist = getTouchDistance(e.touches);
-      const rect = canvasRef.current?.getBoundingClientRect();
+      const rect = frontCanvasRef.current?.getBoundingClientRect();
       if (!rect || lastTouchDistance.current === null || !lastTouchCenter.current) return;
 
       const { minScale, maxScale } = getConstraints();
@@ -275,11 +308,15 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
   return (
     <div
       ref={containerRef}
-      className={`relative overflow-hidden bg-gray-100 w-full h-full ${className ?? ''}`}
+      className={`relative overflow-hidden w-full h-full ${className ?? ''}`}
     >
       <canvas
-        ref={canvasRef}
-        className="block touch-none cursor-move"
+        ref={backCanvasRef}
+        className="absolute inset-0 block touch-none cursor-move"
+      />
+      <canvas
+        ref={frontCanvasRef}
+        className="absolute inset-0 block touch-none cursor-move"
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
