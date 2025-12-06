@@ -100,11 +100,11 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
 
   return (
     <div className="h-full flex flex-col space-y-2">
-      {/* 主区域：左侧图像 / 右侧统计+列表 */}
+      {/* 主区域：左侧图像 / 右侧列表 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 flex-1 min-h-0">
-        {/* 左侧：图像区域 */}
+        {/* 左侧：图像区域（仅保留主图，移除缺陷分布图） */}
         <div className="lg:col-span-2 flex flex-col gap-2 min-h-0">
-          <div className="flex-1 bg-card border border-border p-0.5 relative min-h-[260px] flex flex-col">
+          <div className="flex-1 bg-card border border-border p-1 relative min-h-[260px] flex flex-col">
             {/* 顶部标签栏：视图模式 + 人工确认状态 + 选中缺陷信息 */}
             <div className="absolute top-0 left-0 right-0 px-2 py-1 bg-gradient-to-r from-primary to-primary/80 text-primary-foreground text-[10px] font-bold z-10 flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -214,6 +214,7 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
             </div>
           </div>
 
+          {/* 缺陷缩略分布图（小钢板示意） */}
           <div className="bg-card border border-border p-1.5">
             <DefectDistributionChart
               defects={filteredDefectsByControls}

@@ -72,7 +72,7 @@ proxy: {
 
 **症状：**
 - 后端运行正常
-- 直接访问 `http://localhost:8120/api/ui/steels?limit=5` 能正常返回 JSON
+- 直接访问 `http://localhost:8120/api/steels?limit=5` 能正常返回 JSON
 - 但前端请求失败
 
 **解决方法：**
@@ -126,11 +126,11 @@ proxy: {
 1. **前端请求的路径**
    - 打开浏览器开发者工具
    - Network 标签
-   - 查看实际请求的 URL：`http://localhost:3000/api/ui/steels?limit=50`
+   - 查看实际请求的 URL：`http://localhost:3000/api/steels?limit=50`
 
 2. **后端实际的路径**
    - 查看后端代码或文档
-   - 确认后端注册的路由是 `/api/ui/steels` 还是其他路径
+   - 确认后端注册的路由是 `/api/steels` 还是其他路径
 
 3. **如果路径不匹配，修改其中一方**
 
@@ -173,10 +173,10 @@ curl http://localhost:8120/health
 
 ```bash
 # 直接访问后端
-http://localhost:8120/api/ui/steels?limit=5
+http://localhost:8120/api/steels?limit=5
 
 # 或使用 curl
-curl http://localhost:8120/api/ui/steels?limit=5
+curl http://localhost:8120/api/steels?limit=5
 
 # 期望结果（JSON）：
 {
@@ -206,10 +206,10 @@ curl http://localhost:8120/api/ui/steels?limit=5
 npm run dev
 
 # 2. 浏览器访问（通过 Vite 代理）
-http://localhost:3000/api/ui/steels?limit=5
+http://localhost:3000/api/steels?limit=5
 
 # 3. 查看浏览器 Network 标签
-# - 请求 URL: http://localhost:3000/api/ui/steels?limit=5
+# - 请求 URL: http://localhost:3000/api/steels?limit=5
 # - 状态: 200 OK
 # - 响应: JSON 数据
 ```
@@ -226,7 +226,7 @@ http://localhost:3000/api/ui/steels?limit=5
 - [ ] 后端服务器正在运行
 - [ ] 运行在正确的端口（8120）
 - [ ] 健康检查返回 JSON：`http://localhost:8120/health`
-- [ ] API 端点可访问：`http://localhost:8120/api/ui/steels?limit=5`
+- [ ] API 端点可访问：`http://localhost:8120/api/steels?limit=5`
 - [ ] 后端控制台没有错误
 
 ### ✅ 前端检查
@@ -300,7 +300,7 @@ npm run dev
 
 浏览器控制台现在会显示：
 ```
-🌐 [生产模式] 请求钢板列表: /api/ui/steels?limit=50
+🌐 [生产模式] 请求钢板列表: /api/steels?limit=50
 ✅ 成功加载 20 条钢板记录 (production 模式)
 ```
 

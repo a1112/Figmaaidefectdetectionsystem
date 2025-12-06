@@ -1,3 +1,4 @@
+import React, { useEffect, useState } from 'react';
 import type { Defect } from '../types/app.types';
 import type { SurfaceImageInfo, Surface } from '../src/api/types';
 import { getTileImageUrl } from '../src/api/client';
@@ -11,6 +12,8 @@ interface DefectDistributionChartProps {
   onDefectSelect?: (id: string | null) => void;
   seqNo?: number;
 }
+
+const MAX_DEFECTS_TO_DRAW = 1000;
 
 export function DefectDistributionChart({
   defects,
@@ -86,6 +89,20 @@ export function DefectDistributionChart({
   const filteredDefects = displayDefects.filter(d =>
     surface === 'all' || d.surface === surface
   );
+
+  // 在缺陷数过多时限制绘制数量，避免阻塞渲染。
+  const [visibleDefects, setVisibleDefects] = useState<Defect[]>(filteredDefects);
+
+  useEffect(() => {
+    if (filteredDefects.length <= MAX_DEFECTS_TO_DRAW) {
+      setVisibleDefects(filteredDefects);
+      return;
+    }
+
+    // 仅在超过上限时启用：简单取前 MAX_DEFECTS_TO_DRAW 个，
+    // 后续如需按视图窗口动态裁剪，可在这里加入视图相关逻辑。
+    setVisibleDefects(filteredDefects.slice(0, MAX_DEFECTS_TO_DRAW));
+  }, [filteredDefects]);
 
   const findMetaForSurface = (surf: 'top' | 'bottom'): SurfaceImageInfo | undefined =>
     surfaceImageInfo?.find(info => info.surface === surf);
@@ -163,7 +180,7 @@ export function DefectDistributionChart({
     const title =
       surf === 'top' ? 'TOP SURFACE' : surf === 'bottom' ? 'BOTTOM SURFACE' : 'SURFACE';
     const meta = findMetaForSurface(surf);
-    const plateDefects = filteredDefects.filter(d => d.surface === surf);
+    const plateDefects = visibleDefects.filter(d => d.surface === surf);
 
     const tileImages: JSX.Element[] = [];
 
@@ -263,7 +280,7 @@ export function DefectDistributionChart({
             <div
               key={defect.id}
               onClick={() => onDefectSelect?.(defect.id)}
-              className={`absolute border ${borderColor} ${showSampleData ? 'opacity-40' : 'opacity-30'} ${
+              className={`absolute border-2 ${borderColor} ${showSampleData ? 'opacity-40' : 'opacity-30'} ${
                 isSelected ? 'ring-2 ring-offset-2 ring-primary/80 ring-offset-background' : ''
               } cursor-pointer`}
               style={{

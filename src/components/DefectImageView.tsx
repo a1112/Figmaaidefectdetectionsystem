@@ -5,6 +5,8 @@ import type { SteelPlate, Defect } from '../types/app.types';
 import type { SurfaceImageInfo, Surface } from '../src/api/types';
 import { getTileImageUrl } from '../src/api/client';
 
+const MAX_DEFECTS_TO_DRAW = 1000;
+
 interface DefectImageViewProps {
   selectedPlate: SteelPlate | undefined;
   defects: Defect[];
@@ -28,6 +30,10 @@ export function DefectImageView({
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [isLoadingImage, setIsLoadingImage] = useState(false);
+  const [viewportSize, setViewportSize] = useState<{ width: number; height: number }>({
+    width: 0,
+    height: 0,
+  });
 
   // 瓦片视图的缩放和拖动状态（仅大图模式使用）
   const [zoom, setZoom] = useState(1);
@@ -66,6 +72,7 @@ export function DefectImageView({
   useEffect(() => {
     const el = fullViewContainerRef.current;
     if (!el) return;
+
     const handleWheelNative = (event: WheelEvent) => {
       event.preventDefault();
       const delta = event.deltaY < 0 ? 0.1 : -0.1;
@@ -74,9 +81,22 @@ export function DefectImageView({
         return Number(next.toFixed(2));
       });
     };
+
+    const resizeObserver = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        setViewportSize({
+          width: entry.contentRect.width,
+          height: entry.contentRect.height,
+        });
+      }
+    });
+
     el.addEventListener('wheel', handleWheelNative, { passive: false });
+    resizeObserver.observe(el);
+
     return () => {
       el.removeEventListener('wheel', handleWheelNative);
+      resizeObserver.disconnect();
     };
   }, []);
 
@@ -205,6 +225,7 @@ export function DefectImageView({
               const scaledHeight = worldHeight / (2 ** level);
               const tilesX = Math.max(1, Math.ceil(scaledWidth / tileSize));
               const tilesY = Math.max(1, Math.ceil(scaledHeight / tileSize));
+              const levelScale = 1 / (2 ** level);
 
               const containerStyle: React.CSSProperties = {
                 position: 'absolute',
@@ -251,9 +272,59 @@ export function DefectImageView({
                 }
               }
 
+              // 缺陷覆盖：先保证能看到矩形，暂不按视口裁剪，最多 1000 个
+              const overlay: JSX.Element | null = (() => {
+                const worldDefects = defects.filter(
+                  d => d.surface === actualSurface && typeof d.imageIndex === 'number',
+                );
+
+                if (worldDefects.length === 0) return null;
+
+                const toDraw =
+                  worldDefects.length <= MAX_DEFECTS_TO_DRAW
+                    ? worldDefects
+                    : worldDefects.slice(0, MAX_DEFECTS_TO_DRAW);
+
+                return (
+                  <svg
+                    className="absolute inset-0 pointer-events-none"
+                    viewBox={`0 0 ${scaledWidth} ${scaledHeight}`}
+                    preserveAspectRatio="none"
+                  >
+                    {toDraw.map(defect => {
+                      const frameIndex = defect.imageIndex as number;
+                      const y1 = frameIndex * surfaceMeta.image_height + defect.y;
+                      const x1 = defect.x;
+                      const w = defect.width;
+                      const h = defect.height;
+
+                      const sx = x1 * levelScale;
+                      const sy = y1 * levelScale;
+                      const sw = w * levelScale;
+                      const sh = h * levelScale;
+
+                      return (
+                        <rect
+                          key={defect.id}
+                          x={sx}
+                          y={sy}
+                          width={sw}
+                          height={sh}
+                          fill="none"
+                          stroke="#f97316"
+                          strokeWidth={2}
+                          vectorEffect="non-scaling-stroke"
+                        />
+                      );
+                    })}
+                  </svg>
+                );
+              })();
+
               return (
                 <div style={containerStyle}>
                   {tiles}
+                  {overlay}
                 </div>
               );
             })()
