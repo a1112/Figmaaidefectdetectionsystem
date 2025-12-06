@@ -300,30 +300,6 @@ export function DefectDistributionChart({
           )}
         </div>
       </div>
-
-      {/* 图例 */}
-      <div className="px-4 pb-4">
-        <div className="flex items-center justify-center gap-4 text-[10px]">
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 border-2 border-red-500"></div>
-            <span className="text-muted-foreground">HIGH</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 border-2 border-yellow-500"></div>
-            <span className="text-muted-foreground">MEDIUM</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 border-2 border-green-500"></div>
-            <span className="text-muted-foreground">LOW</span>
-          </div>
-        </div>
-        
-        {filteredDefects.length > 0 && (
-          <div className="text-center text-[10px] text-muted-foreground/50 mt-2">
-            {filteredDefects.length} DEFECT{filteredDefects.length !== 1 ? 'S' : ''} DISPLAYED
-          </div>
-        )}
-      </div>
     </div>
   );
 }

@@ -11,6 +11,7 @@ import type {
   SteelItem,
   DefectItem,
   Surface,
+  SteelMetaResponse,
 } from "./types";
 import * as mock from "./mock";
 
@@ -40,7 +41,7 @@ export async function listSteels(
   // 生产模式：调用真实 API
   try {
     const baseUrl = env.getApiBaseUrl();
-    const url = `${baseUrl}/ui/steels?limit=${limit}`;
+    const url = `${baseUrl}/steels?limit=${limit}`;
     console.log(`🌐 [生产模式] 请求钢板列表: ${url}`);
     
     const response = await fetch(url);
@@ -96,8 +97,8 @@ export async function listSteels(
 }
 
 /**
- * 查询钢板（专用查询接口）
- * 期望后端路径: /api/ui/steels/search
+ * 查询钢板
+ * 路径: /api/steels/search
  */
 export async function searchSteels(
   params: SteelSearchParams,
@@ -118,7 +119,7 @@ export async function searchSteels(
   if (dateTo) query.set('date_to', dateTo);
 
   const baseUrl = env.getApiBaseUrl();
-  const url = `${baseUrl}/ui/steels/search?${query.toString()}`;
+  const url = `${baseUrl}/steels/search?${query.toString()}`;
   console.log(`🌐 [生产模式] 查询钢板: ${url}`);
 
   const response = await fetch(url);
@@ -146,8 +147,8 @@ export async function getDefects(
 }
 
 /**
- * 获取指定钢板的缺陷列表（保留后端原始字段和图像元信息）
- * 对应后端 /api/ui/defects/{seq_no} 响应。
+ * 获取指定钢板的缺陷列表（保留后端原始字段）
+ * 对应后端 /api/defects/{seq_no} 响应。
  */
 export async function getDefectsRaw(
   seqNo: number,
@@ -161,7 +162,7 @@ export async function getDefectsRaw(
   // 生产模式：调用真实 API
   try {
     const baseUrl = env.getApiBaseUrl();
-    const url = `${baseUrl}/ui/defects/${seqNo}`;
+    const url = `${baseUrl}/defects/${seqNo}`;
     console.log(`🌐 [生产模式] 请求缺陷数据: ${url}`);
     
     const response = await fetch(url);
@@ -220,6 +221,39 @@ export async function getFrameImage(
 }
 
 /**
+ * 获取指定钢板的图像元信息（帧数 + 尺寸）
+ * 对应后端 /api/steel-meta/{seq_no} 响应。
+ */
+export async function getSteelMeta(
+  seqNo: number,
+): Promise<SteelMetaResponse> {
+  // 开发模式：使用 mock 缺陷接口中的 surface_images 生成占位元信息
+  if (env.isDevelopment()) {
+    const mockResponse = await mock.mockGetDefects(seqNo);
+    return {
+      seq_no: mockResponse.seq_no,
+      surface_images: mockResponse.surface_images ?? [],
+    };
+  }
+
+  const baseUrl = env.getApiBaseUrl();
+  const url = `${baseUrl}/steel-meta/${seqNo}`;
+  console.log(`🌐 [生产模式] 请求钢板图像元信息: ${url}`);
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`加载钢板图像元信息失败: ${response.status} ${response.statusText}`);
+  }
+
+  const contentType = response.headers.get("content-type");
+  if (!contentType || !contentType.includes("application/json")) {
+    throw new Error(`钢板图像元信息接口返回非 JSON 数据 (Content-Type: ${contentType})`);
+  }
+
+  return response.json() as Promise<SteelMetaResponse>;
+}
+
+/**
  * 获取瓦片图像 URL（用于长带拼接图的分块加载）
  */
 export function getTileImageUrl(params: {
@@ -252,6 +286,7 @@ export function getTileImageUrl(params: {
 export async function getGlobalMeta(): Promise<{
   defect_classes: any;
   tile: { max_level: number; min_level: number; default_tile_size: number };
+  image: { frame_width: number; frame_height: number };
 }> {
   if (env.isDevelopment()) {
     // 开发模式：沿用原有 mock 行为，这里简单返回空对象占位
@@ -262,7 +297,7 @@ export async function getGlobalMeta(): Promise<{
   }
 
   const baseUrl = env.getApiBaseUrl();
-  const url = `${baseUrl}/ui/meta`;
+  const url = `${baseUrl}/meta`;
   console.log(`🌐 [生产模式] 请求全局 Meta: ${url}`);
 
   const response = await fetch(url);

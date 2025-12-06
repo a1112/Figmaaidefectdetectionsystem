@@ -12,7 +12,7 @@ import { BackendErrorPanel } from './components/BackendErrorPanel';
 import { DefectImageView } from './components/DefectImageView';
 // 引入 API 客户端和环境配置
 import { env } from './src/config/env';
-import { listSteels, searchSteels, getDefectsRaw, getTileImageUrl, getGlobalMeta } from './src/api/client';
+import { listSteels, searchSteels, getDefectsRaw, getTileImageUrl, getGlobalMeta, getSteelMeta } from './src/api/client';
 import type { SteelItem, DefectItem, DefectClassItem, SurfaceImageInfo } from './src/api/types';
 import type { Defect, DetectionRecord, SteelPlate } from './types/app.types';
 import { defectTypes, defectColors, defectAccentColors, generateRandomDefects } from './utils/defects';
@@ -378,10 +378,10 @@ export default function App() {
           }
 
           const seqNo = parseInt(selectedPlate.serialNumber, 10);
-          console.log(`🔍 加载钢板 ${selectedPlateId} (seq_no: ${seqNo}) 的缺陷数据...`);
+            console.log(`🔍 加载钢板 ${selectedPlateId} (seq_no: ${seqNo}) 的缺陷数据...`);
 
-          const response = await getDefectsRaw(seqNo);
-          const defectItems: DefectItem[] = response.defects.map(item => ({
+            const response = await getDefectsRaw(seqNo);
+            const defectItems: DefectItem[] = response.defects.map(item => ({
             id: item.defect_id,
             type: item.defect_type as any,
             severity: item.severity,
@@ -408,8 +408,15 @@ export default function App() {
             imageIndex: item.imageIndex,
           }));
 
-          setPlateDefects(mapped);
-          setSurfaceImageInfo(response.surface_images ?? null);
+            setPlateDefects(mapped);
+
+            try {
+              const steelMeta = await getSteelMeta(seqNo);
+              setSurfaceImageInfo(steelMeta.surface_images ?? null);
+            } catch (metaError) {
+              console.warn('⚠️ 加载钢板图像元信息失败:', metaError);
+              setSurfaceImageInfo(null);
+            }
           console.log(`✅ 成功加载 ${mapped.length} 个缺陷 (${env.getMode()} 模式)`);
         } catch (error) {
           console.error('❌ 加载缺陷数据失败:', error);
@@ -442,29 +449,28 @@ export default function App() {
         neighbors.push(steelPlates[index + 1]);
       }
 
-      neighbors.forEach(plate => {
-        const seqNo = parseInt(plate.serialNumber, 10);
-        getDefectsRaw(seqNo)
-          .then(response => {
-            // 使用返回的 surface_images 预热每个表面的第一块瓦片
-            const metas = response.surface_images ?? [];
-            metas.forEach(meta => {
-              const url = getTileImageUrl({
-                surface: meta.surface,
-                seqNo,
-                level: 0,
-                tileX: 0,
-                tileY: 0,
-                tileSize: 512,
+        neighbors.forEach(plate => {
+          const seqNo = parseInt(plate.serialNumber, 10);
+          getSteelMeta(seqNo)
+            .then(meta => {
+              const metas = meta.surface_images ?? [];
+              metas.forEach(surfaceMeta => {
+                const url = getTileImageUrl({
+                  surface: surfaceMeta.surface,
+                  seqNo,
+                  level: 0,
+                  tileX: 0,
+                  tileY: 0,
+                  tileSize: 512,
+                });
+                const img = new Image();
+                img.src = url;
               });
-              const img = new Image();
-              img.src = url;
+            })
+            .catch(() => {
+              // 预取失败忽略，不影响主流程
             });
-          })
-          .catch(() => {
-            // 预取失败忽略，不影响主流程
-          });
-      });
+        });
     }, [selectedPlateId, steelPlates]);
 
   const handleImageUpload = (imageUrl: string) => {

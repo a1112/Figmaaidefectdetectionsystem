@@ -99,12 +99,12 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
       : null;
 
   return (
-    <div className="h-full flex flex-col space-y-4">
+    <div className="h-full flex flex-col space-y-2">
       {/* 主区域：左侧图像 / 右侧统计+列表 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 flex-1 min-h-0">
         {/* 左侧：图像区域 */}
-        <div className="lg:col-span-2 flex flex-col gap-4 min-h-0">
-          <div className="flex-1 bg-card border border-border p-1 relative min-h-[260px] flex flex-col">
+        <div className="lg:col-span-2 flex flex-col gap-2 min-h-0">
+          <div className="flex-1 bg-card border border-border p-0.5 relative min-h-[260px] flex flex-col">
             {/* 顶部标签栏：视图模式 + 人工确认状态 + 选中缺陷信息 */}
             <div className="absolute top-0 left-0 right-0 px-2 py-1 bg-gradient-to-r from-primary to-primary/80 text-primary-foreground text-[10px] font-bold z-10 flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -189,7 +189,7 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
               </span>
             </div>
 
-            <div className="flex-1 flex items-center justify-center bg-black/40">
+            <div className="flex-1 flex items-center justify-center bg-black/40 mt-5">
               {currentImage || detectionResult ? (
                 <DetectionResult
                   imageUrl={currentImage || detectionResult!.fullImageUrl}
@@ -214,7 +214,7 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
             </div>
           </div>
 
-          <div className="bg-card border border-border p-2">
+          <div className="bg-card border border-border p-1.5">
             <DefectDistributionChart
               defects={filteredDefectsByControls}
               surface={surfaceFilter}
@@ -228,8 +228,8 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
         </div>
 
         {/* 右侧：缺陷列表 */}
-        <div className="flex flex-col gap-4 min-h-0">
-          <div className="bg-card border border-border p-2 flex flex-col min-h-[180px]">
+        <div className="flex flex-col gap-2 min-h-0">
+          <div className="bg-card border border-border p-1.5 flex flex-col min-h-[180px]">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-muted-foreground">缺陷列表</span>
             </div>

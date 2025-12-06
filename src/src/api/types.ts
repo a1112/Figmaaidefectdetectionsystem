@@ -122,7 +122,14 @@ export interface DefectResponse {
   seq_no: number;
   defects: DefectItemRaw[];
   total_count: number;
-  surface_images?: SurfaceImageInfo[];
+}
+
+/**
+ * 钢板图像元信息响应（来自后端 /api/ui/steel-meta）
+ */
+export interface SteelMetaResponse {
+  seq_no: number;
+  surface_images: SurfaceImageInfo[];
 }
 
 // ==================== 缺陷字典类型 ====================
