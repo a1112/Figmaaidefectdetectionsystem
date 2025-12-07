@@ -2,10 +2,10 @@
  * 开发/生产模式切换组件
  */
 
-import { useState, useEffect } from 'react';
-import { env } from '../src/config/env';
-import { getApiStatus } from '../src/api/client';
-import { Code, Globe, AlertCircle } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { env } from "../src/config/env";
+import { getApiStatus } from "../src/api/client";
+import { Code, Globe, AlertCircle } from "lucide-react";
 
 export function ModeSwitch() {
   const [mode, setMode] = useState(env.getMode());
@@ -18,20 +18,28 @@ export function ModeSwitch() {
       setApiStatus(getApiStatus());
     };
 
-    window.addEventListener('app_mode_change', handleModeChange as EventListener);
+    window.addEventListener(
+      "app_mode_change",
+      handleModeChange as EventListener,
+    );
     return () => {
-      window.removeEventListener('app_mode_change', handleModeChange as EventListener);
+      window.removeEventListener(
+        "app_mode_change",
+        handleModeChange as EventListener,
+      );
     };
   }, []);
 
-  const handleToggle = (newMode: 'development' | 'production') => {
+  const handleToggle = (
+    newMode: "development" | "production",
+  ) => {
     if (newMode !== mode) {
       env.setMode(newMode);
       setMode(newMode);
       setApiStatus(getApiStatus());
-      
+
       // 提示用户刷新页面以应用更改
-      if (confirm('切换模式后需要刷新页面，是否立即刷新？')) {
+      if (confirm("切换模式后需要刷新页面，是否立即刷新？")) {
         window.location.reload();
       }
     }
@@ -47,11 +55,11 @@ export function ModeSwitch() {
       {/* 模式切换按钮 */}
       <div className="flex gap-2">
         <button
-          onClick={() => handleToggle('development')}
+          onClick={() => handleToggle("development")}
           className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-all ${
-            mode === 'development'
-              ? 'bg-primary/10 border-primary text-primary'
-              : 'bg-muted/30 border-border text-muted-foreground hover:border-primary/50'
+            mode === "development"
+              ? "bg-primary/10 border-primary text-primary"
+              : "bg-muted/30 border-border text-muted-foreground hover:border-primary/50"
           }`}
         >
           <Code className="w-5 h-5" />
@@ -62,11 +70,11 @@ export function ModeSwitch() {
         </button>
 
         <button
-          onClick={() => handleToggle('production')}
+          onClick={() => handleToggle("production")}
           className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-all ${
-            mode === 'production'
-              ? 'bg-primary/10 border-primary text-primary'
-              : 'bg-muted/30 border-border text-muted-foreground hover:border-primary/50'
+            mode === "production"
+              ? "bg-primary/10 border-primary text-primary"
+              : "bg-muted/30 border-border text-muted-foreground hover:border-primary/50"
           }`}
         >
           <Globe className="w-5 h-5" />
@@ -80,14 +88,24 @@ export function ModeSwitch() {
       {/* 当前状态信息 */}
       <div className="bg-muted/30 border border-border rounded-lg p-3 space-y-2">
         <div className="flex items-center gap-2 text-sm">
-          <div className={`w-2 h-2 rounded-full ${
-            mode === 'development' ? 'bg-blue-500' : 'bg-green-500'
-          } animate-pulse`}></div>
-          <span className="text-muted-foreground">当前模式：</span>
-          <span className="font-mono font-bold">{apiStatus.description}</span>
+          <div
+            className={`w-2 h-2 rounded-full ${
+              mode === "development"
+                ? "bg-blue-500"
+                : "bg-green-500"
+            } animate-pulse`}
+          ></div>
+          <span className="text-muted-foreground">
+            当前模式：
+          </span>
+          <span className="font-mono font-bold">
+            {apiStatus.description}
+          </span>
         </div>
         <div className="flex items-center gap-2 text-sm">
-          <span className="text-muted-foreground">API 地址：</span>
+          <span className="text-muted-foreground">
+            API 地址：
+          </span>
           <span className="font-mono text-xs bg-background px-2 py-1 rounded border border-border">
             {apiStatus.baseUrl}
           </span>
@@ -95,19 +113,20 @@ export function ModeSwitch() {
       </div>
 
       {/* 警告提示 */}
-      {mode === 'production' && (
+      {mode === "production" && (
         <div className="flex items-start gap-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
           <AlertCircle className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
           <div className="text-xs text-yellow-200/90">
             <div className="font-medium mb-1">生产模式提醒</div>
             <div className="opacity-80">
-              当前将连接到真实后端 API。请确保后端服务已启动并运行在正确的端口。
+              当前将连接到真实后端
+              API。请确保后端服务已启动并运行在正确的端口。
             </div>
           </div>
         </div>
       )}
 
-      {mode === 'development' && (
+      {mode === "development" && (
         <div className="flex items-start gap-2 bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
           <AlertCircle className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
           <div className="text-xs text-blue-200/90">

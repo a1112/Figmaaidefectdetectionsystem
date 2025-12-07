@@ -24,7 +24,7 @@
     --input: 240 5.9% 90%;
     --ring: 240 5.9% 10%;
     --radius: 0px;
-    
+
     /* Custom Chart Colors for Light Theme */
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
@@ -32,7 +32,7 @@
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
   }
-  
+
   .dark {
     --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;
@@ -54,7 +54,7 @@
     --input: 240 3.7% 15.9%;
     --ring: 240 4.9% 83.9%;
     --radius: 0px;
-    
+
     /* Custom Chart Colors for Dark Theme */
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
@@ -70,9 +70,11 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    font-feature-settings:
+      "rlig" 1,
+      "calt" 1;
   }
-  
+
   /* Custom Scrollbar for Industrial Look */
   ::-webkit-scrollbar {
     width: 8px;
@@ -90,7 +92,11 @@
   }
 
   @keyframes progress {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(100%); }
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
   }
 }

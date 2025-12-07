@@ -1,5 +1,17 @@
-import { RefObject, useEffect, useState } from 'react';
-import { X, Camera, HardDrive, Cpu, Wifi, RefreshCw, Power, RotateCcw, AlertTriangle, CheckCircle2, Activity } from 'lucide-react';
+import { RefObject, useEffect, useState } from "react";
+import {
+  X,
+  Camera,
+  HardDrive,
+  Cpu,
+  Wifi,
+  RefreshCw,
+  Power,
+  RotateCcw,
+  AlertTriangle,
+  CheckCircle2,
+  Activity,
+} from "lucide-react";
 
 interface SystemDiagnosticDialogProps {
   isOpen: boolean;
@@ -7,28 +19,32 @@ interface SystemDiagnosticDialogProps {
   triggerRef: RefObject<HTMLButtonElement>;
 }
 
-export function SystemDiagnosticDialog({ isOpen, onClose, triggerRef }: SystemDiagnosticDialogProps) {
+export function SystemDiagnosticDialog({
+  isOpen,
+  onClose,
+  triggerRef,
+}: SystemDiagnosticDialogProps) {
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const [cameraStatus, setCameraStatus] = useState({
     online: true,
     fps: 30,
-    resolution: '1920x1080',
-    temperature: 42
+    resolution: "1920x1080",
+    temperature: 42,
   });
   const [diskUsage, setDiskUsage] = useState({
     used: 458,
     total: 1024,
-    percentage: 45
+    percentage: 45,
   });
   const [serverResources, setServerResources] = useState({
     cpu: 35,
     memory: 62,
-    temperature: 58
+    temperature: 58,
   });
   const [network, setNetwork] = useState({
-    status: 'connected',
+    status: "connected",
     latency: 12,
-    bandwidth: 95.6
+    bandwidth: 95.6,
   });
 
   // 模拟实时数据更新
@@ -37,21 +53,39 @@ export function SystemDiagnosticDialog({ isOpen, onClose, triggerRef }: SystemDi
 
     const interval = setInterval(() => {
       // 模拟轻微波动
-      setCameraStatus(prev => ({
+      setCameraStatus((prev) => ({
         ...prev,
         fps: 30 + Math.floor(Math.random() * 2),
-        temperature: 42 + Math.floor(Math.random() * 3)
+        temperature: 42 + Math.floor(Math.random() * 3),
       }));
 
-      setServerResources(prev => ({
-        cpu: Math.max(30, Math.min(40, prev.cpu + (Math.random() - 0.5) * 5)),
-        memory: Math.max(60, Math.min(65, prev.memory + (Math.random() - 0.5) * 3)),
-        temperature: Math.max(55, Math.min(62, prev.temperature + (Math.random() - 0.5) * 4))
+      setServerResources((prev) => ({
+        cpu: Math.max(
+          30,
+          Math.min(40, prev.cpu + (Math.random() - 0.5) * 5),
+        ),
+        memory: Math.max(
+          60,
+          Math.min(65, prev.memory + (Math.random() - 0.5) * 3),
+        ),
+        temperature: Math.max(
+          55,
+          Math.min(
+            62,
+            prev.temperature + (Math.random() - 0.5) * 4,
+          ),
+        ),
       }));
 
-      setNetwork(prev => ({
+      setNetwork((prev) => ({
         ...prev,
-        latency: Math.max(10, Math.min(15, prev.latency + (Math.random() - 0.5) * 2))
+        latency: Math.max(
+          10,
+          Math.min(
+            15,
+            prev.latency + (Math.random() - 0.5) * 2,
+          ),
+        ),
       }));
     }, 2000);
 
@@ -63,7 +97,7 @@ export function SystemDiagnosticDialog({ isOpen, onClose, triggerRef }: SystemDi
       const rect = triggerRef.current.getBoundingClientRect();
       setPosition({
         top: rect.bottom + 8,
-        left: rect.left - 500 + rect.width
+        left: rect.left - 500 + rect.width,
       });
     }
   }, [isOpen, triggerRef]);
@@ -71,45 +105,51 @@ export function SystemDiagnosticDialog({ isOpen, onClose, triggerRef }: SystemDi
   if (!isOpen) return null;
 
   const handleResetSystem = () => {
-    alert('执行一键恢复...');
+    alert("执行一键恢复...");
   };
 
   const handleRestartCamera = () => {
-    setCameraStatus(prev => ({ ...prev, online: false }));
+    setCameraStatus((prev) => ({ ...prev, online: false }));
     setTimeout(() => {
-      setCameraStatus(prev => ({ ...prev, online: true, fps: 30 }));
-      alert('相机重启完成');
+      setCameraStatus((prev) => ({
+        ...prev,
+        online: true,
+        fps: 30,
+      }));
+      alert("相机重启完成");
     }, 2000);
   };
 
   const handleRestartServer = () => {
-    alert('确认重启服务器？此操作将中断当前所有检测任务。');
+    alert("确认重启服务器？此操作将中断当前所有检测任务。");
   };
 
   return (
     <>
       {/* Backdrop */}
-      <div 
+      <div
         className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
         onClick={onClose}
       />
-      
+
       {/* Dialog */}
-      <div 
+      <div
         className="fixed z-50 bg-card border-2 border-primary shadow-2xl shadow-primary/20"
         style={{
           top: `${position.top}px`,
           left: `${position.left}px`,
-          width: '550px'
+          width: "550px",
         }}
       >
         {/* Header */}
         <div className="bg-primary/20 border-b-2 border-primary px-4 py-2.5 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Activity className="w-4 h-4 text-primary" />
-            <h3 className="font-bold text-sm uppercase tracking-wider">系统诊断 / SYSTEM DIAGNOSTIC</h3>
+            <h3 className="font-bold text-sm uppercase tracking-wider">
+              系统诊断 / SYSTEM DIAGNOSTIC
+            </h3>
           </div>
-          <button 
+          <button
             onClick={onClose}
             className="p-1 hover:bg-primary/30 rounded transition-colors"
           >
@@ -124,7 +164,9 @@ export function SystemDiagnosticDialog({ isOpen, onClose, triggerRef }: SystemDi
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Camera className="w-4 h-4 text-blue-400" />
-                <h4 className="font-bold text-xs uppercase tracking-wide">相机状态 / CAMERA</h4>
+                <h4 className="font-bold text-xs uppercase tracking-wide">
+                  相机状态 / CAMERA
+                </h4>
               </div>
               {cameraStatus.online ? (
                 <div className="flex items-center gap-1 text-green-400 text-xs">
@@ -138,27 +180,45 @@ export function SystemDiagnosticDialog({ isOpen, onClose, triggerRef }: SystemDi
                 </div>
               )}
             </div>
-            
+
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="bg-background/50 border border-border/30 p-2">
-                <div className="text-muted-foreground mb-1">帧率 FPS</div>
-                <div className="font-mono font-bold text-lg">{cameraStatus.fps} fps</div>
+                <div className="text-muted-foreground mb-1">
+                  帧率 FPS
+                </div>
+                <div className="font-mono font-bold text-lg">
+                  {cameraStatus.fps} fps
+                </div>
               </div>
               <div className="bg-background/50 border border-border/30 p-2">
-                <div className="text-muted-foreground mb-1">分辨率</div>
-                <div className="font-mono font-bold text-sm">{cameraStatus.resolution}</div>
+                <div className="text-muted-foreground mb-1">
+                  分辨率
+                </div>
+                <div className="font-mono font-bold text-sm">
+                  {cameraStatus.resolution}
+                </div>
               </div>
               <div className="bg-background/50 border border-border/30 p-2">
-                <div className="text-muted-foreground mb-1">温度</div>
-                <div className={`font-mono font-bold text-lg ${
-                  cameraStatus.temperature > 50 ? 'text-yellow-400' : 'text-green-400'
-                }`}>
+                <div className="text-muted-foreground mb-1">
+                  温度
+                </div>
+                <div
+                  className={`font-mono font-bold text-lg ${
+                    cameraStatus.temperature > 50
+                      ? "text-yellow-400"
+                      : "text-green-400"
+                  }`}
+                >
                   {cameraStatus.temperature}°C
                 </div>
               </div>
               <div className="bg-background/50 border border-border/30 p-2">
-                <div className="text-muted-foreground mb-1">状态</div>
-                <div className="text-green-400 font-bold">正常</div>
+                <div className="text-muted-foreground mb-1">
+                  状态
+                </div>
+                <div className="text-green-400 font-bold">
+                  正常
+                </div>
               </div>
             </div>
 
@@ -175,22 +235,30 @@ export function SystemDiagnosticDialog({ isOpen, onClose, triggerRef }: SystemDi
           <div className="bg-muted/30 border border-border/50 p-3">
             <div className="flex items-center gap-2 mb-3">
               <HardDrive className="w-4 h-4 text-purple-400" />
-              <h4 className="font-bold text-xs uppercase tracking-wide">磁盘使用 / DISK USAGE</h4>
+              <h4 className="font-bold text-xs uppercase tracking-wide">
+                磁盘使用 / DISK USAGE
+              </h4>
             </div>
-            
+
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs mb-1">
-                <span className="text-muted-foreground">已用空间</span>
-                <span className="font-mono font-bold">{diskUsage.used}GB / {diskUsage.total}GB</span>
+                <span className="text-muted-foreground">
+                  已用空间
+                </span>
+                <span className="font-mono font-bold">
+                  {diskUsage.used}GB / {diskUsage.total}GB
+                </span>
               </div>
-              
+
               {/* Progress Bar */}
               <div className="w-full h-6 bg-background border border-border/50 rounded-sm overflow-hidden relative">
-                <div 
+                <div
                   className={`h-full transition-all duration-500 ${
-                    diskUsage.percentage > 80 ? 'bg-red-500/70' :
-                    diskUsage.percentage > 60 ? 'bg-yellow-500/70' :
-                    'bg-green-500/70'
+                    diskUsage.percentage > 80
+                      ? "bg-red-500/70"
+                      : diskUsage.percentage > 60
+                        ? "bg-yellow-500/70"
+                        : "bg-green-500/70"
                   }`}
                   style={{ width: `${diskUsage.percentage}%` }}
                 />
@@ -203,16 +271,28 @@ export function SystemDiagnosticDialog({ isOpen, onClose, triggerRef }: SystemDi
 
               <div className="grid grid-cols-3 gap-2 text-xs mt-3">
                 <div className="bg-background/50 border border-border/30 p-2 text-center">
-                  <div className="text-muted-foreground mb-1">可用</div>
-                  <div className="font-mono font-bold text-green-400">{diskUsage.total - diskUsage.used}GB</div>
+                  <div className="text-muted-foreground mb-1">
+                    可用
+                  </div>
+                  <div className="font-mono font-bold text-green-400">
+                    {diskUsage.total - diskUsage.used}GB
+                  </div>
                 </div>
                 <div className="bg-background/50 border border-border/30 p-2 text-center">
-                  <div className="text-muted-foreground mb-1">已用</div>
-                  <div className="font-mono font-bold text-yellow-400">{diskUsage.used}GB</div>
+                  <div className="text-muted-foreground mb-1">
+                    已用
+                  </div>
+                  <div className="font-mono font-bold text-yellow-400">
+                    {diskUsage.used}GB
+                  </div>
                 </div>
                 <div className="bg-background/50 border border-border/30 p-2 text-center">
-                  <div className="text-muted-foreground mb-1">总容量</div>
-                  <div className="font-mono font-bold">{diskUsage.total}GB</div>
+                  <div className="text-muted-foreground mb-1">
+                    总容量
+                  </div>
+                  <div className="font-mono font-bold">
+                    {diskUsage.total}GB
+                  </div>
                 </div>
               </div>
             </div>
@@ -222,18 +302,24 @@ export function SystemDiagnosticDialog({ isOpen, onClose, triggerRef }: SystemDi
           <div className="bg-muted/30 border border-border/50 p-3">
             <div className="flex items-center gap-2 mb-3">
               <Cpu className="w-4 h-4 text-orange-400" />
-              <h4 className="font-bold text-xs uppercase tracking-wide">服务器资源 / SERVER RESOURCES</h4>
+              <h4 className="font-bold text-xs uppercase tracking-wide">
+                服务器资源 / SERVER RESOURCES
+              </h4>
             </div>
-            
+
             <div className="space-y-3">
               {/* CPU */}
               <div>
                 <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="text-muted-foreground">CPU使用率</span>
-                  <span className="font-mono font-bold">{serverResources.cpu.toFixed(1)}%</span>
+                  <span className="text-muted-foreground">
+                    CPU使用率
+                  </span>
+                  <span className="font-mono font-bold">
+                    {serverResources.cpu.toFixed(1)}%
+                  </span>
                 </div>
                 <div className="w-full h-4 bg-background border border-border/50 rounded-sm overflow-hidden relative">
-                  <div 
+                  <div
                     className="h-full bg-blue-500/70 transition-all duration-500"
                     style={{ width: `${serverResources.cpu}%` }}
                   />
@@ -243,13 +329,19 @@ export function SystemDiagnosticDialog({ isOpen, onClose, triggerRef }: SystemDi
               {/* Memory */}
               <div>
                 <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="text-muted-foreground">内存使用率</span>
-                  <span className="font-mono font-bold">{serverResources.memory.toFixed(1)}%</span>
+                  <span className="text-muted-foreground">
+                    内存使用率
+                  </span>
+                  <span className="font-mono font-bold">
+                    {serverResources.memory.toFixed(1)}%
+                  </span>
                 </div>
                 <div className="w-full h-4 bg-background border border-border/50 rounded-sm overflow-hidden relative">
-                  <div 
+                  <div
                     className="h-full bg-purple-500/70 transition-all duration-500"
-                    style={{ width: `${serverResources.memory}%` }}
+                    style={{
+                      width: `${serverResources.memory}%`,
+                    }}
                   />
                 </div>
               </div>
@@ -257,23 +349,33 @@ export function SystemDiagnosticDialog({ isOpen, onClose, triggerRef }: SystemDi
               {/* Temperature */}
               <div>
                 <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="text-muted-foreground">服务器温度</span>
-                  <span className={`font-mono font-bold ${
-                    serverResources.temperature > 70 ? 'text-red-400' :
-                    serverResources.temperature > 60 ? 'text-yellow-400' :
-                    'text-green-400'
-                  }`}>
+                  <span className="text-muted-foreground">
+                    服务器温度
+                  </span>
+                  <span
+                    className={`font-mono font-bold ${
+                      serverResources.temperature > 70
+                        ? "text-red-400"
+                        : serverResources.temperature > 60
+                          ? "text-yellow-400"
+                          : "text-green-400"
+                    }`}
+                  >
                     {serverResources.temperature.toFixed(0)}°C
                   </span>
                 </div>
                 <div className="w-full h-4 bg-background border border-border/50 rounded-sm overflow-hidden relative">
-                  <div 
+                  <div
                     className={`h-full transition-all duration-500 ${
-                      serverResources.temperature > 70 ? 'bg-red-500/70' :
-                      serverResources.temperature > 60 ? 'bg-yellow-500/70' :
-                      'bg-green-500/70'
+                      serverResources.temperature > 70
+                        ? "bg-red-500/70"
+                        : serverResources.temperature > 60
+                          ? "bg-yellow-500/70"
+                          : "bg-green-500/70"
                     }`}
-                    style={{ width: `${(serverResources.temperature / 100) * 100}%` }}
+                    style={{
+                      width: `${(serverResources.temperature / 100) * 100}%`,
+                    }}
                   />
                 </div>
               </div>
@@ -293,35 +395,53 @@ export function SystemDiagnosticDialog({ isOpen, onClose, triggerRef }: SystemDi
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Wifi className="w-4 h-4 text-green-400" />
-                <h4 className="font-bold text-xs uppercase tracking-wide">网络状态 / NETWORK</h4>
+                <h4 className="font-bold text-xs uppercase tracking-wide">
+                  网络状态 / NETWORK
+                </h4>
               </div>
               <div className="flex items-center gap-1 text-green-400 text-xs">
                 <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
                 <span>已连接</span>
               </div>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="bg-background/50 border border-border/30 p-2">
-                <div className="text-muted-foreground mb-1">延迟 PING</div>
-                <div className={`font-mono font-bold text-lg ${
-                  network.latency < 20 ? 'text-green-400' :
-                  network.latency < 50 ? 'text-yellow-400' :
-                  'text-red-400'
-                }`}>
+                <div className="text-muted-foreground mb-1">
+                  延迟 PING
+                </div>
+                <div
+                  className={`font-mono font-bold text-lg ${
+                    network.latency < 20
+                      ? "text-green-400"
+                      : network.latency < 50
+                        ? "text-yellow-400"
+                        : "text-red-400"
+                  }`}
+                >
                   {network.latency.toFixed(0)} ms
                 </div>
               </div>
               <div className="bg-background/50 border border-border/30 p-2">
-                <div className="text-muted-foreground mb-1">带宽</div>
-                <div className="font-mono font-bold text-lg text-blue-400">{network.bandwidth} Mbps</div>
+                <div className="text-muted-foreground mb-1">
+                  带宽
+                </div>
+                <div className="font-mono font-bold text-lg text-blue-400">
+                  {network.bandwidth} Mbps
+                </div>
               </div>
               <div className="bg-background/50 border border-border/30 p-2">
-                <div className="text-muted-foreground mb-1">协议</div>
-                <div className="font-mono font-bold">TCP/IP</div>
+                <div className="text-muted-foreground mb-1">
+                  协议
+                </div>
+                <div className="font-mono font-bold">
+                  TCP/IP
+                </div>
               </div>
               <div className="bg-background/50 border border-border/30 p-2">
-                <div className="text-muted-foreground mb-1">端口</div>
+                <div className="text-muted-foreground mb-1">
+                  端口
+                </div>
                 <div className="font-mono font-bold">8080</div>
               </div>
             </div>
@@ -346,7 +466,8 @@ export function SystemDiagnosticDialog({ isOpen, onClose, triggerRef }: SystemDi
             </button>
           </div>
           <div className="mt-2 text-[9px] text-muted-foreground text-center">
-            最后更新: {new Date().toLocaleTimeString('zh-CN')} | 系统版本: v2.0.1
+            最后更新: {new Date().toLocaleTimeString("zh-CN")} |
+            系统版本: v2.0.1
           </div>
         </div>
       </div>

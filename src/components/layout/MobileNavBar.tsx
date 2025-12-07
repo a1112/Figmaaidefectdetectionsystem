@@ -2,9 +2,13 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertCircle,
-  Images
-} from 'lucide-react';
-import type { ActiveTab, SurfaceFilter, SteelPlate } from '../../types/app.types';
+  Images,
+} from "lucide-react";
+import type {
+  ActiveTab,
+  SurfaceFilter,
+  SteelPlate,
+} from "../../types/app.types";
 
 interface MobileNavBarProps {
   activeTab: ActiveTab;
@@ -25,37 +29,50 @@ export const MobileNavBar: React.FC<MobileNavBarProps> = ({
   setSelectedPlateId,
   surfaceFilter,
   setSurfaceFilter,
-  setShowPlatesPanel
+  setShowPlatesPanel,
 }) => {
   const handleTabSwitch = () => {
-    if (activeTab === 'defects') {
-      setActiveTab('images');
-    } else if (activeTab === 'images') {
-      setActiveTab('defects');
+    if (activeTab === "defects") {
+      setActiveTab("images");
+    } else if (activeTab === "images") {
+      setActiveTab("defects");
     } else {
-      setActiveTab('defects');
+      setActiveTab("defects");
     }
   };
 
   const handlePrevPlate = () => {
     if (filteredSteelPlates.length === 0) return;
-    const currentIndex = filteredSteelPlates.findIndex(p => p.plateId === selectedPlateId);
-    const prevIndex = currentIndex > 0 ? currentIndex - 1 : filteredSteelPlates.length - 1;
+    const currentIndex = filteredSteelPlates.findIndex(
+      (p) => p.plateId === selectedPlateId,
+    );
+    const prevIndex =
+      currentIndex > 0
+        ? currentIndex - 1
+        : filteredSteelPlates.length - 1;
     const prevPlate = filteredSteelPlates[prevIndex];
     if (prevPlate) setSelectedPlateId(prevPlate.plateId);
   };
 
   const handleNextPlate = () => {
     if (filteredSteelPlates.length === 0) return;
-    const currentIndex = filteredSteelPlates.findIndex(p => p.plateId === selectedPlateId);
-    const nextIndex = currentIndex < filteredSteelPlates.length - 1 ? currentIndex + 1 : 0;
+    const currentIndex = filteredSteelPlates.findIndex(
+      (p) => p.plateId === selectedPlateId,
+    );
+    const nextIndex =
+      currentIndex < filteredSteelPlates.length - 1
+        ? currentIndex + 1
+        : 0;
     const nextPlate = filteredSteelPlates[nextIndex];
     if (nextPlate) setSelectedPlateId(nextPlate.plateId);
   };
 
   const currentPlateId = (() => {
-    const currentPlate = filteredSteelPlates.find(p => p.plateId === selectedPlateId) || filteredSteelPlates[0];
-    return currentPlate?.plateId || '-';
+    const currentPlate =
+      filteredSteelPlates.find(
+        (p) => p.plateId === selectedPlateId,
+      ) || filteredSteelPlates[0];
+    return currentPlate?.plateId || "-";
   })();
 
   return (
@@ -68,16 +85,22 @@ export const MobileNavBar: React.FC<MobileNavBarProps> = ({
       >
         <ChevronLeft className="w-5 h-5" />
       </button>
-      
+
       {/* 中间区域：缺陷/图像切换 + 钢板切换 + 表面切换 */}
       <div className="flex items-center gap-2 flex-1 min-w-0 justify-center">
         {/* 缺陷/图像切换 */}
         <button
           onClick={handleTabSwitch}
           className="flex items-center gap-1 px-2 py-1.5 bg-muted hover:bg-accent border border-border rounded shrink-0 transition-colors"
-          title={activeTab === 'defects' ? '切换到图像' : activeTab === 'images' ? '切换到缺陷' : '缺陷/图像'}
+          title={
+            activeTab === "defects"
+              ? "切换到图像"
+              : activeTab === "images"
+                ? "切换到缺陷"
+                : "缺陷/图像"
+          }
         >
-          {activeTab === 'defects' ? (
+          {activeTab === "defects" ? (
             <>
               <AlertCircle className="w-4 h-4" />
               <ChevronRight className="w-3 h-3" />
@@ -91,7 +114,7 @@ export const MobileNavBar: React.FC<MobileNavBarProps> = ({
             </>
           )}
         </button>
-        
+
         {/* 钢板切换 */}
         {filteredSteelPlates.length > 0 && (
           <div className="flex items-center gap-1 px-2 py-1 bg-muted border border-border rounded shrink-0">
@@ -114,36 +137,37 @@ export const MobileNavBar: React.FC<MobileNavBarProps> = ({
             </button>
           </div>
         )}
-        
+
         {/* 表面切换（上表/下表/全部） */}
-        {(activeTab === 'defects' || activeTab === 'images') && (
+        {(activeTab === "defects" ||
+          activeTab === "images") && (
           <div className="flex items-center gap-1 bg-muted border border-border rounded p-0.5 shrink-0">
             <button
-              onClick={() => setSurfaceFilter('top')}
+              onClick={() => setSurfaceFilter("top")}
               className={`px-2 py-1 text-xs font-bold rounded transition-colors ${
-                surfaceFilter === 'top'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground'
+                surfaceFilter === "top"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground"
               }`}
             >
               上表
             </button>
             <button
-              onClick={() => setSurfaceFilter('bottom')}
+              onClick={() => setSurfaceFilter("bottom")}
               className={`px-2 py-1 text-xs font-bold rounded transition-colors ${
-                surfaceFilter === 'bottom'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground'
+                surfaceFilter === "bottom"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground"
               }`}
             >
               下表
             </button>
             <button
-              onClick={() => setSurfaceFilter('all')}
+              onClick={() => setSurfaceFilter("all")}
               className={`px-2 py-1 text-xs font-bold rounded transition-colors ${
-                surfaceFilter === 'all'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground'
+                surfaceFilter === "all"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground"
               }`}
             >
               全部

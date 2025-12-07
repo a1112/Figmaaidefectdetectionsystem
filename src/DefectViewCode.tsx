@@ -3,40 +3,42 @@
 // 位置：约第 1179-1212 行
 // ========================================
 
-{/* Viewport 容器开始 */}
+{
+  /* Viewport 容器开始 */
+}
 <div className="flex-1 bg-card border border-border p-1 relative min-h-[300px] flex flex-col">
   {!isMobileDevice && (
-  <div className="absolute top-0 left-0 px-2 py-1 bg-primary text-primary-foreground text-xs font-bold z-10">
-    {env.isProduction() ? '缺陷检测视图' : 'CAM-01 LIVE FEED'}
-  </div>
+    <div className="absolute top-0 left-0 px-2 py-1 bg-primary text-primary-foreground text-xs font-bold z-10">
+      {env.isProduction() ? "缺陷检测视图" : "CAM-01 LIVE FEED"}
+    </div>
   )}
-  
+
   {/* 大图/单缺陷切换按钮 - 仅生产模式显示 */}
   {!isMobileDevice && env.isProduction() && (
     <div className="absolute top-0 right-0 flex gap-1 p-1 z-10">
       <button
-        onClick={() => setImageViewMode('full')}
+        onClick={() => setImageViewMode("full")}
         className={`px-2 py-1 text-xs rounded transition-colors ${
-          imageViewMode === 'full'
-            ? 'bg-primary text-primary-foreground'
-            : 'bg-muted text-muted-foreground hover:bg-accent'
+          imageViewMode === "full"
+            ? "bg-primary text-primary-foreground"
+            : "bg-muted text-muted-foreground hover:bg-accent"
         }`}
       >
         大图
       </button>
       <button
-        onClick={() => setImageViewMode('single')}
+        onClick={() => setImageViewMode("single")}
         className={`px-2 py-1 text-xs rounded transition-colors ${
-          imageViewMode === 'single'
-            ? 'bg-primary text-primary-foreground'
-            : 'bg-muted text-muted-foreground hover:bg-accent'
+          imageViewMode === "single"
+            ? "bg-primary text-primary-foreground"
+            : "bg-muted text-muted-foreground hover:bg-accent"
         }`}
       >
         单缺陷
       </button>
     </div>
   )}
-  
+
   {/* 主显示区域 */}
   <div className="flex-1 bg-black/40 flex items-center justify-center overflow-hidden border border-border/20 relative">
     {env.isProduction() ? (
@@ -51,46 +53,56 @@
         // 无数据
         <div className="flex flex-col items-center justify-center gap-4 text-muted-foreground">
           <AlertCircle className="w-16 h-16 opacity-50" />
-          <p className="text-sm">{selectedPlateId ? '无缺陷数据' : '请选择钢板查看缺陷'}</p>
+          <p className="text-sm">
+            {selectedPlateId
+              ? "无缺陷数据"
+              : "请选择钢板查看缺陷"}
+          </p>
         </div>
       ) : (
         // 显示缺陷图像
-        <DefectImageView 
-          selectedPlate={steelPlates.find(p => p.plateId === selectedPlateId)}
-          defects={plateDefects.filter(d => surfaceFilter === 'all' || d.surface === surfaceFilter)}
+        <DefectImageView
+          selectedPlate={steelPlates.find(
+            (p) => p.plateId === selectedPlateId,
+          )}
+          defects={plateDefects.filter(
+            (d) =>
+              surfaceFilter === "all" ||
+              d.surface === surfaceFilter,
+          )}
           surface={surfaceFilter}
           imageViewMode={imageViewMode}
           selectedDefectId={selectedDefectId}
           onDefectSelect={setSelectedDefectId}
         />
       )
+    ) : // ========== 开发模式 ==========
+    !currentImage ? (
+      // 未上传图像
+      <div className="w-full h-full flex items-center justify-center p-8">
+        <UploadZone onImageUpload={handleImageUpload} />
+      </div>
     ) : (
-      // ========== 开发模式 ==========
-      !currentImage ? (
-        // 未上传图像
-        <div className="w-full h-full flex items-center justify-center p-8">
-          <UploadZone onImageUpload={handleImageUpload} />
-        </div>
-      ) : (
-        // 已上传图像，显示检测结果
-        <div className="relative w-full h-full flex items-center justify-center bg-zinc-950">
-           <DetectionResult
-              imageUrl={currentImage}
-              defects={detectionResult?.defects || []}
-              isDetecting={isDetecting}
-            />
-            <button
-              onClick={() => {
-                setCurrentImage(null);
-                setDetectionResult(null);
-              }}
-              className="absolute top-4 right-4 px-3 py-1.5 bg-destructive/90 hover:bg-destructive text-white text-xs rounded border border-white/10 backdrop-blur-md transition-colors z-20"
-            >
-              CLOSE FEED
-            </button>
-        </div>
-      )
+      // 已上传图像，显示检测结果
+      <div className="relative w-full h-full flex items-center justify-center bg-zinc-950">
+        <DetectionResult
+          imageUrl={currentImage}
+          defects={detectionResult?.defects || []}
+          isDetecting={isDetecting}
+        />
+        <button
+          onClick={() => {
+            setCurrentImage(null);
+            setDetectionResult(null);
+          }}
+          className="absolute top-4 right-4 px-3 py-1.5 bg-destructive/90 hover:bg-destructive text-white text-xs rounded border border-white/10 backdrop-blur-md transition-colors z-20"
+        >
+          CLOSE FEED
+        </button>
+      </div>
     )}
   </div>
-</div>
-{/* Viewport 容器结束 */}
+</div>;
+{
+  /* Viewport 容器结束 */
+}

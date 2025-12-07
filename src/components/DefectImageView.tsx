@@ -1,15 +1,23 @@
-import { useState, useEffect } from 'react';
-import { AlertCircle } from 'lucide-react';
-import { env } from '../src/config/env';
-import type { SteelPlate, Defect } from '../App';
+import { useState, useEffect, useMemo, useRef } from "react";
+import { AlertCircle } from "lucide-react";
+import { env } from "../src/config/env";
+import type { SteelPlate, Defect } from "../types/app.types";
+import type {
+  SurfaceImageInfo,
+  Surface,
+} from "../src/api/types";
+import { getTileImageUrl } from "../src/api/client";
+
+const MAX_DEFECTS_TO_DRAW = 1000;
 
 interface DefectImageViewProps {
   selectedPlate: SteelPlate | undefined;
   defects: Defect[];
-  surface: 'all' | 'top' | 'bottom';
-  imageViewMode: 'full' | 'single';
+  surface: "all" | "top" | "bottom";
+  imageViewMode: "full" | "single";
   selectedDefectId: string | null;
   onDefectSelect: (id: string | null) => void;
+  surfaceImageInfo?: SurfaceImageInfo[] | null;
 }
 
 export function DefectImageView({
@@ -19,24 +27,132 @@ export function DefectImageView({
   imageViewMode,
   selectedDefectId,
   onDefectSelect,
+  surfaceImageInfo,
 }: DefectImageViewProps) {
+  const fullViewContainerRef = useRef<HTMLDivElement | null>(
+    null,
+  );
   const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [imageError, setImageError] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(
+    null,
+  );
   const [isLoadingImage, setIsLoadingImage] = useState(false);
+  const [viewportSize, setViewportSize] = useState<{
+    width: number;
+    height: number;
+  }>({
+    width: 0,
+    height: 0,
+  });
+
+  // 瓦片视图的缩放和拖动状态（仅大图模式使用）
+  const [zoom, setZoom] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const isPanningRef = useRef(false);
+  const lastPosRef = useRef<{ x: number; y: number } | null>(
+    null,
+  );
+
+  const actualSurface: Surface = useMemo(
+    () => (surface === "all" ? "top" : surface) as Surface,
+    [surface],
+  );
+
+  const surfaceMeta: SurfaceImageInfo | undefined = useMemo(
+    () =>
+      surfaceImageInfo?.find(
+        (info) => info.surface === actualSurface,
+      ),
+    [surfaceImageInfo, actualSurface],
+  );
+
+  const seqNo = useMemo(
+    () =>
+      selectedPlate
+        ? parseInt(selectedPlate.serialNumber, 10)
+        : null,
+    [selectedPlate],
+  );
+
+  const chooseTileLevel = (
+    worldHeight: number,
+    targetDisplayHeight: number,
+  ): number => {
+    if (worldHeight <= 0 || targetDisplayHeight <= 0) {
+      return 0;
+    }
+    const ratio = worldHeight / (targetDisplayHeight * 4);
+    const raw = Math.log2(Math.max(1, ratio));
+    const level = Math.ceil(raw);
+    // 后端当前仅支持 0,1,2 级瓦片；这里做一次硬性裁剪，避免 level=3/4 导致 422
+    const maxLevel = 2;
+    return Math.min(maxLevel, Math.max(0, level));
+  };
+
+  // 独立的滚轮缩放处理：使用原生事件避免 React passive wheel 限制
+  useEffect(() => {
+    const el = fullViewContainerRef.current;
+    if (!el) return;
+
+    const handleWheelNative = (event: WheelEvent) => {
+      event.preventDefault();
+      const delta = event.deltaY < 0 ? 0.1 : -0.1;
+      setZoom((prev) => {
+        const next = Math.min(4, Math.max(0.5, prev + delta));
+        return Number(next.toFixed(2));
+      });
+    };
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setViewportSize({
+          width: entry.contentRect.width,
+          height: entry.contentRect.height,
+        });
+      }
+    });
+
+    el.addEventListener("wheel", handleWheelNative, {
+      passive: false,
+    });
+    resizeObserver.observe(el);
+
+    return () => {
+      el.removeEventListener("wheel", handleWheelNative);
+      resizeObserver.disconnect();
+    };
+  }, []);
 
   // 获取当前选中的缺陷
-  const selectedDefect = selectedDefectId ? defects.find(d => d.id === selectedDefectId) : null;
-  
+  const selectedDefect = selectedDefectId
+    ? defects.find((d) => d.id === selectedDefectId)
+    : null;
+
   // 当显示单缺陷模式时，如果没有选中，自动选中第一个
   useEffect(() => {
-    if (imageViewMode === 'single' && !selectedDefectId && defects.length > 0) {
+    if (
+      imageViewMode === "single" &&
+      !selectedDefectId &&
+      defects.length > 0
+    ) {
       onDefectSelect(defects[0].id);
     }
-  }, [imageViewMode, selectedDefectId, defects, onDefectSelect]);
+  }, [
+    imageViewMode,
+    selectedDefectId,
+    defects,
+    onDefectSelect,
+  ]);
 
-  // 加载图像
+  // 加载图像（单缺陷模式仍然用裁剪接口；大图模式在生产环境下优先使用瓦片视图）
   useEffect(() => {
     if (!selectedPlate) {
+      setImageUrl(null);
+      return;
+    }
+
+    // 如果是大图模式但还没有任何缺陷（不知道有效的 imageIndex），先不要请求 image_index=0，避免 404
+    if (imageViewMode === "full" && defects.length === 0) {
       setImageUrl(null);
       return;
     }
@@ -47,31 +163,64 @@ export function DefectImageView({
 
       try {
         const baseUrl = env.getApiBaseUrl();
-        const seqNo = parseInt(selectedPlate.serialNumber, 10);
 
-        let url: string;
-        if (imageViewMode === 'single' && selectedDefect) {
-          // 单缺陷模式：使用缺陷裁剪接口
-          url = `${baseUrl}/images/defect/${selectedDefect.id}?surface=${selectedDefect.surface}`;
-        } else {
-          // 大图模式：使用帧图像接口
-          const actualSurface = surface === 'all' ? 'top' : surface;
-          const imageIndex = defects.length > 0 ? (defects[0].imageIndex || 0) : 0;
-          url = `${baseUrl}/images/frame?surface=${actualSurface}&seq_no=${seqNo}&image_index=${imageIndex}`;
+        // 单缺陷模式：使用缺陷裁剪接口
+        if (imageViewMode === "single" && selectedDefect) {
+          const url = `${baseUrl}/images/defect/${selectedDefect.id}?surface=${selectedDefect.surface}`;
+          console.log(`🖼️ 加载单缺陷图像: ${url}`);
+          setImageUrl(url);
+          return;
         }
 
-        console.log(`🖼️ 加载图像: ${url}`);
-        setImageUrl(url);
+        // 大图模式：如果有 surfaceMeta 和 seqNo，则使用瓦片视图，不再单独加载整帧
+        if (
+          imageViewMode === "full" &&
+          surfaceMeta &&
+          seqNo != null
+        ) {
+          // 瓦片由下方 JSX 动态加载，这里只需清空单帧 URL
+          setImageUrl(null);
+          setImageError(null);
+          return;
+        }
+
+        // 回退：没有元数据时仍使用单帧图像接口
+        if (imageViewMode === "full") {
+          const firstWithIndex = defects.find(
+            (d) => typeof d.imageIndex === "number",
+          );
+          if (
+            !firstWithIndex ||
+            typeof firstWithIndex.imageIndex !== "number"
+          ) {
+            setImageUrl(null);
+            return;
+          }
+          const imageIndex = firstWithIndex.imageIndex;
+          const url = `${baseUrl}/images/frame?surface=${actualSurface}&seq_no=${seqNo}&image_index=${imageIndex}`;
+          console.log(`🖼️ 加载回退大图帧: ${url}`);
+          setImageUrl(url);
+        }
       } catch (error) {
-        console.error('❌ 加载图像失败:', error);
-        setImageError(error instanceof Error ? error.message : '加载失败');
+        console.error("❌ 加载图像失败:", error);
+        setImageError(
+          error instanceof Error ? error.message : "加载失败",
+        );
       } finally {
         setIsLoadingImage(false);
       }
     };
 
     loadImage();
-  }, [selectedPlate, imageViewMode, selectedDefect, surface, defects]);
+  }, [
+    selectedPlate,
+    imageViewMode,
+    selectedDefect,
+    defects,
+    actualSurface,
+    surfaceMeta,
+    seqNo,
+  ]);
 
   if (isLoadingImage) {
     return (
@@ -91,59 +240,196 @@ export function DefectImageView({
     );
   }
 
-  if (!imageUrl) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-4 text-muted-foreground">
-        <AlertCircle className="w-16 h-16 opacity-50" />
-        <p className="text-sm">无可用图像</p>
-      </div>
-    );
-  }
-
   return (
     <div className="relative w-full h-full">
-      {imageViewMode === 'full' ? (
-        // 大图模式：显示完整图像并绘制缺陷框
-        <div className="relative w-full h-full flex items-center justify-center">
-          <img
-            src={imageUrl}
-            alt="钢板缺陷图像"
-            className="max-w-full max-h-full object-contain"
-            onError={() => setImageError('图像加载失败')}
-          />
-          {/* TODO: 在图像上绘制缺陷框 */}
-          <svg
-            className="absolute top-0 left-0 w-full h-full pointer-events-none"
-            style={{ mixBlendMode: 'difference' }}
-          >
-            {defects.map((defect) => (
-              <g key={defect.id}>
-                <rect
-                  x={`${defect.x}%`}
-                  y={`${defect.y}%`}
-                  width={`${defect.width}%`}
-                  height={`${defect.height}%`}
-                  fill="none"
-                  stroke={
-                    defect.severity === 'high' ? '#ef4444' :
-                    defect.severity === 'medium' ? '#f59e0b' :
-                    '#22c55e'
-                  }
-                  strokeWidth="2"
-                  className={selectedDefectId === defect.id ? 'opacity-100' : 'opacity-60'}
-                />
-                <text
-                  x={`${defect.x}%`}
-                  y={`${defect.y - 1}%`}
-                  fill="white"
-                  fontSize="12"
-                  fontWeight="bold"
-                >
-                  {defect.type}
-                </text>
-              </g>
-            ))}
-          </svg>
+      {imageViewMode === "full" ? (
+        // 大图模式：使用瓦片视图 + 简单缩放/拖动，类似地图
+        <div
+          ref={fullViewContainerRef}
+          className="relative w-full h-full overflow-hidden bg-black"
+          onMouseDown={(event) => {
+            isPanningRef.current = true;
+            lastPosRef.current = {
+              x: event.clientX,
+              y: event.clientY,
+            };
+          }}
+          onMouseMove={(event) => {
+            if (!isPanningRef.current || !lastPosRef.current)
+              return;
+            const dx = event.clientX - lastPosRef.current.x;
+            const dy = event.clientY - lastPosRef.current.y;
+            lastPosRef.current = {
+              x: event.clientX,
+              y: event.clientY,
+            };
+            setOffset((prev) => ({
+              x: prev.x + dx,
+              y: prev.y + dy,
+            }));
+          }}
+          onMouseUp={() => {
+            isPanningRef.current = false;
+            lastPosRef.current = null;
+          }}
+          onMouseLeave={() => {
+            isPanningRef.current = false;
+            lastPosRef.current = null;
+          }}
+        >
+          {surfaceMeta && seqNo != null ? (
+            (() => {
+              const worldWidth = surfaceMeta.image_width;
+              const worldHeight =
+                surfaceMeta.frame_count *
+                surfaceMeta.image_height;
+              const baseLevel = chooseTileLevel(
+                worldHeight,
+                600,
+              );
+              const level = baseLevel;
+              const tileSize = 512;
+              const scaledWidth = worldWidth / 2 ** level;
+              const scaledHeight = worldHeight / 2 ** level;
+              const tilesX = Math.max(
+                1,
+                Math.ceil(scaledWidth / tileSize),
+              );
+              const tilesY = Math.max(
+                1,
+                Math.ceil(scaledHeight / tileSize),
+              );
+              const levelScale = 1 / 2 ** level;
+
+              const containerStyle: React.CSSProperties = {
+                position: "absolute",
+                left: "50%",
+                top: "50%",
+                width: scaledWidth,
+                height: scaledHeight,
+                transform: `translate(-50%, -50%) translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
+                transformOrigin: "center center",
+              };
+
+              const tiles: JSX.Element[] = [];
+              for (let tileY = 0; tileY < tilesY; tileY += 1) {
+                for (
+                  let tileX = 0;
+                  tileX < tilesX;
+                  tileX += 1
+                ) {
+                  const url = getTileImageUrl({
+                    surface: actualSurface,
+                    seqNo,
+                    level,
+                    tileX,
+                    tileY,
+                    tileSize,
+                  });
+
+                  const left = tileX * tileSize;
+                  const top = tileY * tileSize;
+                  const width = tileSize;
+                  const height = tileSize;
+
+                  tiles.push(
+                    <img
+                      key={`tile-${tileX}-${tileY}`}
+                      src={url}
+                      alt="mosaic-tile"
+                      className="absolute"
+                      style={{
+                        left,
+                        top,
+                        width,
+                        height,
+                        objectFit: "fill",
+                      }}
+                    />,
+                  );
+                }
+              }
+
+              // 缺陷覆盖：先保证能看到矩形，暂不按视口裁剪，最多 1000 个
+              const overlay: JSX.Element | null = (() => {
+                const worldDefects = defects.filter(
+                  (d) =>
+                    d.surface === actualSurface &&
+                    typeof d.imageIndex === "number",
+                );
+
+                if (worldDefects.length === 0) return null;
+
+                const toDraw =
+                  worldDefects.length <= MAX_DEFECTS_TO_DRAW
+                    ? worldDefects
+                    : worldDefects.slice(
+                        0,
+                        MAX_DEFECTS_TO_DRAW,
+                      );
+
+                return (
+                  <svg
+                    className="absolute inset-0 pointer-events-none"
+                    viewBox={`0 0 ${scaledWidth} ${scaledHeight}`}
+                    preserveAspectRatio="none"
+                  >
+                    {toDraw.map((defect) => {
+                      const frameIndex =
+                        defect.imageIndex as number;
+                      const y1 =
+                        frameIndex * surfaceMeta.image_height +
+                        defect.y;
+                      const x1 = defect.x;
+                      const w = defect.width;
+                      const h = defect.height;
+
+                      const sx = x1 * levelScale;
+                      const sy = y1 * levelScale;
+                      const sw = w * levelScale;
+                      const sh = h * levelScale;
+
+                      return (
+                        <rect
+                          key={defect.id}
+                          x={sx}
+                          y={sy}
+                          width={sw}
+                          height={sh}
+                          fill="none"
+                          stroke="#f97316"
+                          strokeWidth={2}
+                          vectorEffect="non-scaling-stroke"
+                        />
+                      );
+                    })}
+                  </svg>
+                );
+              })();
+
+              return (
+                <div style={containerStyle}>
+                  {tiles}
+                  {overlay}
+                </div>
+              );
+            })()
+          ) : imageUrl ? (
+            // 回退：仍然显示单帧大图
+            <div className="relative w-full h-full flex items-center justify-center">
+              <img
+                src={imageUrl}
+                alt="钢板缺陷图像"
+                className="max-w-full max-h-full object-contain"
+                onError={() => setImageError("图像加载失败")}
+              />
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-4 text-muted-foreground h-full">
+              <AlertCircle className="w-16 h-16 opacity-50" />
+              <p className="text-sm">无可用大图</p>
+            </div>
+          )}
         </div>
       ) : (
         // 单缺陷模式：显示裁剪后的缺陷图像
@@ -152,26 +438,37 @@ export function DefectImageView({
             src={imageUrl}
             alt={`缺陷: ${selectedDefect?.type}`}
             className="max-w-full max-h-full object-contain border-2 border-primary/50 rounded"
-            onError={() => setImageError('图像加载失败')}
+            onError={() => setImageError("图像加载失败")}
           />
           {selectedDefect && (
             <div className="absolute bottom-4 left-4 right-4 bg-black/80 backdrop-blur-sm p-3 rounded border border-border">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-bold text-white">{selectedDefect.type}</span>
-                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${
-                      selectedDefect.severity === 'high' ? 'bg-red-500 text-white' :
-                      selectedDefect.severity === 'medium' ? 'bg-yellow-500 text-black' :
-                      'bg-green-500 text-white'
-                    }`}>
+                    <span className="text-sm font-bold text-white">
+                      {selectedDefect.type}
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 rounded text-xs font-bold ${
+                        selectedDefect.severity === "high"
+                          ? "bg-red-500 text-white"
+                          : selectedDefect.severity === "medium"
+                            ? "bg-yellow-500 text-black"
+                            : "bg-green-500 text-white"
+                      }`}
+                    >
                       {selectedDefect.severity.toUpperCase()}
                     </span>
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    位置: ({selectedDefect.x.toFixed(1)}, {selectedDefect.y.toFixed(1)}) | 
-                    尺寸: {selectedDefect.width.toFixed(1)} × {selectedDefect.height.toFixed(1)} | 
-                    置信度: {(selectedDefect.confidence * 100).toFixed(0)}%
+                    位置: ({selectedDefect.x.toFixed(1)},{" "}
+                    {selectedDefect.y.toFixed(1)}) | 尺寸:{" "}
+                    {selectedDefect.width.toFixed(1)} ×{" "}
+                    {selectedDefect.height.toFixed(1)} | 置信度:{" "}
+                    {(selectedDefect.confidence * 100).toFixed(
+                      0,
+                    )}
+                    %
                   </div>
                 </div>
               </div>

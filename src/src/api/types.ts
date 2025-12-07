@@ -9,31 +9,31 @@
  * 钢板项（后端返回）
  */
 export interface SteelItemRaw {
-  seq_no: number;        // 流水号
-  steel_no: string;      // 钢板号
-  steel_type: string;    // 钢种
-  length: number;        // 长度 (mm)
-  width: number;         // 宽度 (mm)
-  thickness: number;     // 厚度 (mm)
-  timestamp: string;     // ISO 时间戳
-  level: 'A' | 'B' | 'C' | 'D';  // 质量等级
-  defect_count: number;  // 缺陷数量
+  seq_no: number; // 流水号
+  steel_no: string; // 钢板号
+  steel_type: string; // 钢种
+  length: number; // 长度 (mm)
+  width: number; // 宽度 (mm)
+  thickness: number; // 厚度 (mm)
+  timestamp: string; // ISO 时间戳
+  level: "A" | "B" | "C" | "D"; // 质量等级
+  defect_count: number; // 缺陷数量
 }
 
 /**
  * 钢板项（前端使用）
  */
 export interface SteelItem {
-  serialNumber: string;  // 流水号
-  plateId: string;       // 钢板号
-  steelGrade: string;    // 钢种
+  serialNumber: string; // 流水号
+  plateId: string; // 钢板号
+  steelGrade: string; // 钢种
   dimensions: {
     length: number;
     width: number;
     thickness: number;
   };
   timestamp: Date;
-  level: 'A' | 'B' | 'C' | 'D';
+  level: "A" | "B" | "C" | "D";
   defectCount: number;
 }
 
@@ -48,27 +48,43 @@ export interface SteelListResponse {
 // ==================== 缺陷相关类型 ====================
 
 /**
- * 缺陷类型枚举
+ * 缺陷类型枚举（基于 TestData/meta.json 真实数据）
  */
-export type DefectType = 
-  | '纵向裂纹'
-  | '横向裂纹'
-  | '异物压入'
-  | '孔洞'
-  | '辊印'
-  | '压氧'
-  | '边裂'
-  | '划伤';
+export const DEFECT_TYPES = [
+  "纵向裂纹",
+  "横向裂纹",
+  "异物压入",
+  "划伤",
+  "凹坑",
+  "压痕",
+  "夹杂",
+  "氧化铁皮",
+  "结疤",
+  "起皮",
+  "边裂",
+] as const;
+
+export type DefectType = (typeof DEFECT_TYPES)[number];
 
 /**
  * 表面类型
  */
-export type Surface = 'top' | 'bottom';
+export type Surface = "top" | "bottom";
 
 /**
  * 严重程度
  */
-export type Severity = 'low' | 'medium' | 'high';
+export type Severity = "low" | "medium" | "high";
+
+/**
+ * 按表面统计的图像元信息（来自后端 /api/ui/defects）
+ */
+export interface SurfaceImageInfo {
+  surface: Surface;
+  frame_count: number; // 该表面可用帧数量
+  image_width: number; // 单帧宽度（像素）
+  image_height: number; // 单帧高度（像素）
+}
 
 /**
  * 缺陷项（后端返回）
@@ -83,7 +99,7 @@ export interface DefectItemRaw {
   height: number;
   confidence: number;
   surface: Surface;
-  image_index: number;  // 关联的图像索引
+  image_index: number; // 关联的图像索引
 }
 
 /**
@@ -111,6 +127,38 @@ export interface DefectResponse {
   total_count: number;
 }
 
+/**
+ * 钢板图像元信息响应（来自后端 /api/ui/steel-meta）
+ */
+export interface SteelMetaResponse {
+  seq_no: number;
+  surface_images: SurfaceImageInfo[];
+}
+
+// ==================== 缺陷字典类型 ====================
+
+export interface DefectClassColor {
+  red: number;
+  green: number;
+  blue: number;
+}
+
+export interface DefectClassItem {
+  class: number;
+  name: string;
+  tag: string;
+  color: DefectClassColor;
+  desc: string;
+  parent: number[];
+}
+
+export interface DefectClassesResponse {
+  num: number;
+  items: DefectClassItem[];
+}
+
+export type DefectClassMap = Record<number, DefectClassItem>;
+
 // ==================== 图像相关类型 ====================
 
 /**
@@ -128,7 +176,7 @@ export interface FrameImageParams {
  * 健康检查响应
  */
 export interface HealthResponse {
-  status: 'healthy' | 'unhealthy';
+  status: "healthy" | "unhealthy";
   timestamp: string;
   version?: string;
   database?: {
@@ -144,7 +192,7 @@ export interface HealthResponse {
  */
 export function mapSteelItem(raw: SteelItemRaw): SteelItem {
   return {
-    serialNumber: raw.seq_no.toString().padStart(8, '0'),
+    serialNumber: raw.seq_no.toString().padStart(8, "0"),
     plateId: raw.steel_no,
     steelGrade: raw.steel_type,
     dimensions: {

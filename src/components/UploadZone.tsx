@@ -1,39 +1,45 @@
-import { useCallback } from 'react';
-import { Upload, FileUp } from 'lucide-react';
+import { useCallback } from "react";
+import { Upload, FileUp } from "lucide-react";
 
 interface UploadZoneProps {
   onImageUpload: (imageUrl: string) => void;
 }
 
 export function UploadZone({ onImageUpload }: UploadZoneProps) {
-  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const imageUrl = event.target?.result as string;
-        onImageUpload(imageUrl);
-      };
-      reader.readAsDataURL(file);
-    }
-  }, [onImageUpload]);
+  const handleFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const imageUrl = event.target?.result as string;
+          onImageUpload(imageUrl);
+        };
+        reader.readAsDataURL(file);
+      }
+    },
+    [onImageUpload],
+  );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    const file = e.dataTransfer.files?.[0];
-    if (file && file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const imageUrl = event.target?.result as string;
-        onImageUpload(imageUrl);
-      };
-      reader.readAsDataURL(file);
-    }
-  }, [onImageUpload]);
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      const file = e.dataTransfer.files?.[0];
+      if (file && file.type.startsWith("image/")) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const imageUrl = event.target?.result as string;
+          onImageUpload(imageUrl);
+        };
+        reader.readAsDataURL(file);
+      }
+    },
+    [onImageUpload],
+  );
 
   return (
     <div className="w-full h-full flex items-center justify-center">
@@ -49,13 +55,20 @@ export function UploadZone({ onImageUpload }: UploadZoneProps) {
           onChange={handleFileChange}
           className="hidden"
         />
-        <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center gap-4">
+        <label
+          htmlFor="file-upload"
+          className="cursor-pointer flex flex-col items-center gap-4"
+        >
           <div className="p-4 bg-secondary rounded-full group-hover:bg-primary/20 transition-colors">
             <Upload className="w-8 h-8 text-muted-foreground group-hover:text-primary" />
           </div>
           <div>
-            <p className="text-lg font-medium text-foreground">DRAG & DROP IMAGE</p>
-            <p className="text-sm text-muted-foreground mt-1">OR CLICK TO BROWSE FILES</p>
+            <p className="text-lg font-medium text-foreground">
+              DRAG & DROP IMAGE
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              OR CLICK TO BROWSE FILES
+            </p>
           </div>
           <div className="text-xs text-muted-foreground/60 border-t border-border pt-4 mt-2 w-full">
             SUPPORTED FORMATS: JPG, PNG, BMP

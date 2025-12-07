@@ -1,7 +1,17 @@
-import { Database, Search, Filter, BarChart3, Activity, Settings } from 'lucide-react';
-import type { SteelPlate } from '../../types/app.types';
-import type { SearchCriteria, FilterCriteria } from '../SearchDialog';
-import { getLevelText } from '../../utils/steelPlates';
+import {
+  Database,
+  Search,
+  Filter,
+  BarChart3,
+  Activity,
+  Settings,
+} from "lucide-react";
+import type { SteelPlate } from "../../types/app.types";
+import type {
+  SearchCriteria,
+  FilterCriteria,
+} from "../SearchDialog";
+import { getLevelText } from "../../utils/steelPlates";
 
 interface PlatesPanelProps {
   filteredSteelPlates: SteelPlate[];
@@ -14,7 +24,7 @@ interface PlatesPanelProps {
   filterCriteria: FilterCriteria;
   setFilterCriteria: (criteria: FilterCriteria) => void;
   setIsFilterDialogOpen: (open: boolean) => void;
-  setActiveTab: (tab: 'reports' | 'settings') => void;
+  setActiveTab: (tab: "reports" | "settings") => void;
   setIsDiagnosticDialogOpen: (open: boolean) => void;
 }
 
@@ -30,7 +40,7 @@ export const PlatesPanel: React.FC<PlatesPanelProps> = ({
   setFilterCriteria,
   setIsFilterDialogOpen,
   setActiveTab,
-  setIsDiagnosticDialogOpen
+  setIsDiagnosticDialogOpen,
 }) => {
   return (
     <div className="h-full flex flex-col bg-background">
@@ -48,7 +58,7 @@ export const PlatesPanel: React.FC<PlatesPanelProps> = ({
                   const value = e.target.value;
                   setSearchCriteria({
                     plateId: value,
-                    serialNumber: value
+                    serialNumber: value,
                   });
                 }}
               />
@@ -57,19 +67,23 @@ export const PlatesPanel: React.FC<PlatesPanelProps> = ({
               onClick={() => setIsFilterDialogOpen(true)}
               className={`p-2.5 rounded-lg border transition-colors ${
                 filterCriteria.levels.length > 0
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'bg-muted border-border text-muted-foreground'
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-muted border-border text-muted-foreground"
               }`}
             >
               <Filter className="w-5 h-5" />
             </button>
           </div>
-          
+
           {/* 筛选标签显示 */}
-          {(Object.keys(searchCriteria).length > 0 || filterCriteria.levels.length > 0) && (
+          {(Object.keys(searchCriteria).length > 0 ||
+            filterCriteria.levels.length > 0) && (
             <div className="flex items-center gap-2 mt-3 flex-wrap">
-              {filterCriteria.levels.map(level => (
-                <span key={level} className="px-2 py-1 bg-primary/20 text-primary text-xs rounded-full border border-primary/30">
+              {filterCriteria.levels.map((level) => (
+                <span
+                  key={level}
+                  className="px-2 py-1 bg-primary/20 text-primary text-xs rounded-full border border-primary/30"
+                >
                   {getLevelText(level)}
                 </span>
               ))}
@@ -86,37 +100,69 @@ export const PlatesPanel: React.FC<PlatesPanelProps> = ({
           )}
         </div>
       )}
-      
+
       {/* 钢板列表 */}
       <div className="flex-1 overflow-auto">
         {/* 统计信息 */}
-        <div className={`bg-card border-b border-border ${isMobileDevice ? 'p-3' : 'p-4'}`}>
+        <div
+          className={`bg-card border-b border-border ${isMobileDevice ? "p-3" : "p-4"}`}
+        >
           <div className="grid grid-cols-4 gap-4">
             <div className="text-center">
-              <p className={`${isMobileDevice ? 'text-xl' : 'text-2xl'} font-bold text-primary`}>{filteredSteelPlates.length}</p>
-              <p className="text-xs text-muted-foreground mt-1">总数</p>
+              <p
+                className={`${isMobileDevice ? "text-xl" : "text-2xl"} font-bold text-primary`}
+              >
+                {filteredSteelPlates.length}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                总数
+              </p>
             </div>
             <div className="text-center">
-              <p className={`${isMobileDevice ? 'text-xl' : 'text-2xl'} font-bold text-green-500`}>
-                {filteredSteelPlates.filter(p => p.level === 'A').length}
+              <p
+                className={`${isMobileDevice ? "text-xl" : "text-2xl"} font-bold text-green-500`}
+              >
+                {
+                  filteredSteelPlates.filter(
+                    (p) => p.level === "A",
+                  ).length
+                }
               </p>
-              <p className="text-xs text-muted-foreground mt-1">一等品</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                一等品
+              </p>
             </div>
             <div className="text-center">
-              <p className={`${isMobileDevice ? 'text-xl' : 'text-2xl'} font-bold text-yellow-500`}>
-                {filteredSteelPlates.filter(p => p.level === 'B' || p.level === 'C').length}
+              <p
+                className={`${isMobileDevice ? "text-xl" : "text-2xl"} font-bold text-yellow-500`}
+              >
+                {
+                  filteredSteelPlates.filter(
+                    (p) => p.level === "B" || p.level === "C",
+                  ).length
+                }
               </p>
-              <p className="text-xs text-muted-foreground mt-1">合格品</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                合格品
+              </p>
             </div>
             <div className="text-center">
-              <p className={`${isMobileDevice ? 'text-xl' : 'text-2xl'} font-bold text-red-500`}>
-                {filteredSteelPlates.filter(p => p.level === 'D').length}
+              <p
+                className={`${isMobileDevice ? "text-xl" : "text-2xl"} font-bold text-red-500`}
+              >
+                {
+                  filteredSteelPlates.filter(
+                    (p) => p.level === "D",
+                  ).length
+                }
               </p>
-              <p className="text-xs text-muted-foreground mt-1">等外品</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                等外品
+              </p>
             </div>
           </div>
         </div>
-        
+
         {/* 钢板列表项 */}
         {filteredSteelPlates.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
@@ -133,7 +179,9 @@ export const PlatesPanel: React.FC<PlatesPanelProps> = ({
             </button>
           </div>
         ) : (
-          <div className={`${isMobileDevice ? 'p-2' : 'p-4'} space-y-2`}>
+          <div
+            className={`${isMobileDevice ? "p-2" : "p-4"} space-y-2`}
+          >
             {filteredSteelPlates.map((plate) => (
               <div
                 key={plate.plateId}
@@ -146,8 +194,8 @@ export const PlatesPanel: React.FC<PlatesPanelProps> = ({
                 }}
                 className={`bg-card border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md ${
                   selectedPlateId === plate.plateId
-                    ? 'border-primary shadow-lg shadow-primary/20'
-                    : 'border-border hover:border-primary/50'
+                    ? "border-primary shadow-lg shadow-primary/20"
+                    : "border-border hover:border-primary/50"
                 }`}
               >
                 {/* 头部：流水号和等级 */}
@@ -155,40 +203,53 @@ export const PlatesPanel: React.FC<PlatesPanelProps> = ({
                   <span className="text-xs font-mono text-muted-foreground">
                     NO.{plate.serialNumber}
                   </span>
-                  <span className={`px-2 py-1 rounded text-xs font-medium border ${
-                    plate.level === 'A' ? 'bg-green-500/10 border-green-500/30 text-green-400' :
-                    plate.level === 'B' ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' :
-                    plate.level === 'C' ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' :
-                    'bg-red-500/10 border-red-500/30 text-red-400'
-                  }`}>
+                  <span
+                    className={`px-2 py-1 rounded text-xs font-medium border ${
+                      plate.level === "A"
+                        ? "bg-green-500/10 border-green-500/30 text-green-400"
+                        : plate.level === "B"
+                          ? "bg-blue-500/10 border-blue-500/30 text-blue-400"
+                          : plate.level === "C"
+                            ? "bg-yellow-500/10 border-yellow-500/30 text-yellow-400"
+                            : "bg-red-500/10 border-red-500/30 text-red-400"
+                    }`}
+                  >
                     {getLevelText(plate.level)}
                   </span>
                 </div>
-                
+
                 {/* 主要信息 */}
                 <div className="space-y-2">
                   <div className="flex items-baseline gap-2">
-                    <span className="text-lg font-mono font-bold text-foreground">{plate.plateId}</span>
-                    <span className="text-sm font-mono text-muted-foreground">{plate.steelGrade}</span>
+                    <span className="text-lg font-mono font-bold text-foreground">
+                      {plate.plateId}
+                    </span>
+                    <span className="text-sm font-mono text-muted-foreground">
+                      {plate.steelGrade}
+                    </span>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="flex items-center gap-1 text-muted-foreground">
                       <span className="font-medium">规格:</span>
                       <span className="font-mono">
-                        {plate.dimensions.length}×{plate.dimensions.width}×{plate.dimensions.thickness}
+                        {plate.dimensions.length}×
+                        {plate.dimensions.width}×
+                        {plate.dimensions.thickness}
                       </span>
                     </div>
                     <div className="flex items-center gap-1 text-muted-foreground">
                       <span className="font-medium">缺陷:</span>
-                      <span className={`font-mono ${plate.defectCount > 5 ? 'text-red-400' : 'text-foreground'}`}>
+                      <span
+                        className={`font-mono ${plate.defectCount > 5 ? "text-red-400" : "text-foreground"}`}
+                      >
                         {plate.defectCount}
                       </span>
                     </div>
                   </div>
-                  
+
                   <div className="text-xs text-muted-foreground font-mono">
-                    {plate.timestamp.toLocaleString('zh-CN')}
+                    {plate.timestamp.toLocaleString("zh-CN")}
                   </div>
                 </div>
               </div>
@@ -198,44 +259,82 @@ export const PlatesPanel: React.FC<PlatesPanelProps> = ({
       </div>
 
       {/* 底部导航栏（钢板面板显示时） - 报表/监控/设置 */}
-      <div className={`bg-card border-t border-border flex items-center justify-around shrink-0 ${isMobileDevice ? 'h-16 px-4 safe-area-inset-bottom' : 'h-12 px-8'}`}>
+      <div
+        className={`bg-card border-t border-border flex items-center justify-around shrink-0 ${isMobileDevice ? "h-16 px-4 safe-area-inset-bottom" : "h-12 px-8"}`}
+      >
         <button
           onClick={() => {
-            setActiveTab('reports');
+            setActiveTab("reports");
             setShowPlatesPanel(false);
           }}
           className={`flex items-center justify-center gap-2 rounded-lg transition-colors flex-1 text-muted-foreground hover:text-primary hover:bg-accent/50 ${
-            isMobileDevice ? 'flex-col px-4 py-2' : 'flex-row px-6 py-2'
+            isMobileDevice
+              ? "flex-col px-4 py-2"
+              : "flex-row px-6 py-2"
           }`}
         >
-          <BarChart3 className={isMobileDevice ? 'w-7 h-7' : 'w-5 h-5'} />
-          <span className={isMobileDevice ? 'text-[11px] font-medium' : 'text-sm font-medium'}>报表</span>
+          <BarChart3
+            className={isMobileDevice ? "w-7 h-7" : "w-5 h-5"}
+          />
+          <span
+            className={
+              isMobileDevice
+                ? "text-[11px] font-medium"
+                : "text-sm font-medium"
+            }
+          >
+            报表
+          </span>
         </button>
-        
+
         <button
           onClick={() => {
             setIsDiagnosticDialogOpen(true);
             setShowPlatesPanel(false);
           }}
           className={`flex items-center justify-center gap-2 rounded-lg transition-colors flex-1 text-muted-foreground hover:text-primary hover:bg-accent/50 ${
-            isMobileDevice ? 'flex-col px-4 py-2' : 'flex-row px-6 py-2'
+            isMobileDevice
+              ? "flex-col px-4 py-2"
+              : "flex-row px-6 py-2"
           }`}
         >
-          <Activity className={isMobileDevice ? 'w-7 h-7' : 'w-5 h-5'} />
-          <span className={isMobileDevice ? 'text-[11px] font-medium' : 'text-sm font-medium'}>系统监控</span>
+          <Activity
+            className={isMobileDevice ? "w-7 h-7" : "w-5 h-5"}
+          />
+          <span
+            className={
+              isMobileDevice
+                ? "text-[11px] font-medium"
+                : "text-sm font-medium"
+            }
+          >
+            系统监控
+          </span>
         </button>
-        
+
         <button
           onClick={() => {
-            setActiveTab('settings');
+            setActiveTab("settings");
             setShowPlatesPanel(false);
           }}
           className={`flex items-center justify-center gap-2 rounded-lg transition-colors flex-1 text-muted-foreground hover:text-primary hover:bg-accent/50 ${
-            isMobileDevice ? 'flex-col px-4 py-2' : 'flex-row px-6 py-2'
+            isMobileDevice
+              ? "flex-col px-4 py-2"
+              : "flex-row px-6 py-2"
           }`}
         >
-          <Settings className={isMobileDevice ? 'w-7 h-7' : 'w-5 h-5'} />
-          <span className={isMobileDevice ? 'text-[11px] font-medium' : 'text-sm font-medium'}>设置</span>
+          <Settings
+            className={isMobileDevice ? "w-7 h-7" : "w-5 h-5"}
+          />
+          <span
+            className={
+              isMobileDevice
+                ? "text-[11px] font-medium"
+                : "text-sm font-medium"
+            }
+          >
+            设置
+          </span>
         </button>
       </div>
     </div>
