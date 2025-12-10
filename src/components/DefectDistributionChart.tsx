@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useRef, useEffect, useState } from "react";
 import type { Defect } from "../types/app.types";
 import type {
   SurfaceImageInfo,
@@ -122,8 +122,8 @@ export function DefectDistributionChart({
   };
 
   // 钢板缩略显示尺寸
-  const plateWidth = 360;
-  const plateHeight = 160;
+  // 横向布局：宽度 = 高度 × 单图比例 × 图像数量
+  const plateHeight = 120; // 固定高度
 
   const chooseTileLevel = (
     worldHeight: number,
@@ -174,11 +174,100 @@ export function DefectDistributionChart({
     surf: "top" | "bottom",
   ): SurfaceImageInfo | undefined =>
     surfaceImageInfo?.find((info) => info.surface === surf);
+  
+  // 容器引用，用于获取宽度
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(0);
+
+  // 监听容器宽度变化
+  useEffect(() => {
+    if (!containerRef.current) return;
+    
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.offsetWidth);
+      }
+    };
+    
+    updateWidth();
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, []);
+  
+  // 计算横向布局的宽度
+  const calculatePlateWidth = (meta: SurfaceImageInfo | undefined): number => {
+    if (!meta) return 360; // 默认宽度
+    const frameCount = meta.frame_count || 1;
+    const imageWidth = meta.image_width || 1;
+    const imageHeight = meta.image_height || 1;
+    
+    // 正确的映射关系：
+    // 原图：宽度 imageWidth × 总长度 (imageHeight × frameCount)
+    // 显示旋转90度：原图宽度 → 显示高度，原图长度 → 显示宽度
+    // plateHeight / plateWidth = imageWidth / (imageHeight × frameCount)
+    // plateWidth = plateHeight × (imageHeight × frameCount) / imageWidth
+    const totalLength = imageHeight * frameCount;
+    return plateHeight * totalLength / imageWidth;
+  };
+
+  // 计算最终显示高度和宽度（包括拉伸逻辑）
+  const calculateFinalDimensions = useMemo(() => {
+    const topMeta = findMetaForSurface("top");
+    const bottomMeta = findMetaForSurface("bottom");
+    
+    const topWidth = calculatePlateWidth(topMeta);
+    const bottomWidth = calculatePlateWidth(bottomMeta);
+    
+    // 默认总高度为 plateHeight * 2（适配双表面显示）
+    let finalHeight = plateHeight * 2;
+    let finalTopWidth = topWidth;
+    let finalBottomWidth = bottomWidth;
+    let scale = 1; // 统一的缩放比例
+    
+    // 注意：surface === "all" 时显示两个表面，每个占 finalHeight/2
+    // surface !== "all" 时显示单个表面，占 finalHeight 全部
+    // 因此两种情况下 finalHeight 都应该是 plateHeight * 2
+    
+    // 如果宽度不足容器宽度的75%，进行拉伸
+    if (containerWidth > 0) {
+      const targetWidth = containerWidth * 0.75;
+      
+      if (surface === "all") {
+        // 两个表面都显示：使用较长的那个来计算统一缩放比例
+        const maxWidth = Math.max(topWidth, bottomWidth);
+        if (maxWidth < targetWidth) {
+          scale = targetWidth / maxWidth;
+          // 两个表面都应用相同的缩放比例
+          finalTopWidth = topWidth * scale;
+          finalBottomWidth = bottomWidth * scale;
+        }
+      } else {
+        // 单表面显示：只拉伸当前表面
+        const currentWidth = surface === "top" ? topWidth : bottomWidth;
+        if (currentWidth < targetWidth) {
+          scale = targetWidth / currentWidth;
+          if (surface === "top") {
+            finalTopWidth = topWidth * scale;
+          } else {
+            finalBottomWidth = bottomWidth * scale;
+          }
+        }
+      }
+    }
+    
+    return {
+      height: finalHeight,
+      topWidth: finalTopWidth,
+      bottomWidth: finalBottomWidth,
+      scale, // 统一的缩放比例
+    };
+  }, [surface, containerWidth, surfaceImageInfo]);
 
   const computeDisplayRect = (
     defect: Defect,
     meta: SurfaceImageInfo | undefined,
     perSurfaceHeight: number,
+    plateWidth: number,
   ) => {
     if (!meta || typeof defect.imageIndex !== "number") {
       // 无元数据时退回到“单帧 400x300” 的近似映射
@@ -281,6 +370,12 @@ export function DefectDistributionChart({
     const plateDefects = visibleDefects.filter(
       (d) => d.surface === surf,
     );
+    
+    // 使用计算后的宽度（包括拉伸）
+    const plateWidth = surf === "top" 
+      ? calculateFinalDimensions.topWidth 
+      : calculateFinalDimensions.bottomWidth;
+    const frameCount = meta?.frame_count || 1;
 
     const tileImages: JSX.Element[] = [];
 
@@ -344,96 +439,133 @@ export function DefectDistributionChart({
       }
     }
 
-    return (
-      <div
-        key={surf}
-        className="relative border-2 border-foreground/60 bg-muted/5 overflow-hidden"
-        style={{ width: plateWidth, height: perSurfaceHeight }}
+    // 生成刻度尺
+    const renderRuler = (position: "top" | "bottom") => (
+      <div 
+        className="relative w-full h-4 bg-muted/20 border-x-2 border-foreground/60"
+        style={{ width: plateWidth }}
       >
-        <div className="absolute -top-4 left-0 right-0 text-center text-[10px] text-muted-foreground/50 font-mono">
-          {title}
-        </div>
-
-        {/* 瓦片背景 */}
-        {tileImages}
-
-        {/* 参考网格 */}
-        <div className="absolute inset-0 opacity-10">
-          {Array.from({ length: 9 }).map((_, i) => (
-            <div
-              key={`h-${surf}-${i}`}
-              className="absolute w-full border-t border-muted-foreground/30"
-              style={{ top: `${(i + 1) * 10}%` }}
-            />
-          ))}
-          {Array.from({ length: 9 }).map((_, i) => (
-            <div
-              key={`v-${surf}-${i}`}
-              className="absolute h-full border-l border-muted-foreground/30"
-              style={{ left: `${(i + 1) * 10}%` }}
-            />
-          ))}
-        </div>
-
-        {/* 坐标原点调试点：表示旋转后 (0,0) 期望位置 */}
-        <div
-          className="absolute w-2 h-2 bg-red-500/60 rounded-full"
-          style={{ left: 0, bottom: 0 }}
-          title="Origin debug point (0,0)"
-        />
-
-        {/* 缺陷矩形 */}
-        {plateDefects.map((defect) => {
-          const { x, y, w, h } = computeDisplayRect(
-            defect,
-            hasMeta ? meta : undefined,
-            perSurfaceHeight,
-          );
-          const borderColor = getDefectBorderColor(defect.type);
-          const isSelected = selectedDefectId === defect.id;
-
+        {/* 刻度线和标签 */}
+        {Array.from({ length: frameCount + 1 }).map((_, i) => {
+          const positionPercent = (i / frameCount) * 100;
           return (
             <div
-              key={defect.id}
-              onClick={() => onDefectSelect?.(defect.id)}
-              className={`absolute border-2 ${borderColor} ${showSampleData ? "opacity-40" : "opacity-30"} ${
-                isSelected
-                  ? "ring-2 ring-offset-2 ring-primary/80 ring-offset-background"
-                  : ""
-              } cursor-pointer`}
-              style={{
-                left: x,
-                top: y,
-                width: Math.max(w, 3),
-                height: Math.max(h, 3),
-              }}
-              title={`${defect.type} - ${defect.severity} (${Math.round(defect.confidence * 100)}%)`}
-            />
+              key={`ruler-${position}-${surf}-${i}`}
+              className="absolute h-full border-l border-muted-foreground/40"
+              style={{ left: `${positionPercent}%` }}
+            >
+              {/* 刻度数字 */}
+              <div className={`absolute text-[9px] text-muted-foreground font-mono ${
+                position === "top" ? "bottom-0" : "top-0"
+              } left-0 transform -translate-x-1/2`}>
+                {i}
+              </div>
+            </div>
           );
         })}
+      </div>
+    );
+
+    return (
+      <div key={surf} className="flex flex-col gap-0">
+        {/* 上刻度尺 - 仅在上表面显示 */}
+        {surf === "top" && renderRuler("top")}
+        
+        <div
+          className="relative border-2 border-foreground/60 bg-muted/5 overflow-hidden"
+          style={{ width: plateWidth, height: perSurfaceHeight }}
+        >
+          <div className="absolute -top-4 left-0 right-0 text-center text-[10px] text-muted-foreground/50 font-mono">
+            {title}
+          </div>
+
+          {/* 右上角：图像数量标签 */}
+          <div className="absolute -top-4 right-0 text-[10px] text-primary/80 font-mono bg-background/80 px-1.5 py-0.5 rounded">
+            {frameCount} frames
+          </div>
+
+          {/* 瓦片背景 */}
+          {tileImages}
+
+          {/* 帧刻度线（替换原有网格） */}
+          <div className="absolute inset-0 opacity-20 pointer-events-none">
+            {Array.from({ length: frameCount + 1 }).map((_, i) => {
+              const position = (i / frameCount) * 100;
+              return (
+                <div
+                  key={`frame-${surf}-${i}`}
+                  className="absolute h-full border-l border-muted-foreground"
+                  style={{ left: `${position}%` }}
+                />
+              );
+            })}
+          </div>
+
+          {/* 坐标原点调试点：表示旋转后 (0,0) 期望位置 */}
+          <div
+            className="absolute w-2 h-2 bg-red-500/60 rounded-full"
+            style={{ left: 0, bottom: 0 }}
+            title="Origin debug point (0,0)"
+          />
+
+          {/* 缺陷矩形 */}
+          {plateDefects.map((defect) => {
+            const { x, y, w, h } = computeDisplayRect(
+              defect,
+              hasMeta ? meta : undefined,
+              perSurfaceHeight,
+              plateWidth,
+            );
+            const borderColor = getDefectBorderColor(defect.type);
+            const isSelected = selectedDefectId === defect.id;
+
+            return (
+              <div
+                key={defect.id}
+                onClick={() => onDefectSelect?.(defect.id)}
+                className={`absolute border-2 ${borderColor} ${showSampleData ? "opacity-40" : "opacity-30"} ${
+                  isSelected
+                    ? "ring-2 ring-offset-2 ring-primary/80 ring-offset-background"
+                    : ""
+                } cursor-pointer`}
+                style={{
+                  left: x,
+                  top: y,
+                  width: Math.max(w, 3),
+                  height: Math.max(h, 3),
+                }}
+                title={`${defect.type} - ${defect.severity} (${Math.round(defect.confidence * 100)}%)`}
+              />
+            );
+          })}
+        </div>
+
+        {/* 下刻度尺 - 仅在下表面显示 */}
+        {surf === "bottom" && renderRuler("bottom")}
       </div>
     );
   };
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col" ref={containerRef}>
       {defects.length === 0 && (
         <div className="text-center text-[10px] text-muted-foreground/50 mb-2 py-1 border-b border-border/30">
           SHOWING SAMPLE DATA
         </div>
       )}
 
-      <div className="flex-1 flex items-center justify-center p-4 overflow-x-auto">
-        <div className="flex flex-col gap-4 min-w-[360px]">
+      {/* 横向滚动容器 - 支持横向滚动查看长钢板 */}
+      <div className="flex-1 overflow-x-auto overflow-y-hidden">
+        <div className="flex flex-col gap-0 h-full">
           {surface === "all" ? (
             <>
-              {renderPlate("top", plateHeight)}
-              {renderPlate("bottom", plateHeight)}
+              {renderPlate("top", calculateFinalDimensions.height / 2)}
+              {renderPlate("bottom", calculateFinalDimensions.height / 2)}
             </>
           ) : (
             renderPlate(
               surface === "top" ? "top" : "bottom",
-              plateHeight,
+              calculateFinalDimensions.height,
             )
           )}
         </div>

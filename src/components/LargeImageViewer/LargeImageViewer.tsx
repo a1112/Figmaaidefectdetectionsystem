@@ -11,7 +11,7 @@ interface LargeImageViewerProps {
    */
   fixedLevel?: number;
   /**
-   * 当根据缩放计算出的推荐瓦片等级发生变化时回调（用于上层实现“双图层”或延迟切换 LOD）
+   * 当根据缩放计算出的推荐瓦片等级发生变化时回调（用于上层实现"双图层"或延迟切换 LOD）
    */
   onPreferredLevelChange?: (level: number) => void;
   renderTile?: (
@@ -27,6 +27,15 @@ interface LargeImageViewerProps {
     ctx: CanvasRenderingContext2D,
     scale: number
   ) => void;
+  /**
+   * 聚焦目标：传入一个区域，视图会自动平移和缩放到该区域
+   */
+  focusTarget?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null;
 }
 
 export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
@@ -38,6 +47,7 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
   onPreferredLevelChange,
   renderTile,
   renderOverlay,
+  focusTarget,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   // 双 canvas：底层保留上一轮内容，顶层用于当前绘制（便于后续扩展双 LOD 图层）
@@ -317,6 +327,41 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
     lastTouchDistance.current = null;
     lastTouchCenter.current = null;
   }, []);
+
+  // Focus Target - 自动聚焦到指定区域
+  useEffect(() => {
+    if (!focusTarget || containerSize.width === 0 || containerSize.height === 0) {
+      return;
+    }
+
+    const { x, y, width, height } = focusTarget;
+    const { minScale, maxScale } = getConstraints();
+
+    // 计算使目标区域完整显示所需的缩放比例（留出10%的边距）
+    const targetScaleX = (containerSize.width * 0.9) / width;
+    const targetScaleY = (containerSize.height * 0.9) / height;
+    const targetScale = Math.min(targetScaleX, targetScaleY);
+    
+    // 限制在允许的缩放范围内
+    const newScale = clamp(targetScale, minScale, maxScale);
+
+    // 计算目标区域的中心点（图像坐标）
+    const targetCenterX = x + width / 2;
+    const targetCenterY = y + height / 2;
+
+    // 计算视口中心（屏幕坐标）
+    const viewportCenterX = containerSize.width / 2;
+    const viewportCenterY = containerSize.height / 2;
+
+    // 计算平移量：使目标中心对齐视口中心
+    // transform: screenX = imageX * scale + offsetX
+    // 我们希望: targetCenterX * newScale + newOffsetX = viewportCenterX
+    const newX = viewportCenterX - targetCenterX * newScale;
+    const newY = viewportCenterY - targetCenterY * newScale;
+
+    transform.current = { x: newX, y: newY, scale: newScale };
+    setTick(t => t + 1);
+  }, [focusTarget, containerSize, getConstraints]);
 
   return (
     <div

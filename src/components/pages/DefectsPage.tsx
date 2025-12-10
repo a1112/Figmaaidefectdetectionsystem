@@ -1,7 +1,8 @@
 import { DefectList } from "../DefectList";
 import { DetectionResult } from "../DetectionResult";
 import { DefectDistributionChart } from "../DefectDistributionChart";
-import { DefectImageView } from "../DefectImageView";
+import { DefectImageView, type ViewportInfo } from "../DefectImageView";
+import { DefectNavigationBar } from "../DefectNavigationBar";
 import type {
   Defect,
   DetectionRecord,
@@ -15,6 +16,7 @@ import type {
   SearchCriteria,
   FilterCriteria,
 } from "../SearchDialog";
+import { useState } from "react";
 
 interface DefectsPageProps {
   isMobileDevice: boolean;
@@ -109,6 +111,8 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
         ) || null
       : null;
 
+  const [viewportInfo, setViewportInfo] = useState<ViewportInfo | null>(null);
+
   return (
     <div className="h-full flex flex-col space-y-2">
       {/* 主区域：左侧图像 / 右侧列表 */}
@@ -173,41 +177,22 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
                     </span>
                   </div>
                 )}
+              </div>
 
-                {selectedDefect && (
-                  <div className="hidden md:flex flex-col md:flex-row md:items-center gap-1 md:gap-2 bg-black/30 rounded px-2 py-0.5 border border-white/10 text-[10px] font-normal min-w-0">
-                    <span className="font-semibold truncate">
-                      {selectedDefect.type}
-                    </span>
-                    <span className="uppercase text-[9px] px-1.5 py-0.5 rounded bg-primary/90 text-primary-foreground">
-                      {selectedDefect.severity}
-                    </span>
-                    <span className="opacity-80 whitespace-nowrap">
-                      ({selectedDefect.x.toFixed(0)},{" "}
-                      {selectedDefect.y.toFixed(0)})
-                    </span>
-                    <span className="opacity-80 whitespace-nowrap">
-                      {selectedDefect.width.toFixed(0)}×
-                      {selectedDefect.height.toFixed(0)}
-                    </span>
-                    <span className="opacity-80 whitespace-nowrap">
-                      {Math.round(
-                        selectedDefect.confidence * 100,
-                      )}
-                      %
-                    </span>
+              {/* 右侧：缺陷详细信息 + 视图像素信息 */}
+              <div className="flex items-center gap-2 text-[10px] font-normal">
+                {imageViewMode === "full" && viewportInfo && (
+                  <div className="flex items-center gap-2 bg-black/30 rounded px-2 py-0.5 border border-white/10 font-mono">
+                    <span>X: {viewportInfo.x}</span>
+                    <span>Y: {viewportInfo.y}</span>
+                    <span>W: {viewportInfo.width}</span>
+                    <span>H: {viewportInfo.height}</span>
                   </div>
                 )}
               </div>
-
-              <span className="text-[10px] opacity-80 flex-1 text-center truncate">
-                {selectedPlateId
-                  ? `钢板: ${selectedPlateId}`
-                  : "未选择"}
-              </span>
             </div>
 
-            <div className="flex-1 flex items-center justify-center bg-black/40 mt-5">
+            <div className="flex-1 flex items-center justify-center bg-black/40 mt-5 relative">
               {currentImage || detectionResult ? (
                 <DetectionResult
                   imageUrl={
@@ -226,6 +211,7 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
                   selectedDefectId={selectedDefectId}
                   onDefectSelect={setSelectedDefectId}
                   surfaceImageInfo={surfaceImageInfo}
+                  onViewportChange={setViewportInfo}
                 />
               ) : (
                 <div className="text-xs text-muted-foreground">
@@ -236,7 +222,7 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
           </div>
 
           {/* 缺陷缩略分布图（小钢板示意） */}
-          <div className="bg-card border border-border p-1.5">
+          <div className="bg-card border border-border">
             <DefectDistributionChart
               defects={filteredDefectsByControls}
               surface={surfaceFilter}
@@ -258,16 +244,72 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
           <div className="bg-card border border-border p-1.5 flex flex-col min-h-[180px]">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-muted-foreground">
+                缺陷信息
+              </span>
+            </div>
+
+            {/* 选中缺陷的详细信息卡片 */}
+            {selectedDefect && (
+              <div className="mb-2 p-2 bg-card/50 rounded border border-border/50">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div 
+                      className="w-3 h-3 rounded-sm" 
+                      style={{ 
+                        backgroundColor: defectAccentColors[selectedDefect.type] || '#888' 
+                      }}
+                    />
+                    <span className="text-xs font-semibold">{selectedDefect.type}</span>
+                  </div>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded uppercase font-medium ${
+                    selectedDefect.severity === 'high' 
+                      ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                      : selectedDefect.severity === 'medium'
+                        ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+                        : 'bg-green-500/20 text-green-400 border border-green-500/30'
+                  }`}>
+                    {selectedDefect.severity}
+                  </span>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[10px]">
+                  <div>
+                    <span className="text-muted-foreground">位置: </span>
+                    <span className="font-mono">({selectedDefect.x.toFixed(0)}, {selectedDefect.y.toFixed(0)})</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">尺寸: </span>
+                    <span className="font-mono">{selectedDefect.width.toFixed(0)}×{selectedDefect.height.toFixed(0)}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-muted-foreground">置信度: </span>
+                    <span className="font-mono font-semibold">{Math.round(selectedDefect.confidence * 100)}%</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 缺陷列表标题 */}
+            <div className="mb-1">
+              <span className="text-[10px] font-medium text-muted-foreground">
                 缺陷列表
               </span>
             </div>
 
+            {/* 缺陷列表 */}
             <div className="flex-1 min-h-0 overflow-auto">
               <DefectList
                 defects={filteredDefectsByControls}
-                isDetecting={isDetecting}
-                surface={surfaceFilter}
                 defectColors={defectColors}
+                selectedDefectId={selectedDefectId}
+                onDefectSelect={setSelectedDefectId}
+              />
+            </div>
+
+            {/* 缺陷导航栏 */}
+            <div className="mt-2">
+              <DefectNavigationBar
+                defects={filteredDefectsByControls}
                 selectedDefectId={selectedDefectId}
                 onDefectSelect={setSelectedDefectId}
               />
