@@ -1,18 +1,27 @@
-import { useState, useEffect, useMemo } from "react";
+﻿import { useState, useEffect, useMemo, useCallback } from "react";
 import { AlertCircle } from "lucide-react";
 import { env } from "../src/config/env";
-import type { SteelPlate, Defect } from "../types/app.types";
 import type {
-  SurfaceImageInfo,
-  Surface,
-} from "../src/api/types";
+  SteelPlate,
+  Defect,
+  ImageOrientation,
+} from "../types/app.types";
+import type { SurfaceImageInfo } from "../src/api/types";
 import { getTileImageUrl } from "../src/api/client";
 import { LargeImageViewer } from "./LargeImageViewer/LargeImageViewer";
 import type { Tile } from "./LargeImageViewer/utils";
+import {
+  buildOrientationLayout,
+  pickSurfaceForTile,
+  computeTileRequestInfo,
+  convertDefectToWorldRect,
+  type SurfaceLayout,
+} from "../utils/imageOrientation";
 
-// 瓦片图像缓存
 const tileImageCache = new Map<string, HTMLImageElement>();
 const tileImageLoading = new Set<string>();
+const PAN_MARGIN = 200;
+const SURFACE_GAP = 32;
 
 export interface ViewportInfo {
   x: number;
@@ -30,6 +39,13 @@ interface DefectImageViewProps {
   onDefectSelect: (id: string | null) => void;
   surfaceImageInfo?: SurfaceImageInfo[] | null;
   onViewportChange?: (info: ViewportInfo | null) => void;
+  imageOrientation: ImageOrientation;
+}
+
+interface WorldDefectRect {
+  defect: Defect;
+  surface: SurfaceLayout;
+  rect: { x: number; y: number; width: number; height: number };
 }
 
 export function DefectImageView({
@@ -41,69 +57,96 @@ export function DefectImageView({
   onDefectSelect,
   surfaceImageInfo,
   onViewportChange,
+  imageOrientation,
 }: DefectImageViewProps) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [isLoadingImage, setIsLoadingImage] = useState(false);
 
-  const actualSurface: Surface = useMemo(
-    () => (surface === "all" ? "top" : surface) as Surface,
-    [surface],
+  const seqNo = useMemo(() => {
+    if (!selectedPlate) return null;
+    const parsed = parseInt(selectedPlate.serialNumber, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+  }, [selectedPlate]);
+
+  const topMeta = surfaceImageInfo?.find((info) => info.surface === "top");
+  const bottomMeta = surfaceImageInfo?.find((info) => info.surface === "bottom");
+
+  const layout = useMemo(
+    () =>
+      buildOrientationLayout({
+        orientation: imageOrientation,
+        surfaceFilter: surface,
+        topMeta,
+        bottomMeta,
+        surfaceGap: SURFACE_GAP,
+      }),
+    [imageOrientation, surface, topMeta, bottomMeta],
   );
 
-  const surfaceMeta: SurfaceImageInfo | undefined = useMemo(
+  const selectedDefect = useMemo(
     () =>
-      surfaceImageInfo?.find(
-        (info) => info.surface === actualSurface,
-      ),
-    [surfaceImageInfo, actualSurface],
-  );
-
-  const seqNo = useMemo(
-    () =>
-      selectedPlate
-        ? parseInt(selectedPlate.serialNumber, 10)
+      selectedDefectId
+        ? defects.find((item) => item.id === selectedDefectId) ?? null
         : null,
-    [selectedPlate],
+    [defects, selectedDefectId],
   );
 
-  // 获取当前选中的缺陷
-  const selectedDefect = selectedDefectId
-    ? defects.find((d) => d.id === selectedDefectId)
-    : null;
+  const worldDefectRects = useMemo<WorldDefectRect[]>(() => {
+    if (layout.surfaces.length === 0) return [];
+    return defects
+      .map((defect) => {
+        const surfaceLayout = layout.surfaces.find(
+          (s) => s.surface === defect.surface,
+        );
+        if (!surfaceLayout) {
+          return null;
+        }
+        const rect = convertDefectToWorldRect({
+          surface: surfaceLayout,
+          defect,
+          orientation: imageOrientation,
+        });
+        if (!rect) return null;
+        return { defect, surface: surfaceLayout, rect };
+      })
+      .filter(
+        (
+          item,
+        ): item is {
+          defect: Defect;
+          surface: SurfaceLayout;
+          rect: { x: number; y: number; width: number; height: number };
+        } => item !== null,
+      );
+  }, [defects, layout, imageOrientation]);
 
-  // 计算聚焦目标区域
+  useEffect(() => {
+    onViewportChange?.(null);
+  }, [onViewportChange]);
+
   const focusTarget = useMemo(() => {
-    if (!selectedDefect || !surfaceMeta || imageViewMode !== "full") {
+    if (
+      imageViewMode !== "full" ||
+      !selectedDefectId ||
+      worldDefectRects.length === 0
+    ) {
       return null;
     }
-
-    // 只聚焦到当前表面的缺陷
-    if (selectedDefect.surface !== actualSurface) {
-      return null;
-    }
-
-    // 确保缺陷有 imageIndex
-    if (typeof selectedDefect.imageIndex !== "number") {
-      return null;
-    }
-
-    const frameHeight = surfaceMeta.image_height;
-    const defectY = selectedDefect.imageIndex * frameHeight + selectedDefect.y;
-    const defectX = selectedDefect.x;
-
-    // 放大区域，让缺陷周围也可见
-    const padding = Math.max(selectedDefect.width, selectedDefect.height) * 2;
-    
+    const target = worldDefectRects.find(
+      (item) => item.defect.id === selectedDefectId,
+    );
+    if (!target) return null;
+    const padding =
+      Math.max(target.rect.width, target.rect.height, 100) * 1.5;
     return {
-      x: Math.max(0, defectX - padding / 2),
-      y: Math.max(0, defectY - padding / 2),
-      width: selectedDefect.width + padding,
-      height: selectedDefect.height + padding,
+      x: Math.max(target.surface.offsetX, target.rect.x - padding),
+      y: Math.max(target.surface.offsetY, target.rect.y - padding),
+      width: target.rect.width + padding * 2,
+      height: target.rect.height + padding * 2,
     };
-  }, [selectedDefect, surfaceMeta, actualSurface, imageViewMode]);
+  }, [imageViewMode, selectedDefectId, worldDefectRects]);
 
-  // 当显示单缺陷模式时，如果没有选中，自动选中第一个
   useEffect(() => {
     if (
       imageViewMode === "single" &&
@@ -112,376 +155,290 @@ export function DefectImageView({
     ) {
       onDefectSelect(defects[0].id);
     }
-  }, [
-    imageViewMode,
-    selectedDefectId,
-    defects,
-    onDefectSelect,
-  ]);
+  }, [imageViewMode, selectedDefectId, defects, onDefectSelect]);
 
-  // 加载图像（单缺陷模式使用裁剪接口）
   useEffect(() => {
-    if (!selectedPlate) {
+    if (imageViewMode !== "single") {
       setImageUrl(null);
+      setImageError(null);
+      setIsLoadingImage(false);
       return;
     }
-
-    if (imageViewMode === "full") {
-      // 大图模式使用 LargeImageViewer，不需要加载单帧图像
+    if (!selectedDefect || seqNo == null) {
+      setImageUrl(null);
+      setImageError(null);
+      setIsLoadingImage(false);
+      return;
+    }
+    if (typeof selectedDefect.imageIndex !== "number") {
+      setImageError("缺陷缺少 imageIndex，无法裁剪");
       setImageUrl(null);
       setIsLoadingImage(false);
       return;
     }
+    const baseUrl = env.getApiBaseUrl();
+    const padding = Math.round(
+      Math.max(selectedDefect.width, selectedDefect.height) * 0.5,
+    );
+    const params = new URLSearchParams({
+      surface: selectedDefect.surface,
+      seq_no: String(seqNo),
+      image_index: String(selectedDefect.imageIndex),
+      x: Math.max(0, Math.floor(selectedDefect.x - padding)).toString(),
+      y: Math.max(0, Math.floor(selectedDefect.y - padding)).toString(),
+      w: Math.ceil(selectedDefect.width + padding * 2).toString(),
+      h: Math.ceil(selectedDefect.height + padding * 2).toString(),
+      fmt: "JPEG",
+    });
+    const url = `${baseUrl}/images/crop?${params.toString()}`;
+    setIsLoadingImage(true);
+    setImageError(null);
+    setImageUrl(url);
+  }, [imageViewMode, selectedDefect, seqNo]);
 
-    const loadImage = async () => {
-      setIsLoadingImage(true);
-      setImageError(null);
+  const viewerTileSize = useMemo(() => {
+    const fallback = 1024;
+    return Math.max(
+      topMeta?.image_height ?? 0,
+      bottomMeta?.image_height ?? 0,
+      fallback,
+    );
+  }, [topMeta, bottomMeta]);
 
-      try {
-        const baseUrl = env.getApiBaseUrl();
-
-        // 单缺陷模式：使用缺陷裁剪接口
-        if (imageViewMode === "single" && selectedDefect) {
-          const url = `${baseUrl}/images/defect/${selectedDefect.id}?surface=${selectedDefect.surface}`;
-          console.log(`🖼️ 加载单缺陷图像: ${url}`);
-          setImageUrl(url);
-          return;
-        }
-      } catch (error) {
-        console.error("❌ 加载图像失败:", error);
-        setImageError(
-          error instanceof Error ? error.message : "加载失败",
-        );
-      } finally {
-        setIsLoadingImage(false);
+  const renderTile = useCallback(
+    (ctx: CanvasRenderingContext2D, tile: Tile, tileSizeArg: number, scale: number) => {
+      if (seqNo == null || layout.surfaces.length === 0) {
+        ctx.fillStyle = "#f1f5f9";
+        ctx.fillRect(tile.x, tile.y, tile.width, tile.height);
+        return;
       }
-    };
 
-    loadImage();
-  }, [
-    selectedPlate,
-    imageViewMode,
-    selectedDefect,
-    actualSurface,
-    seqNo,
-  ]);
+      const surfaceLayout = pickSurfaceForTile(layout, tile);
+      if (!surfaceLayout) {
+        ctx.fillStyle = "#f8fafc";
+        ctx.fillRect(tile.x, tile.y, tile.width, tile.height);
+        return;
+      }
 
-  if (isLoadingImage) {
+      const virtualTileSize =
+        tileSizeArg * Math.pow(2, tile.level);
+      const requestInfo = computeTileRequestInfo({
+        surface: surfaceLayout,
+        tile,
+        orientation: imageOrientation,
+        virtualTileSize,
+      });
+      if (!requestInfo) {
+        ctx.fillStyle = "#f8fafc";
+        ctx.fillRect(tile.x, tile.y, tile.width, tile.height);
+        return;
+      }
+
+      const cacheKey = `${imageOrientation}-${surfaceLayout.surface}-${seqNo}-${tile.level}-${requestInfo.tileX}-${requestInfo.tileY}-${tileSizeArg}`;
+      const cached = tileImageCache.get(cacheKey);
+      const url = getTileImageUrl({
+        surface: surfaceLayout.surface,
+        seqNo,
+        level: tile.level,
+        tileX: requestInfo.tileX,
+        tileY: requestInfo.tileY,
+        tileSize: tileSizeArg,
+        fmt: "JPEG",
+        orientation: imageOrientation,
+      });
+
+      if (cached && cached.complete) {
+        ctx.drawImage(cached, tile.x, tile.y, tile.width, tile.height);
+      } else {
+        if (!tileImageLoading.has(cacheKey)) {
+          tileImageLoading.add(cacheKey);
+          const img = new Image();
+          img.src = url;
+          img.onload = () => {
+            tileImageCache.set(cacheKey, img);
+            tileImageLoading.delete(cacheKey);
+          };
+          img.onerror = () => {
+            tileImageLoading.delete(cacheKey);
+          };
+        }
+        ctx.fillStyle = "#e2e8f0";
+        ctx.fillRect(tile.x, tile.y, tile.width, tile.height);
+        ctx.strokeStyle = "#cbd5f5";
+        ctx.lineWidth = 1 / scale;
+        ctx.strokeRect(tile.x, tile.y, tile.width, tile.height);
+      }
+
+      const severityColor = (severity: Defect["severity"]) => {
+        switch (severity) {
+          case "high":
+            return "#ef4444";
+          case "medium":
+            return "#f97316";
+          default:
+            return "#22c55e";
+        }
+      };
+
+      const defectsInTile = worldDefectRects.filter((item) => {
+        if (item.surface.surface !== surfaceLayout.surface) {
+          return false;
+        }
+        const { rect } = item;
+        return !(
+          rect.x + rect.width < tile.x ||
+          rect.x > tile.x + tile.width ||
+          rect.y + rect.height < tile.y ||
+          rect.y > tile.y + tile.height
+        );
+      });
+
+      defectsInTile.forEach(({ defect, rect }) => {
+        ctx.strokeStyle = severityColor(defect.severity);
+        ctx.lineWidth =
+          defect.id === selectedDefectId ? 3 / scale : 1.5 / scale;
+        ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
+        if (scale > 0.4) {
+          ctx.save();
+          ctx.translate(rect.x + 4, rect.y + 4);
+          const labelScale = 1 / scale;
+          ctx.scale(labelScale, labelScale);
+          ctx.font = "10px 'Consolas', sans-serif";
+          ctx.fillStyle = ctx.strokeStyle;
+          ctx.fillText(defect.type, 0, 10);
+          ctx.restore();
+        }
+      });
+    },
+    [layout, seqNo, imageOrientation, worldDefectRects, selectedDefectId],
+  );
+
+  const renderOverlay = useCallback(
+    (ctx: CanvasRenderingContext2D, scale: number) => {
+      layout.surfaces.forEach((surfaceLayout) => {
+        const stroke =
+          surfaceLayout.surface === "top" ? "#0284c7" : "#f97316";
+        ctx.save();
+        ctx.lineWidth = 3 / scale;
+        ctx.strokeStyle = stroke;
+        ctx.setLineDash([12 / scale, 6 / scale]);
+        ctx.strokeRect(
+          surfaceLayout.offsetX,
+          surfaceLayout.offsetY,
+          surfaceLayout.worldWidth,
+          surfaceLayout.worldHeight,
+        );
+        ctx.setLineDash([]);
+
+        ctx.translate(
+          surfaceLayout.offsetX + 12 / scale,
+          surfaceLayout.offsetY + 16 / scale,
+        );
+        const labelScale = 1 / scale;
+        ctx.scale(labelScale, labelScale);
+        ctx.font = "bold 12px 'Consolas', sans-serif";
+        ctx.fillStyle = stroke;
+        ctx.fillText(
+          surfaceLayout.surface === "top"
+            ? "TOP SURFACE"
+            : "BOTTOM SURFACE",
+          0,
+          0,
+        );
+        ctx.restore();
+      });
+    },
+    [layout],
+  );
+
+  if (imageViewMode === "single") {
+    if (isLoadingImage) {
+      return (
+        <div className="flex flex-col items-center justify-center gap-4 text-muted-foreground">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <p className="text-sm">加载缺陷裁剪图像...</p>
+        </div>
+      );
+    }
+    if (imageError) {
+      return (
+        <div className="flex flex-col items-center justify-center gap-4 text-destructive">
+          <AlertCircle className="w-16 h-16 opacity-50" />
+          <p className="text-sm">{imageError}</p>
+        </div>
+      );
+    }
+    if (!imageUrl) {
+      return (
+        <div className="flex flex-col items-center justify-center gap-4 text-muted-foreground">
+          <AlertCircle className="w-16 h-16 opacity-50" />
+          <p className="text-sm">请选择一个缺陷以查看裁剪图</p>
+        </div>
+      );
+    }
     return (
-      <div className="flex flex-col items-center justify-center gap-4 text-muted-foreground">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        <p className="text-sm">加载图像中...</p>
+      <div className="relative w-full h-full flex flex-col items-center justify-center gap-4 p-4">
+        <img
+          src={imageUrl}
+          alt="缺陷裁剪图"
+          className="max-w-full max-h-full object-contain border border-border rounded shadow-lg"
+          onLoad={() => setIsLoadingImage(false)}
+          onError={() => {
+            setIsLoadingImage(false);
+            setImageError("缺陷裁剪图加载失败");
+          }}
+        />
+        {selectedDefect && (
+          <div className="absolute bottom-4 left-4 right-4 bg-black/70 text-white text-xs p-3 rounded border border-white/10 shadow-lg">
+            <div className="flex flex-wrap gap-3 justify-between">
+              <span className="font-semibold">{selectedDefect.type}</span>
+              <span>
+                置信度: {(selectedDefect.confidence * 100).toFixed(1)}%
+              </span>
+              <span>
+                尺寸: {selectedDefect.width.toFixed(0)}×
+                {selectedDefect.height.toFixed(0)}
+              </span>
+              <span>
+                位置: ({selectedDefect.x.toFixed(0)},
+                {selectedDefect.y.toFixed(0)})
+              </span>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
-  if (imageError) {
+  if (seqNo == null) {
     return (
-      <div className="flex flex-col items-center justify-center gap-4 text-destructive">
+      <div className="flex flex-col items-center justify-center gap-4 text-muted-foreground h-full">
         <AlertCircle className="w-16 h-16 opacity-50" />
-        <p className="text-sm">图像加载失败: {imageError}</p>
+        <p className="text-sm">请选择左侧钢板以加载大图</p>
+      </div>
+    );
+  }
+
+  if (layout.surfaces.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 text-muted-foreground h-full">
+        <AlertCircle className="w-16 h-16 opacity-50" />
+        <p className="text-sm">缺少图像元数据或当前筛选无可用表面</p>
       </div>
     );
   }
 
   return (
-    <div className="relative w-full h-full">
-      {imageViewMode === "full" ? (
-        // 大图模式：使用 LargeImageViewer（与图像界面一致）
-        <>
-          {surfaceImageInfo && seqNo != null ? (
-            (() => {
-              const tileSize = 512;
-              
-              // 获取上下表面的元数据
-              const topMeta = surfaceImageInfo?.find((info) => info.surface === "top");
-              const bottomMeta = surfaceImageInfo?.find((info) => info.surface === "bottom");
-
-              // 根据选中缺陷决定显示哪个表面
-              const showTop = actualSurface === "top";
-              const showBottom = actualSurface === "bottom";
-
-              // 瓦片渲染函数
-              const createRenderTile = (surfaceType: Surface) => {
-                const metaForSurface = surfaceType === "top" ? topMeta : bottomMeta;
-                if (!metaForSurface) return undefined;
-
-                return (
-                  ctx: CanvasRenderingContext2D,
-                  tile: Tile,
-                  tileSizeParam: number,
-                  scale: number
-                ) => {
-                  const tileX = Math.floor(tile.x / tileSizeParam);
-                  const tileY = Math.floor(tile.y / tileSizeParam);
-
-                  const url = getTileImageUrl({
-                    surface: surfaceType,
-                    seqNo,
-                    level: tile.level,
-                    tileX,
-                    tileY,
-                    tileSize: tileSizeParam,
-                    fmt: "JPEG",
-                  });
-
-                  const cacheKey = `${surfaceType}-${seqNo}-${tile.level}-${tileX}-${tileY}-${tileSizeParam}`;
-                  const cached = tileImageCache.get(cacheKey);
-
-                  if (cached && cached.complete) {
-                    // 绘制瓦片图像
-                    ctx.drawImage(cached, tile.x, tile.y, tile.width, tile.height);
-
-                    // 调试：瓦片边框
-                    ctx.strokeStyle = "rgba(0,0,0,0.2)";
-                    ctx.lineWidth = 1 / scale;
-                    ctx.strokeRect(tile.x, tile.y, tile.width, tile.height);
-
-                    // 开发模式：显示瓦片信息
-                    if (env.isDevelopment()) {
-                      ctx.save();
-                      ctx.translate(tile.x + 5, tile.y + 5);
-                      const textScale = 1 / scale;
-                      ctx.scale(textScale, textScale);
-                      ctx.font = "11px 'Consolas', monospace";
-                      
-                      // 半透明背景
-                      ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
-                      ctx.fillRect(-2, -2, 140, 90);
-
-                      // 瓦片基本信息
-                      ctx.fillStyle = "#00ff40";
-                      ctx.fillText(`L${tile.level} [${tileX},${tileY}]`, 2, 10);
-                      ctx.fillStyle = "#ffaa00";
-                      ctx.fillText(`Pos: ${Math.round(tile.x)},${Math.round(tile.y)}`, 2, 24);
-                      ctx.fillStyle = "#00aaff";
-                      ctx.fillText(`${Math.round(tile.width)}×${Math.round(tile.height)}`, 2, 38);
-                      
-                      // Surface 和状态
-                      ctx.fillStyle = "#ff6600";
-                      ctx.fillText(`Surface: ${surfaceType}`, 2, 52);
-                      ctx.fillStyle = "#00ff00";
-                      ctx.fillText(`✓ LOADED`, 2, 66);
-                      
-                      // 序列号
-                      ctx.fillStyle = "#aaa";
-                      ctx.font = "9px 'Consolas', monospace";
-                      ctx.fillText(`seq:${seqNo}`, 2, 80);
-
-                      ctx.restore();
-                    }
-
-                    // 绘制该瓦片范围内的缺陷
-                    const defectsForSurface = defects.filter(
-                      (d) => d.surface === surfaceType && typeof d.imageIndex === "number"
-                    );
-
-                    if (defectsForSurface.length > 0 && metaForSurface) {
-                      const frameHeight = metaForSurface.image_height;
-
-                      // 过滤出当前瓦片范围内的缺陷
-                      const visibleDefects = defectsForSurface.filter((d) => {
-                        const defectY = d.imageIndex * frameHeight + d.y;
-                        const defectX = d.x;
-
-                        // 判断是否与当前瓦片相交
-                        return !(
-                          defectX + d.width < tile.x ||
-                          defectX > tile.x + tile.width ||
-                          defectY + d.height < tile.y ||
-                          defectY > tile.y + tile.height
-                        );
-                      });
-
-                      // 绘制缺陷矩形框
-                      visibleDefects.forEach((d) => {
-                        const defectY = d.imageIndex * frameHeight + d.y;
-                        const defectX = d.x;
-
-                        // 根据严重程度选择颜色
-                        let strokeColor = "#ffff00";
-                        if (d.severity === "high") {
-                          strokeColor = "#ff0000";
-                        } else if (d.severity === "medium") {
-                          strokeColor = "#ff8800";
-                        }
-
-                        // 如果是选中的缺陷，使用更亮的颜色
-                        if (d.id === selectedDefectId) {
-                          strokeColor = "#00ff00"; // 亮绿色
-                          ctx.lineWidth = 3 / scale;
-                        } else {
-                          ctx.lineWidth = 2 / scale;
-                        }
-
-                        ctx.strokeStyle = strokeColor;
-                        ctx.strokeRect(defectX, defectY, d.width, d.height);
-
-                        // 绘制缺陷类型标签
-                        if (scale > 0.3) {
-                          ctx.save();
-                          ctx.translate(defectX + 2, defectY + 2);
-                          const labelScale = 1 / scale;
-                          ctx.scale(labelScale, labelScale);
-                          ctx.font = "10px sans-serif";
-                          ctx.fillStyle = strokeColor;
-                          ctx.fillText(d.type, 0, 10);
-                          ctx.restore();
-                        }
-                      });
-                    }
-
-                    return;
-                  }
-
-                  // 开始加载瓦片
-                  if (!tileImageLoading.has(cacheKey)) {
-                    tileImageLoading.add(cacheKey);
-                    const img = new Image();
-                    img.src = url;
-                    img.onload = () => {
-                      tileImageCache.set(cacheKey, img);
-                      tileImageLoading.delete(cacheKey);
-                    };
-                    img.onerror = () => {
-                      tileImageLoading.delete(cacheKey);
-                    };
-                  }
-
-                  // 绘制占位网格
-                  ctx.fillStyle = "#f8f8f8";
-                  ctx.fillRect(tile.x, tile.y, tile.width, tile.height);
-
-                  ctx.strokeStyle = "#ccc";
-                  ctx.lineWidth = 1 / scale;
-                  ctx.strokeRect(tile.x, tile.y, tile.width, tile.height);
-
-                  // 开发模式：显示加载中的瓦片信息
-                  if (env.isDevelopment()) {
-                    ctx.save();
-                    ctx.translate(tile.x + 5, tile.y + 5);
-                    const loadingScale = 1 / scale;
-                    ctx.scale(loadingScale, loadingScale);
-                    ctx.font = "11px 'Consolas', monospace";
-
-                    // 半透明背景
-                    ctx.fillStyle = "rgba(200, 200, 200, 0.8)";
-                    ctx.fillRect(-2, -2, 140, 90);
-
-                    // 瓦片信息
-                    ctx.fillStyle = "#666";
-                    ctx.fillText(`L${tile.level} [${tileX},${tileY}]`, 2, 10);
-                    ctx.fillStyle = "#888";
-                    ctx.fillText(`Pos: ${Math.round(tile.x)},${Math.round(tile.y)}`, 2, 24);
-                    ctx.fillStyle = "#aaa";
-                    ctx.fillText(`${Math.round(tile.width)}×${Math.round(tile.height)}`, 2, 38);
-
-                    // Surface 和 Status
-                    ctx.fillStyle = "#ff6600";
-                    ctx.fillText(`Surface: ${surfaceType}`, 2, 52);
-                    ctx.fillStyle = "#ff0000";
-                    ctx.fillText(`⏳ LOADING...`, 2, 66);
-
-                    // URL 信息
-                    ctx.fillStyle = "#999";
-                    ctx.font = "9px 'Consolas', monospace";
-                    ctx.fillText(`seq:${seqNo}`, 2, 80);
-
-                    ctx.restore();
-                  }
-                };
-              };
-
-              return (
-                <div className="relative w-full h-full">
-                  {/* 上表面画布 */}
-                  {showTop && topMeta && (
-                    <div className="absolute inset-0">
-                      <LargeImageViewer
-                        imageWidth={topMeta.image_width}
-                        imageHeight={topMeta.frame_count * topMeta.image_height}
-                        tileSize={tileSize}
-                        className="bg-black"
-                        renderTile={createRenderTile("top")}
-                        focusTarget={focusTarget}
-                      />
-                    </div>
-                  )}
-
-                  {/* 下表面画布 */}
-                  {showBottom && bottomMeta && (
-                    <div className="absolute inset-0">
-                      <LargeImageViewer
-                        imageWidth={bottomMeta.image_width}
-                        imageHeight={bottomMeta.frame_count * bottomMeta.image_height}
-                        tileSize={tileSize}
-                        className="bg-black"
-                        renderTile={createRenderTile("bottom")}
-                        focusTarget={focusTarget}
-                      />
-                    </div>
-                  )}
-                </div>
-              );
-            })()
-          ) : (
-            <div className="flex flex-col items-center justify-center gap-4 text-muted-foreground h-full">
-              <AlertCircle className="w-16 h-16 opacity-50" />
-              <p className="text-sm">无可用大图</p>
-            </div>
-          )}
-        </>
-      ) : (
-        // 单缺陷模式显示裁剪后的缺陷图像
-        <div className="relative w-full h-full flex flex-col items-center justify-center gap-4 p-4">
-          {imageUrl ? (
-            <>
-              <img
-                src={imageUrl}
-                alt={`缺陷: ${selectedDefect?.type}`}
-                className="max-w-full max-h-full object-contain border-2 border-primary/50 rounded"
-                onError={() => setImageError("图像加载失败")}
-              />
-              {selectedDefect && (
-                <div className="absolute bottom-4 left-4 right-4 bg-black/80 backdrop-blur-sm p-3 rounded border border-border">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-bold text-white">
-                          {selectedDefect.type}
-                        </span>
-                        <span
-                          className={`px-2 py-0.5 rounded text-xs font-bold ${
-                            selectedDefect.severity === "high"
-                              ? "bg-red-500 text-white"
-                              : selectedDefect.severity === "medium"
-                                ? "bg-yellow-500 text-black"
-                                : "bg-green-500 text-white"
-                          }`}
-                        >
-                          {selectedDefect.severity.toUpperCase()}
-                        </span>
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        位置: ({selectedDefect.x.toFixed(1)},{" "}
-                        {selectedDefect.y.toFixed(1)}) | 尺寸:{" "}
-                        {selectedDefect.width.toFixed(1)} ×{" "}
-                        {selectedDefect.height.toFixed(1)} | 置信度:{" "}
-                        {(selectedDefect.confidence * 100).toFixed(0)}%
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="flex flex-col items-center justify-center gap-4 text-muted-foreground">
-              <AlertCircle className="w-16 h-16 opacity-50" />
-              <p className="text-sm">请选择一个缺陷</p>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+    <LargeImageViewer
+      imageWidth={layout.worldWidth}
+      imageHeight={layout.worldHeight}
+      tileSize={viewerTileSize}
+      className="bg-slate-900/80"
+      renderTile={renderTile}
+      renderOverlay={renderOverlay}
+      focusTarget={focusTarget}
+      fixedLevel={0}
+      panMargin={PAN_MARGIN}
+    />
   );
 }

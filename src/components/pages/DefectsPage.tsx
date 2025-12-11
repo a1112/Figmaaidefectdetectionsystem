@@ -9,6 +9,7 @@ import type {
   SteelPlate,
   SurfaceFilter,
   ImageViewMode,
+  ImageOrientation,
   ManualConfirmStatus,
 } from "../../types/app.types";
 import type { SurfaceImageInfo } from "../../src/api/types";
@@ -53,6 +54,7 @@ interface DefectsPageProps {
   setSelectedDefectId: (id: string | null) => void;
   searchCriteria: SearchCriteria;
   filterCriteria: FilterCriteria;
+  imageOrientation: ImageOrientation;
 }
 
 export const DefectsPage: React.FC<DefectsPageProps> = ({
@@ -81,6 +83,7 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
   setSelectedDefectId,
   searchCriteria,
   filterCriteria,
+  imageOrientation,
 }) => {
   const activeDefects: Defect[] =
     currentImage || detectionResult
@@ -212,6 +215,7 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
                   onDefectSelect={setSelectedDefectId}
                   surfaceImageInfo={surfaceImageInfo}
                   onViewportChange={setViewportInfo}
+                  imageOrientation={imageOrientation}
                 />
               ) : (
                 <div className="text-xs text-muted-foreground">

@@ -36,6 +36,7 @@ import type {
   Defect,
   DetectionRecord,
   SteelPlate,
+  ImageOrientation,
 } from "./types/app.types";
 import {
   defectTypes,
@@ -92,6 +93,12 @@ import { ImagesPage } from "./components/pages/ImagesPage";
 import { MockDataEditorPage } from "./components/pages/MockDataEditorPage";
 import { LargeImageViewer } from "./components/LargeImageViewer/LargeImageViewer";
 import type { Tile } from "./components/LargeImageViewer/utils";
+import {
+  buildOrientationLayout,
+  pickSurfaceForTile,
+  computeTileRequestInfo,
+  convertDefectToWorldRect,
+} from "./utils/imageOrientation";
 
 // 简单的瓦片图像缓存，避免重复加载同一瓦片
 const tileImageCache = new Map<string, HTMLImageElement>();
@@ -128,6 +135,26 @@ export default function App() {
   const [imageViewMode, setImageViewMode] = useState<
     "full" | "single"
   >("full"); // 图像显示模式：大图/单缺陷
+  const [imageOrientation, setImageOrientation] =
+    useState<ImageOrientation>(() => {
+      if (typeof window === "undefined") {
+        return "horizontal";
+      }
+      const stored = window.localStorage.getItem(
+        "image_orientation",
+      );
+      return stored === "vertical" ? "vertical" : "horizontal";
+    });
+  const handleImageOrientationChange = (
+    next: ImageOrientation,
+  ) => {
+    setImageOrientation(next);
+    try {
+      window.localStorage.setItem("image_orientation", next);
+    } catch {
+      // ignore persisted preference errors
+    }
+  };
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [manualConfirmStatus, setManualConfirmStatus] =
     useState<
@@ -1383,428 +1410,214 @@ export default function App() {
                         </div>
                       );
                     }
-                    if (
-                      !surfaceImageInfo ||
-                      surfaceImageInfo.length === 0
-                    ) {
+                    if (!surfaceImageInfo || surfaceImageInfo.length === 0) {
                       return (
                         <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
-                          当前钢板尚无图像元数据（surface_images
-                          为空）
+                          当前钢板尚无图像元数据（surface_images 为空）
                         </div>
                       );
                     }
-
-                    const topMeta = surfaceImageInfo.find(
-                      (info) => info.surface === "top",
-                    );
-                    const bottomMeta = surfaceImageInfo.find(
-                      (info) => info.surface === "bottom",
-                    );
-                    if (!topMeta && !bottomMeta) {
+                    const seqNo = Number(selectedPlate.serialNumber);
+                    if (Number.isNaN(seqNo)) {
                       return (
                         <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
-                          当前钢板上下表面都没有图像元数据
+                          无法解析序列号，无法请求图像
                         </div>
                       );
                     }
-
-                    const toRotatedSize = (
-                      meta: SurfaceImageInfo | undefined,
-                    ) => {
-                      if (!meta) {
-                        return { width: 0, height: 0 };
+                    const topMeta = surfaceImageInfo.find((info) => info.surface === "top");
+                    const bottomMeta = surfaceImageInfo.find((info) => info.surface === "bottom");
+                    const layout = buildOrientationLayout({
+                      orientation: imageOrientation,
+                      surfaceFilter,
+                      topMeta,
+                      bottomMeta,
+                      surfaceGap: imageOrientation === "horizontal" ? 0 : 40,
+                    });
+                    if (layout.surfaces.length === 0) {
+                      return (
+                        <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
+                          无法构建图像布局，请检查表面配置
+                        </div>
+                      );
+                    }
+                    const viewerTileSize = Math.max(
+                      topMeta?.image_height ?? 0,
+                      bottomMeta?.image_height ?? 0,
+                      1024,
+                    );
+                    const defectWorldRects = plateDefects
+                      .map((defect) => {
+                        const surfaceLayout = layout.surfaces.find(
+                          (s) => s.surface === defect.surface,
+                        );
+                        if (!surfaceLayout) {
+                          return null;
+                        }
+                        const rect = convertDefectToWorldRect({
+                          surface: surfaceLayout,
+                          defect,
+                          orientation: imageOrientation,
+                        });
+                        if (!rect) {
+                          return null;
+                        }
+                        return { defect, surface: surfaceLayout, rect };
+                      })
+                      .filter(
+                        (
+                          item,
+                        ): item is {
+                          defect: Defect;
+                          surface: SurfaceLayout;
+                          rect: { x: number; y: number; width: number; height: number };
+                        } => item !== null,
+                      );
+                    const severityColor = (severity: Defect["severity"]) => {
+                      switch (severity) {
+                        case "high":
+                          return "#ef4444";
+                        case "medium":
+                          return "#f97316";
+                        default:
+                          return "#22c55e";
                       }
-                      const imgW = meta.image_width || 1;
-                      const imgH = meta.image_height || 1;
-                      const frameCount = meta.frame_count || 1;
-                      const mosaicW = imgW;
-                      const mosaicH = frameCount * imgH;
-                      // 逆时针 90°：高变宽，宽变高
-                      return {
-                        width: mosaicH,
-                        height: mosaicW,
-                      };
                     };
-
-                    const topRot = toRotatedSize(topMeta);
-                    const bottomRot = toRotatedSize(bottomMeta);
-                    // 上下表面中间无间隙
-                    const gap = 0;
-
-                    // 🎯 根据 surfaceFilter 决定渲染哪些表面
-                    const shouldRenderTop = surfaceFilter === "all" || surfaceFilter === "top";
-                    const shouldRenderBottom = surfaceFilter === "all" || surfaceFilter === "bottom";
-
-                    const worldLength = Math.max(
-                      shouldRenderTop ? topRot.width : 0,
-                      shouldRenderBottom ? bottomRot.width : 0,
-                    );
-                    const worldWidth =
-                      (shouldRenderTop ? topRot.height : 0) +
-                      (shouldRenderBottom ? bottomRot.height : 0) +
-                      (shouldRenderTop && shouldRenderBottom ? gap : 0);
-
-                    if (worldLength <= 0 || worldWidth <= 0) {
-                      return (
-                        <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
-                          图像尺寸为 0，无法构建长带视图
-                        </div>
-                      );
-                    }
-
-                    const seqNo = Number(
-                      selectedPlate.serialNumber,
-                    );
-                    const baseTileSize = 1024;
-                    
-                    // 获取当前钢板的缺陷数据用于绘制
-                    const defectsForDrawing = plateDefects || [];
-
                     const renderTile = (
                       ctx: CanvasRenderingContext2D,
                       tile: Tile,
-                      tileSize: number,
+                      tileSizeArg: number,
                       scale: number,
                     ) => {
-                      const virtualTileSize =
-                        tileSize * Math.pow(2, tile.level);
-
-                      // 计算瓦片中心的世界坐标，用于判断所在表面或间隙
-                      const centerY = tile.y + tile.height / 2;
-
-                      let surface: "top" | "bottom" | null =
-                        null;
-                      let yOffset = 0;
-                      let surfaceWidth = 0;
-                      let surfaceHeight = 0;
-                      let metaForSurface: SurfaceImageInfo | undefined = undefined;
-
-                      // 计算当前有效的顶部高度（根据过滤器）
-                      const effectiveTopHeight = shouldRenderTop ? topRot.height : 0;
-
-                      if (
-                        shouldRenderTop &&
-                        centerY < effectiveTopHeight &&
-                        topRot.height > 0
-                      ) {
-                        surface = "top";
-                        yOffset = 0;
-                        surfaceWidth = topRot.width;
-                        surfaceHeight = topRot.height;
-                        metaForSurface = topMeta;
-                      } else if (
-                        shouldRenderBottom &&
-                        centerY >= effectiveTopHeight &&
-                        bottomRot.height > 0
-                      ) {
-                        surface = "bottom";
-                        yOffset = effectiveTopHeight;
-                        surfaceWidth = bottomRot.width;
-                        surfaceHeight = bottomRot.height;
-                        metaForSurface = bottomMeta;
-                      } else {
-                        // 无有效表面数据或被过滤器隐藏
+                      const surfaceLayout = pickSurfaceForTile(layout, tile);
+                      if (!surfaceLayout) {
+                        ctx.fillStyle = "#f1f5f9";
+                        ctx.fillRect(tile.x, tile.y, tile.width, tile.height);
                         return;
                       }
-
-                      // 超出该表面有效宽高的瓦片不请求（避免加载多余图像）
-                      if (tile.x >= surfaceWidth) {
+                      const virtualTileSize = tileSizeArg * Math.pow(2, tile.level);
+                      const requestInfo = computeTileRequestInfo({
+                        surface: surfaceLayout,
+                        tile,
+                        orientation: imageOrientation,
+                        virtualTileSize,
+                      });
+                      if (!requestInfo) {
+                        ctx.fillStyle = "#f1f5f9";
+                        ctx.fillRect(tile.x, tile.y, tile.width, tile.height);
                         return;
                       }
-
-                      const mosaicY = tile.y - yOffset;
-                      if (
-                        mosaicY >= surfaceHeight ||
-                        mosaicY + tile.height <= 0
-                      ) {
-                        return;
-                      }
-
-                      const tileX = Math.floor(
-                        tile.x / virtualTileSize,
-                      );
-                      const tileY = Math.floor(
-                        mosaicY / virtualTileSize,
-                      );
-
-                      if (tileX < 0 || tileY < 0) {
-                        return;
-                      }
-
-                      // 进一步按照后端的马赛克高度裁剪 tileY，避免请求超出范围导致 404
-                      if (!metaForSurface) {
-                        return;
-                      }
-                      // 与后端 get_tile 中的计算保持一致：
-                      // rotated_h = first.width -> mosaic_height = rotated_h
-                      const rotatedH =
-                        metaForSurface.image_width || 1;
-                      const mosaicHeightBackend = rotatedH;
-                      const maxTileYBackend = Math.ceil(
-                        mosaicHeightBackend / virtualTileSize,
-                      );
-                      if (tileY >= maxTileYBackend) {
-                        return;
-                      }
-
+                      const cacheKey = `${imageOrientation}-${surfaceLayout.surface}-${seqNo}-${tile.level}-${requestInfo.tileX}-${requestInfo.tileY}-${tileSizeArg}`;
+                      const cached = tileImageCache.get(cacheKey);
                       const url = getTileImageUrl({
-                        surface,
+                        surface: surfaceLayout.surface,
                         seqNo,
                         level: tile.level,
-                        tileX,
-                        tileY,
-                        tileSize,
+                        tileX: requestInfo.tileX,
+                        tileY: requestInfo.tileY,
+                        tileSize: tileSizeArg,
                         fmt: "JPEG",
+                        orientation: imageOrientation,
                       });
-
-                      const cacheKey = `${surface}-${seqNo}-${tile.level}-${tileX}-${tileY}-${tileSize}`;
-                      const cached =
-                        tileImageCache.get(cacheKey);
-
                       if (cached && cached.complete) {
-                        ctx.drawImage(
-                          cached,
-                          tile.x,
-                          tile.y,
-                          tile.width,
-                          tile.height,
-                        );
-
-                        // 绘制瓦片边框用于调试
-                        ctx.strokeStyle = "rgba(0,0,0,0.2)";
-                        ctx.lineWidth = 1 / scale;
-                        ctx.strokeRect(
-                          tile.x,
-                          tile.y,
-                          tile.width,
-                          tile.height,
-                        );
-                        
-                        // 🎨 绘制瓦片信息（级别、位置、尺寸）
-                        ctx.save();
-                        ctx.translate(tile.x + 5, tile.y + 5);
-                        const textScale = 1 / scale;
-                        ctx.scale(textScale, textScale);
-                        ctx.font = "11px 'Consolas', monospace";
-                        ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
-                        ctx.fillRect(-2, -2, 140, 90);
-                        
-                        // 瓦片基本信息
-                        ctx.fillStyle = "#00ff40";
-                        ctx.fillText(`L${tile.level} [${tileX},${tileY}]`, 2, 10);
-                        ctx.fillStyle = "#ffaa00";
-                        ctx.fillText(`Pos: ${Math.round(tile.x)},${Math.round(tile.y)}`, 2, 24);
-                        ctx.fillStyle = "#00aaff";
-                        ctx.fillText(`${Math.round(tile.width)}×${Math.round(tile.height)}`, 2, 38);
-                        
-                        // Surface 和状态
-                        ctx.fillStyle = "#ff6600";
-                        ctx.fillText(`Surface: ${surface}`, 2, 52);
-                        ctx.fillStyle = "#00ff00";
-                        ctx.fillText(`✓ LOADED`, 2, 66);
-                        
-                        // 序列号
-                        ctx.fillStyle = "#aaa";
-                        ctx.font = "9px 'Consolas', monospace";
-                        ctx.fillText(`seq:${seqNo}`, 2, 80);
-                        
-                        ctx.restore();
-
-                        // 🎯 绘制该瓦片范围内的缺陷
-                        if (metaForSurface && defectsForDrawing.length > 0) {
-                          const frameWidth = metaForSurface.image_width || 1;
-                          const frameHeight = metaForSurface.image_height || 1;
-
-                          // 过滤出当前表面和当前瓦片范围内的缺陷
-                          const visibleDefects = defectsForDrawing.filter((d: Defect) => {
-                            if (d.surface !== surface) return false;
-
-                            // 将缺陷坐标转换为世界坐标
-                            // mosaic坐标：x不变，y = imageIndex * frameHeight + defect.y
-                            const mosaicX = d.x;
-                            const mosaicY = d.imageIndex * frameHeight + d.y;
-                            
-                            // 旋转90度（逆时针）：world_x = mosaic_y, world_y = mosaic_x
-                            const worldX = mosaicY;
-                            const worldY = mosaicX + yOffset; // 加上表面偏移
-                            const worldW = d.height; // 旋转后宽高互换
-                            const worldH = d.width;
-
-                            // 判断是否与当前瓦片相交
-                            return !(
-                              worldX + worldW < tile.x ||
-                              worldX > tile.x + tile.width ||
-                              worldY + worldH < tile.y ||
-                              worldY > tile.y + tile.height
-                            );
-                          });
-
-                          // 绘制缺陷矩形框
-                          visibleDefects.forEach((d: Defect) => {
-                            const mosaicX = d.x;
-                            const mosaicY = d.imageIndex * frameHeight + d.y;
-                            const worldX = mosaicY;
-                            const worldY = mosaicX + yOffset;
-                            const worldW = d.height;
-                            const worldH = d.width;
-
-                            // 根据严重程度选择颜色
-                            let strokeColor = "#ffff00"; // 默认黄色
-                            if (d.severity === "high") {
-                              strokeColor = "#ff0000"; // 红色
-                            } else if (d.severity === "medium") {
-                              strokeColor = "#ff8800"; // 橙色
-                            } else {
-                              strokeColor = "#ffff00"; // 黄色
-                            }
-
-                            ctx.strokeStyle = strokeColor;
-                            ctx.lineWidth = 2 / scale;
-                            ctx.strokeRect(worldX, worldY, worldW, worldH);
-
-                            // 绘制缺陷类型标签（小字）
-                            if (scale > 0.3) { // 只在放大时显示文字
-                              ctx.save();
-                              ctx.translate(worldX + 2, worldY + 2);
-                              const labelScale = 1 / scale;
-                              ctx.scale(labelScale, labelScale);
-                              ctx.font = "10px sans-serif";
-                              ctx.fillStyle = strokeColor;
-                              ctx.fillText(d.type, 0, 10);
-                              ctx.restore();
-                            }
-                          });
+                        ctx.drawImage(cached, tile.x, tile.y, tile.width, tile.height);
+                      } else {
+                        if (!tileImageLoading.has(cacheKey)) {
+                          tileImageLoading.add(cacheKey);
+                          const img = new Image();
+                          img.src = url;
+                          img.onload = () => {
+                            tileImageCache.set(cacheKey, img);
+                            tileImageLoading.delete(cacheKey);
+                          };
+                          img.onerror = () => {
+                            tileImageLoading.delete(cacheKey);
+                          };
                         }
-                        
-                        return;
+                        ctx.fillStyle = "#e2e8f0";
+                        ctx.fillRect(tile.x, tile.y, tile.width, tile.height);
+                        ctx.strokeStyle = "#94a3b8";
+                        ctx.lineWidth = 1 / scale;
+                        ctx.strokeRect(tile.x, tile.y, tile.width, tile.height);
                       }
-
-                      if (!tileImageLoading.has(cacheKey)) {
-                        tileImageLoading.add(cacheKey);
-                        const img = new Image();
-                        img.src = url;
-                        img.onload = () => {
-                          tileImageCache.set(cacheKey, img);
-                          tileImageLoading.delete(cacheKey);
-                        };
-                        img.onerror = () => {
-                          tileImageLoading.delete(cacheKey);
-                        };
-                      }
-
-                      // 尚未加载完成时，绘制占位网格
-                      ctx.fillStyle = "#f8f8f8";
-                      ctx.fillRect(
-                        tile.x,
-                        tile.y,
-                        tile.width,
-                        tile.height,
-                      );
-
-                      ctx.strokeStyle = "#ccc";
-                      ctx.lineWidth = 1 / scale;
-                      ctx.strokeRect(
-                        tile.x,
-                        tile.y,
-                        tile.width,
-                        tile.height,
-                      );
-
-                      // 🔄 绘制加载中的瓦片数据信息
-                      ctx.save();
-                      ctx.translate(tile.x + 5, tile.y + 5);
-                      const loadingScale = 1 / scale;
-                      ctx.scale(loadingScale, loadingScale);
-                      ctx.font = "11px 'Consolas', monospace";
-                      
-                      // 半透明背景
-                      ctx.fillStyle = "rgba(200, 200, 200, 0.8)";
-                      ctx.fillRect(-2, -2, 140, 90);
-                      
-                      // 瓦片信息
-                      ctx.fillStyle = "#666";
-                      ctx.fillText(`L${tile.level} [${tileX},${tileY}]`, 2, 10);
-                      ctx.fillStyle = "#888";
-                      ctx.fillText(`Pos: ${Math.round(tile.x)},${Math.round(tile.y)}`, 2, 24);
-                      ctx.fillStyle = "#aaa";
-                      ctx.fillText(`${Math.round(tile.width)}×${Math.round(tile.height)}`, 2, 38);
-                      
-                      // Surface 和 Status
-                      ctx.fillStyle = "#ff6600";
-                      ctx.fillText(`Surface: ${surface}`, 2, 52);
-                      ctx.fillStyle = "#ff0000";
-                      ctx.fillText(`⏳ LOADING...`, 2, 66);
-                      
-                      // URL 信息（简化显示）
-                      ctx.fillStyle = "#999";
-                      ctx.font = "9px 'Consolas', monospace";
-                      ctx.fillText(`seq:${seqNo}`, 2, 80);
-                      
-                      ctx.restore();
+                      const defectsInTile = defectWorldRects.filter((item) => {
+                        const { rect, surface } = item;
+                        if (surface.surface !== surfaceLayout.surface) {
+                          return false;
+                        }
+                        return !(
+                          rect.x + rect.width < tile.x ||
+                          rect.x > tile.x + tile.width ||
+                          rect.y + rect.height < tile.y ||
+                          rect.y > tile.y + tile.height
+                        );
+                      });
+                      defectsInTile.forEach(({ defect, rect }) => {
+                        ctx.strokeStyle = severityColor(defect.severity);
+                        ctx.lineWidth =
+                          defect.id === selectedDefectId ? 3 / scale : 1.5 / scale;
+                        ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
+                        if (scale > 0.4) {
+                          ctx.save();
+                          ctx.translate(rect.x + 4, rect.y + 4);
+                          const labelScale = 1 / scale;
+                          ctx.scale(labelScale, labelScale);
+                          ctx.font = "10px 'Consolas', sans-serif";
+                          ctx.fillStyle = ctx.strokeStyle;
+                          ctx.fillText(defect.type, 0, 10);
+                          ctx.restore();
+                        }
+                      });
                     };
-
-                    // 🎨 绘制表面轮廓边框（在所有瓦片绘制完成后）
                     const renderOverlay = (
                       ctx: CanvasRenderingContext2D,
                       scale: number,
                     ) => {
-                      // 绘制上表面轮廓（仅当应该渲染时）
-                      if (shouldRenderTop && topRot.height > 0 && topRot.width > 0) {
-                        ctx.strokeStyle = "#0088ff";
-                        ctx.lineWidth = 3 / scale;
-                        ctx.setLineDash([10 / scale, 5 / scale]);
-                        ctx.strokeRect(0, 0, topRot.width, topRot.height);
-                        ctx.setLineDash([]);
-                        
-                        // 绘制标签
+                      layout.surfaces.forEach((surfaceLayout) => {
+                        const stroke =
+                          surfaceLayout.surface === "top"
+                            ? "#0ea5e9"
+                            : "#f97316";
                         ctx.save();
-                        ctx.translate(10, 10);
+                        ctx.lineWidth = 3 / scale;
+                        ctx.strokeStyle = stroke;
+                        ctx.setLineDash([10 / scale, 6 / scale]);
+                        ctx.strokeRect(
+                          surfaceLayout.offsetX,
+                          surfaceLayout.offsetY,
+                          surfaceLayout.worldWidth,
+                          surfaceLayout.worldHeight,
+                        );
+                        ctx.setLineDash([]);
+                        ctx.translate(
+                          surfaceLayout.offsetX + 12 / scale,
+                          surfaceLayout.offsetY + 18 / scale,
+                        );
                         const labelScale = 1 / scale;
                         ctx.scale(labelScale, labelScale);
-                        ctx.font = "bold 14px 'Consolas', sans-serif";
-                        ctx.fillStyle = "rgba(0, 136, 255, 0.9)";
-                        ctx.fillRect(-2, -14, 95, 20);
-                        ctx.fillStyle = "#fff";
-                        ctx.fillText("TOP SURFACE", 2, 0);
+                        ctx.font = "bold 12px 'Consolas', sans-serif";
+                        ctx.fillStyle = stroke;
+                        ctx.fillText(
+                          surfaceLayout.surface === "top"
+                            ? "TOP SURFACE"
+                            : "BOTTOM SURFACE",
+                          0,
+                          0,
+                        );
                         ctx.restore();
-                      }
-
-                      // 绘制下表面轮廓（仅当应该渲染时）
-                      if (shouldRenderBottom && bottomRot.height > 0 && bottomRot.width > 0) {
-                        const bottomY = shouldRenderTop ? topRot.height : 0;
-                        ctx.strokeStyle = "#ff6600";
-                        ctx.lineWidth = 3 / scale;
-                        ctx.setLineDash([10 / scale, 5 / scale]);
-                        ctx.strokeRect(0, bottomY, bottomRot.width, bottomRot.height);
-                        ctx.setLineDash([]);
-                        
-                        // 绘制标签
-                        ctx.save();
-                        ctx.translate(10, bottomY + 10);
-                        const labelScale = 1 / scale;
-                        ctx.scale(labelScale, labelScale);
-                        ctx.font = "bold 14px 'Consolas', sans-serif";
-                        ctx.fillStyle = "rgba(255, 102, 0, 0.9)";
-                        ctx.fillRect(-2, -14, 130, 20);
-                        ctx.fillStyle = "#fff";
-                        ctx.fillText("BOTTOM SURFACE", 2, 0);
-                        ctx.restore();
-                      }
+                      });
                     };
-
                     return (
                       <LargeImageViewer
-                        imageWidth={worldLength}
-                        imageHeight={worldWidth}
-                        tileSize={baseTileSize}
+                        imageWidth={layout.worldWidth}
+                        imageHeight={layout.worldHeight}
+                        tileSize={viewerTileSize}
                         className="bg-slate-50"
                         fixedLevel={activeTileLevel}
-                        onPreferredLevelChange={
-                          setPreferredTileLevel
-                        }
+                        onPreferredLevelChange={setPreferredTileLevel}
                         renderTile={renderTile}
                         renderOverlay={renderOverlay}
+                        panMargin={200}
                       />
                     );
                   })()}
@@ -1839,6 +1652,7 @@ export default function App() {
                 searchCriteria={searchCriteria}
                 filterCriteria={filterCriteria}
                 surfaceImageInfo={surfaceImageInfo}
+                imageOrientation={imageOrientation}
               />
             )}
 
@@ -2081,7 +1895,12 @@ export default function App() {
             )}
 
             {!showPlatesPanel && activeTab === "settings" && (
-              <SettingsPage theme={theme} setTheme={setTheme} />
+              <SettingsPage
+                theme={theme}
+                setTheme={setTheme}
+                imageOrientation={imageOrientation}
+                setImageOrientation={handleImageOrientationChange}
+              />
             )}
 
             {!showPlatesPanel && activeTab === "mockdata" && (

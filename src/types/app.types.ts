@@ -52,6 +52,7 @@ export type ActiveTab =
 export type SurfaceFilter = "all" | "top" | "bottom";
 export type DefectLogView = "list" | "chart";
 export type ImageViewMode = "full" | "single";
+export type ImageOrientation = "horizontal" | "vertical";
 export type Theme = "light" | "dark";
 export type ManualConfirmStatus =
   | "unprocessed"

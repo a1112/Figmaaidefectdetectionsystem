@@ -36,6 +36,10 @@ interface LargeImageViewerProps {
     width: number;
     height: number;
   } | null;
+  /**
+   * 限制在图像边缘外还能多移动的像素（避免看见超出范围的区域）
+   */
+  panMargin?: number;
 }
 
 export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
@@ -48,6 +52,7 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
   renderTile,
   renderOverlay,
   focusTarget,
+  panMargin,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   // 双 canvas：底层保留上一轮内容，顶层用于当前绘制（便于后续扩展双 LOD 图层）
@@ -66,6 +71,42 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
   const [, setTick] = useState(0);
 
   const lastPreferredLevelRef = useRef<number | null>(null);
+
+  const clampTransform = useCallback(
+    (next: { x: number; y: number; scale: number }) => {
+      if (
+        panMargin == null ||
+        containerSize.width === 0 ||
+        containerSize.height === 0
+      ) {
+        return next;
+      }
+
+      const margin = panMargin;
+      const cw = containerSize.width;
+      const ch = containerSize.height;
+
+      const minX = cw - (imageWidth + margin) * next.scale;
+      const maxX = margin * next.scale;
+      const minY = ch - (imageHeight + margin) * next.scale;
+      const maxY = margin * next.scale;
+
+      const clampRange = (value: number, lower: number, upper: number) => {
+        if (lower > upper) {
+          const mid = (lower + upper) / 2;
+          lower = upper = mid;
+        }
+        return Math.min(Math.max(value, lower), upper);
+      };
+
+      return {
+        scale: next.scale,
+        x: clampRange(next.x, minX, maxX),
+        y: clampRange(next.y, minY, maxY),
+      };
+    },
+    [panMargin, containerSize, imageWidth, imageHeight],
+  );
 
   // Calculate constraints
   const getConstraints = useCallback(() => {
@@ -167,14 +208,14 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
   useEffect(() => {
     if (containerSize.width > 0 && transform.current.scale === 1) {
       const { minScale } = getConstraints();
-      transform.current = {
+      transform.current = clampTransform({
         scale: minScale,
         x: (containerSize.width - imageWidth * minScale) / 2,
         y: (containerSize.height - imageHeight * minScale) / 2,
-      };
+      });
       setTick(t => t + 1);
     }
-  }, [containerSize, imageWidth, imageHeight, getConstraints]);
+  }, [containerSize, imageWidth, imageHeight, getConstraints, clampTransform]);
 
   // Resize Observer
   useEffect(() => {
@@ -223,9 +264,9 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
     const newX = mouseX - mouseVirtualX * newScale;
     const newY = mouseY - mouseVirtualY * newScale;
 
-    transform.current = { x: newX, y: newY, scale: newScale };
+    transform.current = clampTransform({ x: newX, y: newY, scale: newScale });
     setTick(t => t + 1);
-  }, [getConstraints]);
+  }, [getConstraints, clampTransform]);
 
   useEffect(() => {
     const canvas = frontCanvasRef.current;
@@ -249,9 +290,13 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
     const dx = e.clientX - lastMousePosition.current.x;
     const dy = e.clientY - lastMousePosition.current.y;
     lastMousePosition.current = { x: e.clientX, y: e.clientY };
-    transform.current.x += dx;
-    transform.current.y += dy;
-  }, []);
+    const current = transform.current;
+    transform.current = clampTransform({
+      scale: current.scale,
+      x: current.x + dx,
+      y: current.y + dy,
+    });
+  }, [clampTransform]);
 
   const handleMouseUp = useCallback(() => {
     isDragging.current = false;
@@ -291,8 +336,12 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
       const dx = e.touches[0].clientX - lastMousePosition.current.x;
       const dy = e.touches[0].clientY - lastMousePosition.current.y;
       lastMousePosition.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-      transform.current.x += dx;
-      transform.current.y += dy;
+      const current = transform.current;
+      transform.current = clampTransform({
+        scale: current.scale,
+        x: current.x + dx,
+        y: current.y + dy,
+      });
     } else if (e.touches.length === 2) {
       const dist = getTouchDistance(e.touches);
       const rect = frontCanvasRef.current?.getBoundingClientRect();
@@ -314,13 +363,13 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
       const newX = centerX - mouseVirtualX * newScale;
       const newY = centerY - mouseVirtualY * newScale;
 
-      transform.current = { x: newX, y: newY, scale: newScale };
+      transform.current = clampTransform({ x: newX, y: newY, scale: newScale });
       lastTouchDistance.current = dist;
       lastTouchCenter.current = { x: centerX, y: centerY };
 
       setTick(t => t + 1);
     }
-  }, [getConstraints]);
+  }, [getConstraints, clampTransform]);
 
   const handleTouchEnd = useCallback(() => {
     isDragging.current = false;
@@ -359,7 +408,7 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
     const newX = viewportCenterX - targetCenterX * newScale;
     const newY = viewportCenterY - targetCenterY * newScale;
 
-    transform.current = { x: newX, y: newY, scale: newScale };
+    transform.current = clampTransform({ x: newX, y: newY, scale: newScale });
     setTick(t => t + 1);
   }, [focusTarget, containerSize, getConstraints]);
 

@@ -74,6 +74,7 @@
           imageViewMode={imageViewMode}
           selectedDefectId={selectedDefectId}
           onDefectSelect={setSelectedDefectId}
+          imageOrientation={imageOrientation}
         />
       )
     ) : // ========== 开发模式 ==========

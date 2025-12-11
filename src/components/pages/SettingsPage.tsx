@@ -1,17 +1,31 @@
 import React, { useEffect, useState } from "react";
-import { Moon, Sun, HardDrive, Minimize2 } from "lucide-react";
+import {
+  Moon,
+  Sun,
+  HardDrive,
+  Minimize2,
+  Rows3,
+  Columns3,
+} from "lucide-react";
 import { ModeSwitch } from "../ModeSwitch";
-import type { Theme } from "../../types/app.types";
+import type {
+  Theme,
+  ImageOrientation,
+} from "../../types/app.types";
 import { env, type ApiProfile } from "../../src/config/env";
 
 interface SettingsPageProps {
   theme: Theme;
   setTheme: (theme: Theme) => void;
+  imageOrientation: ImageOrientation;
+  setImageOrientation: (value: ImageOrientation) => void;
 }
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({
   theme,
   setTheme,
+  imageOrientation,
+  setImageOrientation,
 }) => {
   const [apiProfile, setApiProfile] = useState<ApiProfile>(
     env.getApiProfile(),
@@ -158,6 +172,36 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             >
               <Moon className="w-3.5 h-3.5" />
               DARK
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 items-center gap-4">
+          <label className="text-sm font-medium">
+            IMAGE ORIENTATION / 图像方向
+          </label>
+          <div className="flex items-center gap-2 bg-background border border-border rounded-sm p-1">
+            <button
+              onClick={() => setImageOrientation("horizontal")}
+              className={`flex-1 px-3 py-1.5 text-xs rounded-sm transition-colors flex items-center justify-center gap-1.5 ${
+                imageOrientation === "horizontal"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Rows3 className="w-3.5 h-3.5" />
+              横向
+            </button>
+            <button
+              onClick={() => setImageOrientation("vertical")}
+              className={`flex-1 px-3 py-1.5 text-xs rounded-sm transition-colors flex items-center justify-center gap-1.5 ${
+                imageOrientation === "vertical"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Columns3 className="w-3.5 h-3.5" />
+              纵向
             </button>
           </div>
         </div>
