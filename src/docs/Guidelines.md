@@ -10,7 +10,7 @@
 
 - 入口与页面：
   - `App.tsx`：主页面布局（侧边栏 + 顶部工具栏 + 主内容区）。
-  - `components/`：页面使用的 UI 组件（如 `UploadZone`, `DefectList`, `ModeSwitch`）。
+  - `components/`：页面使用的 UI 组件（如 `DefectList`, `ModeSwitch`, `DefectReport`）。
 - 核心逻辑与配置（不要改变整体结构，只在其中扩展）：
   - `src/api/types.ts`：**唯一**的 API 类型定义与映射函数。
   - `src/api/mock.ts`：开发模式下的 Mock 数据。

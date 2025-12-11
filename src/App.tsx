@@ -1,6 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { UploadZone } from "./components/UploadZone";
-import { DetectionResult } from "./components/DetectionResult";
 import { DefectList } from "./components/DefectList";
 import { DefectReport } from "./components/DefectReport";
 import { DefectDistributionChart } from "./components/DefectDistributionChart";
@@ -67,7 +65,6 @@ import {
   PieChart,
   Moon,
   Sun,
-  Upload,
   Search,
   Filter,
   RotateCcw,
@@ -100,12 +97,6 @@ const tileImageCache = new Map<string, HTMLImageElement>();
 const tileImageLoading = new Set<string>();
 
 export default function App() {
-  const [currentImage, setCurrentImage] = useState<
-    string | null
-  >(null);
-  const [isDetecting, setIsDetecting] = useState(false);
-  const [detectionResult, setDetectionResult] =
-    useState<DetectionRecord | null>(null);
   const [history, setHistory] = useState<DetectionRecord[]>([]);
   const [activeTab, setActiveTab] = useState<AppTab>("defects");
   const [isSidebarCollapsed, setIsSidebarCollapsed] =
@@ -276,10 +267,7 @@ export default function App() {
   // 缺陷类型过滤
   const [selectedDefectTypes, setSelectedDefectTypes] =
     useState<string[]>(defectTypes);
-  const activeDefects =
-    currentImage || detectionResult
-      ? detectionResult?.defects || []
-      : plateDefects;
+  const activeDefects = plateDefects;
   const filteredDefectsByControls = activeDefects.filter(
     (defect) =>
       (surfaceFilter === "all" ||
@@ -552,7 +540,6 @@ export default function App() {
     if (!selectedPlateId) {
       setPlateDefects([]);
       setSurfaceImageInfo(null);
-      setDetectionResult(null);
       return;
     }
 
@@ -568,7 +555,6 @@ export default function App() {
           console.warn("未找到选中的钢板:", selectedPlateId);
           setPlateDefects([]);
           setSelectedPlateId(null);
-          setDetectionResult(null);
           return;
         }
 
@@ -676,38 +662,6 @@ export default function App() {
     });
   }, [selectedPlateId, steelPlates]);
 
-  const handleImageUpload = (imageUrl: string) => {
-    setCurrentImage(imageUrl);
-    setDetectionResult(null);
-    simulateDetection(imageUrl);
-  };
-
-  const simulateDetection = (imageUrl: string) => {
-    setIsDetecting(true);
-
-    setTimeout(() => {
-      const defects = generateRandomDefects();
-      const status =
-        defects.length === 0
-          ? "pass"
-          : defects.some((d) => d.severity === "high")
-            ? "fail"
-            : "warning";
-
-      const record: DetectionRecord = {
-        id: Date.now().toString(),
-        defectImageUrl: imageUrl, // 假设缺陷图像和完整图像相同
-        fullImageUrl: imageUrl,
-        timestamp: new Date(),
-        defects,
-        status,
-      };
-
-      setDetectionResult(record);
-      setHistory((prev) => [record, ...prev].slice(0, 50));
-      setIsDetecting(false);
-    }, 2000);
-  };
 
   // 生成缺陷统计数据
   const getDefectStats = () => {
@@ -787,8 +741,6 @@ export default function App() {
             setIsFilterDialogOpen={setIsFilterDialogOpen}
             searchButtonRef={searchButtonRef}
             filterButtonRef={filterButtonRef}
-            handleImageUpload={handleImageUpload}
-            setActiveTab={setActiveTab}
           />
         </div>
 
@@ -843,10 +795,6 @@ export default function App() {
                 {activeTab === "defects" && (
                   <DefectsPage
                     isMobileDevice={isMobileDevice}
-                    currentImage={currentImage}
-                    isDetecting={isDetecting}
-                    detectionResult={detectionResult}
-                    history={history}
                     steelPlates={steelPlates}
                     filteredSteelPlates={filteredSteelPlates}
                     selectedPlateId={selectedPlateId}

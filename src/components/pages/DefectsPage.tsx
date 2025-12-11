@@ -1,11 +1,9 @@
 import { DefectList } from "../DefectList";
-import { DetectionResult } from "../DetectionResult";
 import { DefectDistributionChart } from "../DefectDistributionChart";
 import { DefectImageView, type ViewportInfo } from "../DefectImageView";
 import { DefectNavigationBar } from "../DefectNavigationBar";
 import type {
   Defect,
-  DetectionRecord,
   SteelPlate,
   SurfaceFilter,
   ImageViewMode,
@@ -21,10 +19,6 @@ import { useState } from "react";
 
 interface DefectsPageProps {
   isMobileDevice: boolean;
-  currentImage: string | null;
-  isDetecting: boolean;
-  detectionResult: DetectionRecord | null;
-  history: DetectionRecord[];
   steelPlates: SteelPlate[];
   filteredSteelPlates: SteelPlate[];
   selectedPlateId: string | null;
@@ -59,10 +53,6 @@ interface DefectsPageProps {
 
 export const DefectsPage: React.FC<DefectsPageProps> = ({
   isMobileDevice,
-  currentImage,
-  isDetecting,
-  detectionResult,
-  history,
   steelPlates,
   filteredSteelPlates,
   selectedPlateId,
@@ -85,10 +75,7 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
   filterCriteria,
   imageOrientation,
 }) => {
-  const activeDefects: Defect[] =
-    currentImage || detectionResult
-      ? detectionResult?.defects || []
-      : plateDefects;
+  const activeDefects: Defect[] = plateDefects;
 
   const filteredDefectsByControls = activeDefects.filter(
     (defect) =>
@@ -196,16 +183,7 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
             </div>
 
             <div className="flex-1 flex items-center justify-center bg-black/40 mt-5 relative">
-              {currentImage || detectionResult ? (
-                <DetectionResult
-                  imageUrl={
-                    currentImage ||
-                    detectionResult!.fullImageUrl
-                  }
-                  defects={filteredDefectsByControls}
-                  isDetecting={isDetecting}
-                />
-              ) : selectedPlate ? (
+              {selectedPlate ? (
                 <DefectImageView
                   selectedPlate={selectedPlate}
                   defects={defectsForImageView}
@@ -219,7 +197,7 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
                 />
               ) : (
                 <div className="text-xs text-muted-foreground">
-                  请上传图像或选择左侧钢板记录。
+                  请选择左侧钢板记录。
                 </div>
               )}
             </div>

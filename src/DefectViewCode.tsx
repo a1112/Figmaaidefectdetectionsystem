@@ -4,7 +4,7 @@
 // ========================================
 
 {
-  /* Viewport 容器开始 */
+    /* Viewport 容器开始 */
 }
 <div className="flex-1 bg-card border border-border p-1 relative min-h-[300px] flex flex-col">
   {!isMobileDevice && (
@@ -13,8 +13,8 @@
     </div>
   )}
 
-  {/* 大图/单缺陷切换按钮 - 仅生产模式显示 */}
-  {!isMobileDevice && env.isProduction() && (
+    {/* 大图/单缺陷切换按钮 - 仅生产模式显示 */}
+  {!isMobileDevice && (
     <div className="absolute top-0 right-0 flex gap-1 p-1 z-10">
       <button
         onClick={() => setImageViewMode("full")}
@@ -24,7 +24,7 @@
             : "bg-muted text-muted-foreground hover:bg-accent"
         }`}
       >
-        大图
+          大图
       </button>
       <button
         onClick={() => setImageViewMode("single")}
@@ -41,69 +41,38 @@
 
   {/* 主显示区域 */}
   <div className="flex-1 bg-black/40 flex items-center justify-center overflow-hidden border border-border/20 relative">
-    {env.isProduction() ? (
-      // ========== 生产模式 ==========
-      isLoadingDefects ? (
-        // 加载中
-        <div className="flex flex-col items-center justify-center gap-4 text-muted-foreground">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <p className="text-sm">加载缺陷数据中...</p>
-        </div>
-      ) : !selectedPlateId || plateDefects.length === 0 ? (
-        // 无数据
-        <div className="flex flex-col items-center justify-center gap-4 text-muted-foreground">
-          <AlertCircle className="w-16 h-16 opacity-50" />
-          <p className="text-sm">
-            {selectedPlateId
-              ? "无缺陷数据"
+    {isLoadingDefects ? (
+      <div className="flex flex-col items-center justify-center gap-4 text-muted-foreground">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <p className="text-sm">加载缺陷数据中</p>
+      </div>
+    ) : !selectedPlateId || plateDefects.length === 0 ? (
+      <div className="flex flex-col items-center justify-center gap-4 text-muted-foreground">
+        <AlertCircle className="w-16 h-16 opacity-50" />
+        <p className="text-sm">
+          {selectedPlateId ? "无缺陷数据"
               : "请选择钢板查看缺陷"}
-          </p>
-        </div>
-      ) : (
-        // 显示缺陷图像
-        <DefectImageView
-          selectedPlate={steelPlates.find(
-            (p) => p.plateId === selectedPlateId,
-          )}
-          defects={plateDefects.filter(
-            (d) =>
-              surfaceFilter === "all" ||
-              d.surface === surfaceFilter,
-          )}
-          surface={surfaceFilter}
-          imageViewMode={imageViewMode}
-          selectedDefectId={selectedDefectId}
-          onDefectSelect={setSelectedDefectId}
-          imageOrientation={imageOrientation}
-        />
-      )
-    ) : // ========== 开发模式 ==========
-    !currentImage ? (
-      // 未上传图像
-      <div className="w-full h-full flex items-center justify-center p-8">
-        <UploadZone onImageUpload={handleImageUpload} />
+        </p>
       </div>
     ) : (
-      // 已上传图像，显示检测结果
-      <div className="relative w-full h-full flex items-center justify-center bg-zinc-950">
-        <DetectionResult
-          imageUrl={currentImage}
-          defects={detectionResult?.defects || []}
-          isDetecting={isDetecting}
-        />
-        <button
-          onClick={() => {
-            setCurrentImage(null);
-            setDetectionResult(null);
-          }}
-          className="absolute top-4 right-4 px-3 py-1.5 bg-destructive/90 hover:bg-destructive text-white text-xs rounded border border-white/10 backdrop-blur-md transition-colors z-20"
-        >
-          CLOSE FEED
-        </button>
-      </div>
+      <DefectImageView
+        selectedPlate={steelPlates.find(
+          (p) => p.plateId === selectedPlateId,
+        )}
+        defects={plateDefects.filter(
+          (d) =>
+            surfaceFilter === "all" ||
+            d.surface === surfaceFilter,
+        )}
+        surface={surfaceFilter}
+        imageViewMode={imageViewMode}
+        selectedDefectId={selectedDefectId}
+        onDefectSelect={setSelectedDefectId}
+        imageOrientation={imageOrientation}
+      />
     )}
   </div>
 </div>;
 {
-  /* Viewport 容器结束 */
+  /*容器结束*/
 }

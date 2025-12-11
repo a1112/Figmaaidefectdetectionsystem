@@ -1,5 +1,5 @@
-import { Upload, Search, Filter, RotateCcw } from 'lucide-react';
-import type { SteelPlate, ActiveTab } from '../../types/app.types';
+import { Search, Filter, RotateCcw } from 'lucide-react';
+import type { SteelPlate } from '../../types/app.types';
 import type { SearchCriteria, FilterCriteria } from '../SearchDialog';
 import { getLevelText } from '../../utils/steelPlates';
 
@@ -18,8 +18,6 @@ interface SidebarProps {
   setIsFilterDialogOpen: (open: boolean) => void;
   searchButtonRef: React.RefObject<HTMLButtonElement>;
   filterButtonRef: React.RefObject<HTMLButtonElement>;
-  handleImageUpload: (imageUrl: string) => void;
-  setActiveTab: (tab: ActiveTab) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -36,9 +34,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setIsSearchDialogOpen,
   setIsFilterDialogOpen,
   searchButtonRef,
-  filterButtonRef,
-  handleImageUpload,
-  setActiveTab
+  filterButtonRef
 }) => {
   if (isCollapsed) return null;
 
@@ -231,32 +227,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
       </div>
       
-      {/* 上传按钮区域 - 底部固定 */}
-      <div className="p-2 bg-muted/20 border-t border-border space-y-1 shrink-0">
-        <label className="block">
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                  const imageUrl = event.target?.result as string;
-                  handleImageUpload(imageUrl);
-                  setActiveTab('defects'); // 切换到缺陷界面
-                };
-                reader.readAsDataURL(file);
-              }
-            }}
-          />
-          <div className="flex items-center justify-center gap-1.5 px-3 py-2 bg-primary hover:bg-primary/80 text-primary-foreground text-xs font-bold cursor-pointer border border-primary/50 transition-colors">
-            <Upload className="w-3.5 h-3.5" />
-            上传缺陷图像
-          </div>
-        </label>
-      </div>
     </div>
   );
 };

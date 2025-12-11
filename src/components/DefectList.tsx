@@ -3,7 +3,6 @@ import type { Defect } from "../types/app.types";
 
 interface DefectListProps {
   defects: Defect[];
-  isDetecting: boolean;
   surface: "all" | "top" | "bottom";
   defectColors?: {
     [key: string]: { bg: string; border: string; text: string };
@@ -14,7 +13,6 @@ interface DefectListProps {
 
 export function DefectList({
   defects,
-  isDetecting,
   surface,
   defectColors,
   selectedDefectId,
@@ -46,19 +44,7 @@ export function DefectList({
 
   return (
     <div className="h-full flex flex-col">
-      {isDetecting ? (
-        <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground space-y-4">
-          <div className="relative">
-            <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-2 h-2 bg-primary rounded-full"></div>
-            </div>
-          </div>
-          <p className="text-xs animate-pulse">
-            ANALYZING IMAGE...
-          </p>
-        </div>
-      ) : defects.length === 0 ? (
+      {defects.length === 0 ? (
         <div className="flex-1 flex flex-col text-muted-foreground/50">
           <div className="flex flex-col items-center justify-center py-4 border-b border-border/30">
             <Target className="w-8 h-8 mb-2 opacity-20" />
