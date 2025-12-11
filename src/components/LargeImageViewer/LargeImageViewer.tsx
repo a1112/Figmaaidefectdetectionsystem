@@ -40,6 +40,10 @@ interface LargeImageViewerProps {
    * 限制在图像边缘外还能多移动的像素（避免看见超出范围的区域）
    */
   panMargin?: number;
+  /**
+   * 纵向布局时优先按照高度填充视口（避免将宽度过度压缩）
+   */
+  fitToHeight?: boolean;
 }
 
 export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
@@ -53,6 +57,7 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
   renderOverlay,
   focusTarget,
   panMargin,
+  fitToHeight,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   // 双 canvas：底层保留上一轮内容，顶层用于当前绘制（便于后续扩展双 LOD 图层）
@@ -112,7 +117,9 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
   const getConstraints = useCallback(() => {
     const cw = containerSize.width;
     const ch = containerSize.height;
-    const fitScale = Math.min(cw / imageWidth, ch / imageHeight);
+    const fitScale = fitToHeight
+      ? ch / imageHeight
+      : Math.min(cw / imageWidth, ch / imageHeight);
     const minScale = fitScale;
     const maxScale = 1.0;
     return { minScale, maxScale };

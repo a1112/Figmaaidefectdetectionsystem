@@ -139,18 +139,24 @@ export function computeTileRequestInfo({
   tile,
   orientation,
   virtualTileSize,
+  tileSize,
 }: {
   surface: SurfaceLayout;
   tile: Tile;
   orientation: ImageOrientation;
   virtualTileSize: number;
+  tileSize: number;
 }):
   | {
       tileX: number;
       tileY: number;
     }
   | null {
-  const localX = tile.x - surface.offsetX;
+  const alignedOffsetX =
+    orientation === "vertical" && surface.surface === "bottom"
+      ? Math.ceil(surface.offsetX / tileSize) * tileSize
+      : surface.offsetX;
+  const localX = tile.x - alignedOffsetX;
   const localY = tile.y - surface.offsetY;
   const intersects =
     localX + tile.width > 0 &&

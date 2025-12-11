@@ -70,19 +70,46 @@ export function DefectImageView({
   }, [selectedPlate]);
 
   const topMeta = surfaceImageInfo?.find((info) => info.surface === "top");
-  const bottomMeta = surfaceImageInfo?.find((info) => info.surface === "bottom");
-
-  const layout = useMemo(
-    () =>
-      buildOrientationLayout({
-        orientation: imageOrientation,
-        surfaceFilter: surface,
-        topMeta,
-        bottomMeta,
-        surfaceGap: SURFACE_GAP,
-      }),
-    [imageOrientation, surface, topMeta, bottomMeta],
+  const bottomMeta = surfaceImageInfo?.find(
+    (info) => info.surface === "bottom",
   );
+  const viewerTileSize = useMemo(() => {
+    const fallback = 1024;
+    return Math.max(
+      topMeta?.image_height ?? 0,
+      bottomMeta?.image_height ?? 0,
+      fallback,
+    );
+  }, [topMeta, bottomMeta]);
+  const layout = useMemo(() => {
+    let surfaceGap = SURFACE_GAP;
+    if (
+      imageOrientation === "vertical" &&
+      surface === "all" &&
+      topMeta &&
+      bottomMeta
+    ) {
+      const tileWidth = viewerTileSize;
+      const topWidth = topMeta.image_width ?? 0;
+      surfaceGap = Math.max(
+        0,
+        Math.ceil(topWidth / tileWidth) * tileWidth - topWidth,
+      );
+    }
+    return buildOrientationLayout({
+      orientation: imageOrientation,
+      surfaceFilter: surface,
+      topMeta,
+      bottomMeta,
+      surfaceGap,
+    });
+  }, [
+    imageOrientation,
+    surface,
+    topMeta,
+    bottomMeta,
+    viewerTileSize,
+  ]);
 
   const selectedDefect = useMemo(
     () =>
@@ -196,15 +223,6 @@ export function DefectImageView({
     setImageUrl(url);
   }, [imageViewMode, selectedDefect, seqNo]);
 
-  const viewerTileSize = useMemo(() => {
-    const fallback = 1024;
-    return Math.max(
-      topMeta?.image_height ?? 0,
-      bottomMeta?.image_height ?? 0,
-      fallback,
-    );
-  }, [topMeta, bottomMeta]);
-
   const renderTile = useCallback(
     (ctx: CanvasRenderingContext2D, tile: Tile, tileSizeArg: number, scale: number) => {
       if (seqNo == null || layout.surfaces.length === 0) {
@@ -227,6 +245,7 @@ export function DefectImageView({
         tile,
         orientation: imageOrientation,
         virtualTileSize,
+        tileSize: tileSizeArg,
       });
       if (!requestInfo) {
         ctx.fillStyle = "#f8fafc";
@@ -439,6 +458,7 @@ export function DefectImageView({
       focusTarget={focusTarget}
       fixedLevel={0}
       panMargin={PAN_MARGIN}
+      fitToHeight={imageOrientation === "vertical"}
     />
   );
 }

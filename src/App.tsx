@@ -1417,7 +1417,7 @@ export default function App() {
                         </div>
                       );
                     }
-                    const seqNo = Number(selectedPlate.serialNumber);
+                    const seqNo = parseInt(selectedPlate.serialNumber, 10);
                     if (Number.isNaN(seqNo)) {
                       return (
                         <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
@@ -1427,12 +1427,32 @@ export default function App() {
                     }
                     const topMeta = surfaceImageInfo.find((info) => info.surface === "top");
                     const bottomMeta = surfaceImageInfo.find((info) => info.surface === "bottom");
+                    const viewerTileSize = Math.max(
+                      topMeta?.image_height ?? 0,
+                      bottomMeta?.image_height ?? 0,
+                      1024,
+                    );
+                    let surfaceGap = 0;
+                    if (
+                      imageOrientation === "vertical" &&
+                      surfaceFilter === "all" &&
+                      topMeta &&
+                      bottomMeta
+                    ) {
+                      const topWidth = topMeta.image_width ?? 0;
+                      const tileWidth = viewerTileSize;
+                      surfaceGap = Math.max(
+                        0,
+                        Math.ceil(topWidth / tileWidth) * tileWidth -
+                          topWidth,
+                      );
+                    }
                     const layout = buildOrientationLayout({
                       orientation: imageOrientation,
                       surfaceFilter,
                       topMeta,
                       bottomMeta,
-                      surfaceGap: imageOrientation === "horizontal" ? 0 : 40,
+                      surfaceGap,
                     });
                     if (layout.surfaces.length === 0) {
                       return (
@@ -1441,11 +1461,6 @@ export default function App() {
                         </div>
                       );
                     }
-                    const viewerTileSize = Math.max(
-                      topMeta?.image_height ?? 0,
-                      bottomMeta?.image_height ?? 0,
-                      1024,
-                    );
                     const defectWorldRects = plateDefects
                       .map((defect) => {
                         const surfaceLayout = layout.surfaces.find(
@@ -1462,7 +1477,11 @@ export default function App() {
                         if (!rect) {
                           return null;
                         }
-                        return { defect, surface: surfaceLayout, rect };
+                        return {
+                          defect,
+                          surface: surfaceLayout,
+                          rect,
+                        };
                       })
                       .filter(
                         (
@@ -1470,7 +1489,12 @@ export default function App() {
                         ): item is {
                           defect: Defect;
                           surface: SurfaceLayout;
-                          rect: { x: number; y: number; width: number; height: number };
+                          rect: {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                          };
                         } => item !== null,
                       );
                     const severityColor = (severity: Defect["severity"]) => {
@@ -1489,18 +1513,24 @@ export default function App() {
                       tileSizeArg: number,
                       scale: number,
                     ) => {
-                      const surfaceLayout = pickSurfaceForTile(layout, tile);
+                      const surfaceLayout = pickSurfaceForTile(
+                        layout,
+                        tile,
+                      );
                       if (!surfaceLayout) {
                         ctx.fillStyle = "#f1f5f9";
                         ctx.fillRect(tile.x, tile.y, tile.width, tile.height);
                         return;
                       }
-                      const virtualTileSize = tileSizeArg * Math.pow(2, tile.level);
+                      const virtualTileSize =
+                        tileSizeArg *
+                        Math.pow(2, tile.level);
                       const requestInfo = computeTileRequestInfo({
                         surface: surfaceLayout,
                         tile,
                         orientation: imageOrientation,
                         virtualTileSize,
+                        tileSize: tileSizeArg,
                       });
                       if (!requestInfo) {
                         ctx.fillStyle = "#f1f5f9";
@@ -1520,7 +1550,13 @@ export default function App() {
                         orientation: imageOrientation,
                       });
                       if (cached && cached.complete) {
-                        ctx.drawImage(cached, tile.x, tile.y, tile.width, tile.height);
+                        ctx.drawImage(
+                          cached,
+                          tile.x,
+                          tile.y,
+                          tile.width,
+                          tile.height,
+                        );
                       } else {
                         if (!tileImageLoading.has(cacheKey)) {
                           tileImageLoading.add(cacheKey);
