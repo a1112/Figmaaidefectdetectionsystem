@@ -168,22 +168,17 @@ export function computeTileRequestInfo({
     return null;
   }
 
-  const tileX = Math.floor(localX / virtualTileSize);
-  const tileY = Math.floor(localY / virtualTileSize);
+  const sourceX = orientation === "horizontal" ? localY : localX;
+  const sourceY = orientation === "horizontal" ? localX : localY;
+
+  const tileX = Math.floor(sourceX / virtualTileSize);
+  const tileY = Math.floor(sourceY / virtualTileSize);
   if (tileX < 0 || tileY < 0) {
     return null;
   }
 
-  const orientedWidth =
-    orientation === "horizontal"
-      ? surface.mosaicHeight
-      : surface.mosaicWidth;
-  const orientedHeight =
-    orientation === "horizontal"
-      ? surface.mosaicWidth
-      : surface.mosaicHeight;
-  const maxTileX = Math.ceil(orientedWidth / virtualTileSize);
-  const maxTileY = Math.ceil(orientedHeight / virtualTileSize);
+  const maxTileX = Math.ceil(surface.mosaicWidth / virtualTileSize);
+  const maxTileY = Math.ceil(surface.mosaicHeight / virtualTileSize);
 
   if (tileX >= maxTileX || tileY >= maxTileY) {
     return null;

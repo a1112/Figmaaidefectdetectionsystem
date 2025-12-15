@@ -186,6 +186,7 @@ export default function App() {
     useState(0);
   const [activeTileLevel, setActiveTileLevel] = useState(0);
   const [defaultTileSize, setDefaultTileSize] = useState(0);
+  const [maxTileLevel, setMaxTileLevel] = useState(0);
   useEffect(() => {
     const id = setTimeout(() => {
       setActiveTileLevel(preferredTileLevel);
@@ -261,6 +262,15 @@ export default function App() {
           nextDefaultTileSize > 0
         ) {
           setDefaultTileSize(nextDefaultTileSize);
+        }
+
+        const nextMaxTileLevel = res?.tile?.max_level;
+        if (
+          typeof nextMaxTileLevel === "number" &&
+          Number.isFinite(nextMaxTileLevel) &&
+          nextMaxTileLevel >= 0
+        ) {
+          setMaxTileLevel(nextMaxTileLevel);
         }
       } catch (error) {
         console.warn("⚠️ 加载全局 Meta 失败:", error);
@@ -803,6 +813,7 @@ export default function App() {
                     activeTileLevel={activeTileLevel}
                     onPreferredLevelChange={setPreferredTileLevel}
                     defaultTileSize={defaultTileSize}
+                    maxTileLevel={maxTileLevel}
                   />
                 )}
 
@@ -831,6 +842,7 @@ export default function App() {
                     surfaceImageInfo={surfaceImageInfo}
                     imageOrientation={imageOrientation}
                     defaultTileSize={defaultTileSize}
+                    maxTileLevel={maxTileLevel}
                   />
                 )}
 

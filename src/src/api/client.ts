@@ -305,7 +305,6 @@ export function getTileImageUrl(params: {
   tileY: number;
   tileSize?: number;
   fmt?: string;
-  orientation?: "horizontal" | "vertical";
 }): string {
   const {
     surface,
@@ -315,7 +314,6 @@ export function getTileImageUrl(params: {
     tileY,
     tileSize = 1024,
     fmt = "JPEG",
-    orientation = "vertical",
   } = params;
   const baseUrl = env.getApiBaseUrl();
   return (
@@ -326,7 +324,6 @@ export function getTileImageUrl(params: {
     `&tile_x=${tileX}` +
     `&tile_y=${tileY}` +
     `&tile_size=${tileSize}` +
-    `&orientation=${orientation}` +
     `&fmt=${fmt}`
   );
 }

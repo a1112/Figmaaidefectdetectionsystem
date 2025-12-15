@@ -6,6 +6,7 @@ interface LargeImageViewerProps {
   imageHeight: number;
   tileSize?: number;
   className?: string;
+  maxLevel?: number;
   /**
    * Initial zoom scale: use 'fit' to fit viewport (default), or a number (e.g. 1 for 100%).
    */
@@ -55,6 +56,7 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
   imageHeight,
   tileSize = 256,
   className,
+  maxLevel: maxLevelProp,
   initialScale = 'fit',
   fixedLevel,
   onPreferredLevelChange,
@@ -143,10 +145,14 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
     const { x, y, scale } = transform.current;
 
     // 计算推荐等级（用于通知上层）
-    const maxLevel = Math.max(
+    const computedMaxLevel = Math.max(
       0,
       Math.ceil(Math.log2(Math.max(1, imageWidth / tileSize))),
     );
+    const maxLevel =
+      typeof maxLevelProp === 'number'
+        ? Math.max(0, Math.floor(maxLevelProp))
+        : computedMaxLevel;
     let preferredLevel = Math.floor(Math.log2(1 / scale));
     if (preferredLevel < 0) preferredLevel = 0;
     if (preferredLevel > maxLevel) preferredLevel = maxLevel;
@@ -176,6 +182,7 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
       { width: imageWidth, height: imageHeight },
       scale,
       fixedLevel,
+      maxLevel,
     );
 
     tiles.forEach(tile => {

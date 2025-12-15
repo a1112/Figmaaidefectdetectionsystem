@@ -25,6 +25,7 @@ interface ImagesTabProps {
   activeTileLevel: number;
   onPreferredLevelChange: (level: number) => void;
   defaultTileSize: number;
+  maxTileLevel: number;
 }
 
 export function ImagesTab({
@@ -38,6 +39,7 @@ export function ImagesTab({
   activeTileLevel,
   onPreferredLevelChange,
   defaultTileSize,
+  maxTileLevel,
 }: ImagesTabProps) {
   return (
     <div className="h-full flex flex-col gap-2">
@@ -189,16 +191,23 @@ export function ImagesTab({
               tileY: requestInfo.tileY,
               tileSize: tileSizeArg,
               fmt: "JPEG",
-              orientation: imageOrientation,
             });
             if (cached && cached.complete) {
-              ctx.drawImage(
-                cached,
-                tile.x,
-                tile.y,
-                tile.width,
-                tile.height,
-              );
+              if (imageOrientation === "horizontal") {
+                ctx.save();
+                ctx.translate(tile.x, tile.y);
+                ctx.transform(0, 1, 1, 0, 0, 0);
+                ctx.drawImage(cached, 0, 0, tile.height, tile.width);
+                ctx.restore();
+              } else {
+                ctx.drawImage(
+                  cached,
+                  tile.x,
+                  tile.y,
+                  tile.width,
+                  tile.height,
+                );
+              }
             } else {
               if (!tileImageLoading.has(cacheKey)) {
                 tileImageLoading.add(cacheKey);
@@ -291,6 +300,7 @@ export function ImagesTab({
               imageHeight={layout.worldHeight}
               tileSize={viewerTileSize}
               className="bg-slate-50"
+              maxLevel={maxTileLevel}
               fixedLevel={activeTileLevel}
               onPreferredLevelChange={onPreferredLevelChange}
               renderTile={renderTile}

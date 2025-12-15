@@ -41,6 +41,7 @@ interface DefectImageViewProps {
   onViewportChange?: (info: ViewportInfo | null) => void;
   imageOrientation: ImageOrientation;
   defaultTileSize: number;
+  maxTileLevel: number;
 }
 
 interface WorldDefectRect {
@@ -60,6 +61,7 @@ export function DefectImageView({
   onViewportChange,
   imageOrientation,
   defaultTileSize,
+  maxTileLevel,
 }: DefectImageViewProps) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
@@ -252,11 +254,18 @@ export function DefectImageView({
         tileY: requestInfo.tileY,
         tileSize: tileSizeArg,
         fmt: "JPEG",
-        orientation: imageOrientation,
       });
 
       if (cached && cached.complete) {
-        ctx.drawImage(cached, tile.x, tile.y, tile.width, tile.height);
+        if (imageOrientation === "horizontal") {
+          ctx.save();
+          ctx.translate(tile.x, tile.y);
+          ctx.transform(0, 1, 1, 0, 0, 0);
+          ctx.drawImage(cached, 0, 0, tile.height, tile.width);
+          ctx.restore();
+        } else {
+          ctx.drawImage(cached, tile.x, tile.y, tile.width, tile.height);
+        }
       } else {
         if (!tileImageLoading.has(cacheKey)) {
           tileImageLoading.add(cacheKey);
@@ -443,6 +452,7 @@ export function DefectImageView({
       tileSize={viewerTileSize}
       className="bg-slate-900/80"
       initialScale={1}
+      maxLevel={maxTileLevel}
       renderTile={renderTile}
       renderOverlay={renderOverlay}
       focusTarget={focusTarget}

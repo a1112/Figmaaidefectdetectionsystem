@@ -50,6 +50,7 @@ interface DefectsPageProps {
   filterCriteria: FilterCriteria;
   imageOrientation: ImageOrientation;
   defaultTileSize: number;
+  maxTileLevel: number;
 }
 
 export const DefectsPage: React.FC<DefectsPageProps> = ({
@@ -76,6 +77,7 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
   filterCriteria,
   imageOrientation,
   defaultTileSize,
+  maxTileLevel,
 }) => {
   const activeDefects: Defect[] = plateDefects;
 
@@ -201,6 +203,7 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
                   onViewportChange={setViewportInfo}
                   imageOrientation={imageOrientation}
                   defaultTileSize={defaultTileSize}
+                  maxTileLevel={maxTileLevel}
                 />
               ) : (
                 <div className="text-xs text-muted-foreground">
