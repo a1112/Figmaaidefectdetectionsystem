@@ -143,7 +143,10 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
     const { x, y, scale } = transform.current;
 
     // 计算推荐等级（用于通知上层）
-    const maxLevel = 2;
+    const maxLevel = Math.max(
+      0,
+      Math.ceil(Math.log2(Math.max(1, imageWidth / tileSize))),
+    );
     let preferredLevel = Math.floor(Math.log2(1 / scale));
     if (preferredLevel < 0) preferredLevel = 0;
     if (preferredLevel > maxLevel) preferredLevel = maxLevel;

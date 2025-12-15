@@ -446,7 +446,6 @@ export function DefectImageView({
       renderTile={renderTile}
       renderOverlay={renderOverlay}
       focusTarget={focusTarget}
-      fixedLevel={0}
       panMargin={PAN_MARGIN}
       fitToHeight={imageOrientation === "vertical"}
     />

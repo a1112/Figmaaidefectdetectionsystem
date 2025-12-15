@@ -41,8 +41,9 @@ export function ImagesTab({
 }: ImagesTabProps) {
   return (
     <div className="h-full flex flex-col gap-2">
-      <div className="text-xs text-muted-foreground">
-        钢板长带虚拟图像（滚轮缩放，拖动平移）
+      <div className="text-xs text-muted-foreground flex items-center justify-between gap-2">
+        <span>钢板长带虚拟图像（滚轮缩放，拖动平移）</span>
+        <span className="font-mono">当前瓦片等级: L{activeTileLevel}</span>
       </div>
       <div className="flex-1 min-h-0 bg-card border border-border relative">
         {(() => {
