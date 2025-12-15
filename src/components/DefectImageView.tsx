@@ -371,14 +371,6 @@ export function DefectImageView({
   );
 
   if (imageViewMode === "single") {
-    if (isLoadingImage) {
-      return (
-        <div className="flex flex-col items-center justify-center gap-4 text-muted-foreground">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <p className="text-sm">加载缺陷裁剪图像...</p>
-        </div>
-      );
-    }
     if (imageError) {
       return (
         <div className="flex flex-col items-center justify-center gap-4 text-destructive">
@@ -397,6 +389,12 @@ export function DefectImageView({
     }
     return (
       <div className="relative w-full h-full flex flex-col items-center justify-center gap-4 p-4">
+        {isLoadingImage && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black/40 text-white">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            <p className="text-sm">加载缺陷裁剪图像...</p>
+          </div>
+        )}
         <img
           src={imageUrl}
           alt="缺陷裁剪图"
@@ -408,20 +406,22 @@ export function DefectImageView({
           }}
         />
         {selectedDefect && (
-          <div className="absolute bottom-4 left-4 right-4 bg-black/70 text-white text-xs p-3 rounded border border-white/10 shadow-lg">
-            <div className="flex flex-wrap gap-3 justify-between">
-              <span className="font-semibold">{selectedDefect.type}</span>
-              <span>
-                置信度: {(selectedDefect.confidence * 100).toFixed(1)}%
-              </span>
-              <span>
-                尺寸: {selectedDefect.width.toFixed(0)}×
-                {selectedDefect.height.toFixed(0)}
-              </span>
-              <span>
-                位置: ({selectedDefect.x.toFixed(0)},
-                {selectedDefect.y.toFixed(0)})
-              </span>
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-4">
+            <div className="w-full max-w-md bg-black/70 text-white text-xs p-3 rounded border border-white/10 shadow-lg">
+              <div className="flex flex-wrap gap-3 justify-between">
+                <span className="font-semibold">{selectedDefect.type}</span>
+                <span>
+                  置信度: {(selectedDefect.confidence * 100).toFixed(1)}%
+                </span>
+                <span>
+                  尺寸: {selectedDefect.width.toFixed(0)}×
+                  {selectedDefect.height.toFixed(0)}
+                </span>
+                <span>
+                  位置: ({selectedDefect.x.toFixed(0)},
+                  {selectedDefect.y.toFixed(0)})
+                </span>
+              </div>
             </div>
           </div>
         )}

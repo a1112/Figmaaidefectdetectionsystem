@@ -218,8 +218,11 @@ export function convertDefectToWorldRect({
 
   const frameHeight = surface.meta.image_height ?? 0;
   const mosaicX = defect.x;
-  const mosaicY =
-    defect.imageIndex * frameHeight + defect.y;
+  const frameIndex =
+    Number.isFinite(defect.imageIndex) && defect.imageIndex > 0
+      ? defect.imageIndex - 1
+      : 0;
+  const mosaicY = frameIndex * frameHeight + defect.y;
 
   if (orientation === "horizontal") {
     return {

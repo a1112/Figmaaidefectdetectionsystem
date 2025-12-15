@@ -56,8 +56,8 @@ export function DefectList({
 
           {/* 模拟示例数据 */}
           <div className="p-2 space-y-1">
-            {[
-              {
+              {[
+                {
                 id: "sample-1",
                 type: "纵向裂纹",
                 severity: "high" as const,
@@ -111,13 +111,16 @@ export function DefectList({
                     {Math.round(defect.y)})
                   </span>
                   <span
-                    className={`px-1.5 py-0.5 text-[10px] uppercase border ${
-                      defect.severity === "high"
-                        ? "text-red-500 border-red-500/50 bg-red-500/10"
-                        : defect.severity === "medium"
-                          ? "text-yellow-500 border-yellow-500/50 bg-yellow-500/10"
-                          : "text-green-500 border-green-500/50 bg-green-500/10"
+                    className={`text-[10px] uppercase px-2 py-0.5 rounded-full border ${
+                      defect.surface === "top"
+                        ? "border-blue-300 text-blue-500/90 bg-blue-500/10"
+                        : "border-orange-300 text-orange-500/90 bg-orange-500/10"
                     }`}
+                  >
+                    {defect.surface === "top" ? "TOP" : "BOTTOM"}
+                  </span>
+                  <span
+                    className={`px-1.5 py-0.5 text-[10px] uppercase border ${getSeverityColor(defect.severity)}`}
                   >
                     {Math.round(defect.confidence * 100)}%
                   </span>
@@ -131,35 +134,44 @@ export function DefectList({
             const typeColor = getDefectColor(defect.type);
             const isSelected = selectedDefectId === defect.id;
             return (
-              <div
-                key={`${defect.id}-${index}`}
-                onClick={() => onDefectSelect?.(defect.id)}
-                className={`flex items-center gap-2 px-2 py-1.5 border bg-card hover:bg-accent/50 transition-colors text-xs cursor-pointer ${
-                  isSelected
-                    ? "border-primary bg-primary/10"
-                    : "border-border"
+            <div
+              key={`${defect.id}-${index}`}
+              onClick={() => onDefectSelect?.(defect.id)}
+              className={`flex items-center gap-2 px-2 py-1.5 border bg-card hover:bg-accent/50 transition-colors text-xs cursor-pointer ${
+                isSelected
+                  ? "border-primary bg-primary/10"
+                  : "border-border"
+              }`}
+            >
+              <span className="text-muted-foreground font-mono w-8">
+                #{index + 1}
+              </span>
+              <span
+                className={`font-medium flex-1 ${typeColor.text}`}
+              >
+                {defect.type}
+              </span>
+              <span className="text-muted-foreground font-mono text-[10px]">
+                ({Math.round(defect.x)},{Math.round(defect.y)}
+                )
+              </span>
+              <span
+                className={`text-[10px] uppercase px-2 py-0.5 rounded-full border ${
+                  defect.surface === "top"
+                    ? "border-blue-300 text-blue-500/90 bg-blue-500/10"
+                    : "border-orange-300 text-orange-500/90 bg-orange-500/10"
                 }`}
               >
-                <span className="text-muted-foreground font-mono w-8">
-                  #{index + 1}
-                </span>
-                <span
-                  className={`font-medium flex-1 ${typeColor.text}`}
-                >
-                  {defect.type}
-                </span>
-                <span className="text-muted-foreground font-mono text-[10px]">
-                  ({Math.round(defect.x)},{Math.round(defect.y)}
-                  )
-                </span>
-                <span
-                  className={`px-1.5 py-0.5 text-[10px] uppercase border ${getSeverityColor(defect.severity)}`}
-                >
-                  {Math.round(defect.confidence * 100)}%
-                </span>
-              </div>
-            );
-          })}
+                {defect.surface === "top" ? "TOP" : "BOTTOM"}
+              </span>
+              <span
+                className={`px-1.5 py-0.5 text-[10px] uppercase border ${getSeverityColor(defect.severity)}`}
+              >
+                {Math.round(defect.confidence * 100)}%
+              </span>
+            </div>
+          );
+        })}
         </div>
       )}
     </div>
