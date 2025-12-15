@@ -7,6 +7,10 @@ interface LargeImageViewerProps {
   tileSize?: number;
   className?: string;
   /**
+   * Initial zoom scale: use 'fit' to fit viewport (default), or a number (e.g. 1 for 100%).
+   */
+  initialScale?: number | 'fit';
+  /**
    * 固定瓦片等级（0/1/2）；如果不传则根据缩放自动计算
    */
   fixedLevel?: number;
@@ -51,6 +55,7 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
   imageHeight,
   tileSize = 256,
   className,
+  initialScale = 'fit',
   fixedLevel,
   onPreferredLevelChange,
   renderTile,
@@ -75,6 +80,7 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
   // Force render for UI overlays (like zoom level text)
   const [, setTick] = useState(0);
 
+  const didInitRef = useRef(false);
   const lastPreferredLevelRef = useRef<number | null>(null);
 
   const clampTransform = useCallback(
@@ -120,10 +126,10 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
     const fitScale = fitToHeight
       ? ch / imageHeight
       : Math.min(cw / imageWidth, ch / imageHeight);
-    const minScale = fitScale;
     const maxScale = 1.0;
+    const minScale = Math.min(fitScale, maxScale);
     return { minScale, maxScale };
-  }, [containerSize, imageWidth, imageHeight]);
+  }, [containerSize, imageWidth, imageHeight, fitToHeight]);
 
   // Main Draw Function
   const draw = useCallback(() => {
@@ -211,18 +217,34 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
     return () => cancelAnimationFrame(animationFrameId);
   }, [draw]);
 
+  useEffect(() => {
+    didInitRef.current = false;
+    transform.current = { x: 0, y: 0, scale: 1 };
+  }, [imageWidth, imageHeight, initialScale, fitToHeight]);
+
   // Initial centering
   useEffect(() => {
-    if (containerSize.width > 0 && transform.current.scale === 1) {
-      const { minScale } = getConstraints();
-      transform.current = clampTransform({
-        scale: minScale,
-        x: (containerSize.width - imageWidth * minScale) / 2,
-        y: (containerSize.height - imageHeight * minScale) / 2,
-      });
-      setTick(t => t + 1);
+    if (
+      didInitRef.current ||
+      containerSize.width === 0 ||
+      containerSize.height === 0
+    ) {
+      return;
     }
-  }, [containerSize, imageWidth, imageHeight, getConstraints, clampTransform]);
+
+    const { minScale, maxScale } = getConstraints();
+    const requestedScale =
+      initialScale === 'fit' ? minScale : initialScale;
+    const nextScale = clamp(requestedScale, minScale, maxScale);
+
+    transform.current = clampTransform({
+      scale: nextScale,
+      x: (containerSize.width - imageWidth * nextScale) / 2,
+      y: (containerSize.height - imageHeight * nextScale) / 2,
+    });
+    didInitRef.current = true;
+    setTick(t => t + 1);
+  }, [containerSize, imageWidth, imageHeight, getConstraints, clampTransform, initialScale]);
 
   // Resize Observer
   useEffect(() => {

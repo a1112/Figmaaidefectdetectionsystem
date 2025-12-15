@@ -64,7 +64,7 @@
             surfaceFilter === "all" ||
             d.surface === surfaceFilter,
         )}
-        surface={surfaceFilter}
+        viewerSurface={"top"}
         imageViewMode={imageViewMode}
         selectedDefectId={selectedDefectId}
         onDefectSelect={setSelectedDefectId}

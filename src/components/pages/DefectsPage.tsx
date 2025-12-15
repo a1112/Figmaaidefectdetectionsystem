@@ -15,7 +15,7 @@ import type {
   SearchCriteria,
   FilterCriteria,
 } from "../SearchDialog";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface DefectsPageProps {
   isMobileDevice: boolean;
@@ -91,11 +91,6 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
       (p) => p.plateId === selectedPlateId,
     ) || filteredSteelPlates[0];
 
-  const defectsForImageView = plateDefects.filter(
-    (d) =>
-      surfaceFilter === "all" || d.surface === surfaceFilter,
-  );
-
   const selectedDefect =
     selectedDefectId && filteredDefectsByControls.length > 0
       ? filteredDefectsByControls.find(
@@ -104,6 +99,15 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
       : null;
 
   const [viewportInfo, setViewportInfo] = useState<ViewportInfo | null>(null);
+  const [viewerSurface, setViewerSurface] = useState<"top" | "bottom">("top");
+
+  useEffect(() => {
+    const next =
+      selectedDefect?.surface === "bottom" ? "bottom" : selectedDefect?.surface === "top" ? "top" : null;
+    if (next) {
+      setViewerSurface(next);
+    }
+  }, [selectedDefect?.surface]);
 
   return (
     <div className="h-full flex flex-col space-y-2">
@@ -188,8 +192,8 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
               {selectedPlate ? (
                 <DefectImageView
                   selectedPlate={selectedPlate}
-                  defects={defectsForImageView}
-                  surface={surfaceFilter}
+                  defects={activeDefects}
+                  viewerSurface={viewerSurface}
                   imageViewMode={imageViewMode}
                   selectedDefectId={selectedDefectId}
                   onDefectSelect={setSelectedDefectId}

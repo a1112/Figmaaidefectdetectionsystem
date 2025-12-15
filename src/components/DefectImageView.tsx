@@ -33,7 +33,7 @@ export interface ViewportInfo {
 interface DefectImageViewProps {
   selectedPlate: SteelPlate | undefined;
   defects: Defect[];
-  surface: "all" | "top" | "bottom";
+  viewerSurface: "top" | "bottom";
   imageViewMode: "full" | "single";
   selectedDefectId: string | null;
   onDefectSelect: (id: string | null) => void;
@@ -52,7 +52,7 @@ interface WorldDefectRect {
 export function DefectImageView({
   selectedPlate,
   defects,
-  surface,
+  viewerSurface,
   imageViewMode,
   selectedDefectId,
   onDefectSelect,
@@ -84,30 +84,17 @@ export function DefectImageView({
     );
   }, [topMeta, bottomMeta, defaultTileSize]);
   const layout = useMemo(() => {
-    let surfaceGap = SURFACE_GAP;
-    if (
-      imageOrientation === "vertical" &&
-      surface === "all" &&
-      topMeta &&
-      bottomMeta
-    ) {
-      const tileWidth = viewerTileSize;
-      const topWidth = topMeta.image_width ?? 0;
-      surfaceGap = Math.max(
-        0,
-        Math.ceil(topWidth / tileWidth) * tileWidth - topWidth,
-      );
-    }
+    const surfaceGap = SURFACE_GAP;
     return buildOrientationLayout({
       orientation: imageOrientation,
-      surfaceFilter: surface,
+      surfaceFilter: viewerSurface,
       topMeta,
       bottomMeta,
       surfaceGap,
     });
   }, [
     imageOrientation,
-    surface,
+    viewerSurface,
     topMeta,
     bottomMeta,
     viewerTileSize,
@@ -455,6 +442,7 @@ export function DefectImageView({
       imageHeight={layout.worldHeight}
       tileSize={viewerTileSize}
       className="bg-slate-900/80"
+      initialScale={1}
       renderTile={renderTile}
       renderOverlay={renderOverlay}
       focusTarget={focusTarget}
