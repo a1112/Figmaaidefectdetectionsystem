@@ -222,9 +222,10 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
         </div>
 
         {/* 右侧：缺陷列表 */}
-        <div className="flex flex-col gap-2 min-h-0">
-          <div className="bg-card border border-border p-1.5 flex flex-col min-h-[180px]">
-            <div className="flex items-center justify-between mb-2">
+        <div className="flex flex-col gap-2 min-h-0 h-full">
+          <div className="flex-1 min-h-0">
+            <div className="bg-card border border-border p-1.5 flex flex-col h-full min-h-[180px]">
+              <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-muted-foreground">
                 缺陷信息
               </span>
@@ -282,6 +283,7 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
             <div className="flex-1 min-h-0 overflow-auto">
               <DefectList
                 defects={filteredDefectsByControls}
+                surface={surfaceFilter}
                 defectColors={defectColors}
                 selectedDefectId={selectedDefectId}
                 onDefectSelect={setSelectedDefectId}
@@ -296,6 +298,7 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
                 onDefectSelect={setSelectedDefectId}
               />
             </div>
+          </div>
           </div>
         </div>
       </div>
