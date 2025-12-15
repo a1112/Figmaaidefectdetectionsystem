@@ -40,6 +40,7 @@ interface DefectImageViewProps {
   surfaceImageInfo?: SurfaceImageInfo[] | null;
   onViewportChange?: (info: ViewportInfo | null) => void;
   imageOrientation: ImageOrientation;
+  defaultTileSize: number;
 }
 
 interface WorldDefectRect {
@@ -58,6 +59,7 @@ export function DefectImageView({
   surfaceImageInfo,
   onViewportChange,
   imageOrientation,
+  defaultTileSize,
 }: DefectImageViewProps) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
@@ -74,13 +76,13 @@ export function DefectImageView({
     (info) => info.surface === "bottom",
   );
   const viewerTileSize = useMemo(() => {
-    const fallback = 1024;
     return Math.max(
       topMeta?.image_height ?? 0,
       bottomMeta?.image_height ?? 0,
-      fallback,
+      defaultTileSize,
+      512,
     );
-  }, [topMeta, bottomMeta]);
+  }, [topMeta, bottomMeta, defaultTileSize]);
   const layout = useMemo(() => {
     let surfaceGap = SURFACE_GAP;
     if (

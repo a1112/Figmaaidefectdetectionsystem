@@ -185,6 +185,7 @@ export default function App() {
   const [preferredTileLevel, setPreferredTileLevel] =
     useState(0);
   const [activeTileLevel, setActiveTileLevel] = useState(0);
+  const [defaultTileSize, setDefaultTileSize] = useState(0);
   useEffect(() => {
     const id = setTimeout(() => {
       setActiveTileLevel(preferredTileLevel);
@@ -253,6 +254,14 @@ export default function App() {
         }
 
         // 目前 tile 配置仅由后端告知最大层级和默认瓦片尺寸，前端内部逻辑已保持一致。
+        const nextDefaultTileSize = res?.tile?.default_tile_size;
+        if (
+          typeof nextDefaultTileSize === "number" &&
+          Number.isFinite(nextDefaultTileSize) &&
+          nextDefaultTileSize > 0
+        ) {
+          setDefaultTileSize(nextDefaultTileSize);
+        }
       } catch (error) {
         console.warn("⚠️ 加载全局 Meta 失败:", error);
       }
@@ -615,7 +624,7 @@ export default function App() {
     };
 
     loadPlateDefects();
-  }, [selectedPlateId, steelPlates]);
+  }, [selectedPlateId, steelPlates, defaultTileSize]);
 
   // 预取前后卷的缺陷数据和首块瓦片，以加速分布图加载
   useEffect(() => {
@@ -644,13 +653,17 @@ export default function App() {
         .then((meta) => {
           const metas = meta.surface_images ?? [];
           metas.forEach((surfaceMeta) => {
+            const tileSize =
+              defaultTileSize ||
+              surfaceMeta.image_height ||
+              512;
             const url = getTileImageUrl({
               surface: surfaceMeta.surface,
               seqNo,
               level: 0,
               tileX: 0,
               tileY: 0,
-              tileSize: 512,
+              tileSize,
             });
             const img = new Image();
             img.src = url;
@@ -789,6 +802,7 @@ export default function App() {
                     selectedDefectId={selectedDefectId}
                     activeTileLevel={activeTileLevel}
                     onPreferredLevelChange={setPreferredTileLevel}
+                    defaultTileSize={defaultTileSize}
                   />
                 )}
 
@@ -816,6 +830,7 @@ export default function App() {
                     filterCriteria={filterCriteria}
                     surfaceImageInfo={surfaceImageInfo}
                     imageOrientation={imageOrientation}
+                    defaultTileSize={defaultTileSize}
                   />
                 )}
 

@@ -49,6 +49,7 @@ interface DefectsPageProps {
   searchCriteria: SearchCriteria;
   filterCriteria: FilterCriteria;
   imageOrientation: ImageOrientation;
+  defaultTileSize: number;
 }
 
 export const DefectsPage: React.FC<DefectsPageProps> = ({
@@ -74,6 +75,7 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
   searchCriteria,
   filterCriteria,
   imageOrientation,
+  defaultTileSize,
 }) => {
   const activeDefects: Defect[] = plateDefects;
 
@@ -194,6 +196,7 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
                   surfaceImageInfo={surfaceImageInfo}
                   onViewportChange={setViewportInfo}
                   imageOrientation={imageOrientation}
+                  defaultTileSize={defaultTileSize}
                 />
               ) : (
                 <div className="text-xs text-muted-foreground">
@@ -212,6 +215,7 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
               surfaceImageInfo={surfaceImageInfo}
               selectedDefectId={selectedDefectId}
               onDefectSelect={setSelectedDefectId}
+              defaultTileSize={defaultTileSize}
               seqNo={
                 selectedPlate
                   ? parseInt(selectedPlate.serialNumber, 10)

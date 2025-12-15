@@ -16,6 +16,7 @@ interface DefectDistributionChartProps {
   selectedDefectId?: string | null;
   onDefectSelect?: (id: string | null) => void;
   seqNo?: number;
+  defaultTileSize?: number;
 }
 
 const MAX_DEFECTS_TO_DRAW = 1000;
@@ -87,6 +88,7 @@ export function DefectDistributionChart({
   selectedDefectId,
   onDefectSelect,
   seqNo,
+  defaultTileSize,
 }: DefectDistributionChartProps) {
   const getSeverityColor = (severity: string) => {
     switch (severity) {
@@ -391,7 +393,11 @@ export function DefectDistributionChart({
       );
       const scaledWidth = worldWidth / 2 ** level;
       const scaledHeight = worldHeight / 2 ** level;
-      const tileSize = 512;
+      const tileSize = Math.max(
+        defaultTileSize ?? 0,
+        meta.image_height ?? 0,
+        512,
+      );
       const tilesX = Math.max(
         1,
         Math.ceil(scaledWidth / tileSize),

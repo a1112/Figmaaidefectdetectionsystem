@@ -353,6 +353,7 @@ export async function getGlobalMeta(): Promise<{
         min_level: 0,
         default_tile_size: 1024,
       },
+      image: { frame_width: 16384, frame_height: 1024 },
     };
   }
 

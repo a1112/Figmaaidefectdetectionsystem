@@ -69,6 +69,7 @@
         selectedDefectId={selectedDefectId}
         onDefectSelect={setSelectedDefectId}
         imageOrientation={imageOrientation}
+        defaultTileSize={0}
       />
     )}
   </div>

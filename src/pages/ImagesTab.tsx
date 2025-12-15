@@ -24,6 +24,7 @@ interface ImagesTabProps {
   selectedDefectId: string | null;
   activeTileLevel: number;
   onPreferredLevelChange: (level: number) => void;
+  defaultTileSize: number;
 }
 
 export function ImagesTab({
@@ -36,6 +37,7 @@ export function ImagesTab({
   selectedDefectId,
   activeTileLevel,
   onPreferredLevelChange,
+  defaultTileSize,
 }: ImagesTabProps) {
   return (
     <div className="h-full flex flex-col gap-2">
@@ -78,7 +80,8 @@ export function ImagesTab({
           const viewerTileSize = Math.max(
             topMeta?.image_height ?? 0,
             bottomMeta?.image_height ?? 0,
-            1024,
+            defaultTileSize,
+            512,
           );
           let surfaceGap = 0;
           if (
