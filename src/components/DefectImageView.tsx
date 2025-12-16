@@ -453,6 +453,7 @@ export function DefectImageView({
       className="bg-slate-900/80"
       initialScale={1}
       maxLevel={maxTileLevel}
+      prefetchMargin={400}
       renderTile={renderTile}
       renderOverlay={renderOverlay}
       focusTarget={focusTarget}

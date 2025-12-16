@@ -8,6 +8,10 @@ interface LargeImageViewerProps {
   className?: string;
   maxLevel?: number;
   /**
+   * 预加载视口外瓦片的距离（屏幕像素）。例如 400 表示在视口外 400px 内的瓦片也会被请求。
+   */
+  prefetchMargin?: number;
+  /**
    * Initial zoom scale: use 'fit' to fit viewport (default), or a number (e.g. 1 for 100%).
    */
   initialScale?: number | 'fit';
@@ -57,6 +61,7 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
   tileSize = 256,
   className,
   maxLevel: maxLevelProp,
+  prefetchMargin = 0,
   initialScale = 'fit',
   fixedLevel,
   onPreferredLevelChange,
@@ -224,6 +229,17 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
       height: containerSize.height / scale,
     };
 
+    const safeScale = Math.max(scale, 1e-6);
+    const extra = Math.max(0, prefetchMargin) / safeScale;
+    const paddedVisibleRect = extra
+      ? {
+          x: visibleRect.x - extra,
+          y: visibleRect.y - extra,
+          width: visibleRect.width + extra * 2,
+          height: visibleRect.height + extra * 2,
+        }
+      : visibleRect;
+
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(scale, scale);
@@ -233,7 +249,7 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
     ctx.strokeRect(0, 0, imageWidth, imageHeight);
 
     const tiles = getVisibleTiles(
-      visibleRect,
+      paddedVisibleRect,
       tileSize,
       { width: imageWidth, height: imageHeight },
       scale,
@@ -279,6 +295,7 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
     imageWidth,
     maxLevelProp,
     onPreferredLevelChange,
+    prefetchMargin,
     renderOverlay,
     renderTile,
     tileSize,
