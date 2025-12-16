@@ -223,6 +223,7 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
               selectedDefectId={selectedDefectId}
               onDefectSelect={setSelectedDefectId}
               defaultTileSize={defaultTileSize}
+              maxTileLevel={maxTileLevel}
               seqNo={
                 selectedPlate
                   ? parseInt(selectedPlate.serialNumber, 10)

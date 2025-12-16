@@ -17,6 +17,7 @@ interface DefectDistributionChartProps {
   onDefectSelect?: (id: string | null) => void;
   seqNo?: number;
   defaultTileSize?: number;
+  maxTileLevel?: number;
 }
 
 const MAX_DEFECTS_TO_DRAW = 1000;
@@ -137,7 +138,11 @@ export function DefectDistributionChart({
     const ratio = worldHeight / (targetDisplayHeight * 4);
     const raw = Math.log2(Math.max(1, ratio));
     const level = Math.ceil(raw);
-    return Math.min(8, Math.max(0, level));
+    const cap =
+      typeof maxTileLevel === "number" && Number.isFinite(maxTileLevel)
+        ? Math.max(0, Math.floor(maxTileLevel))
+        : 8;
+    return Math.min(cap, Math.max(0, level));
   };
 
   const hasMeta =

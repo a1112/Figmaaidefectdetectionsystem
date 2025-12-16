@@ -312,7 +312,6 @@ export function getTileImageUrl(params: {
     level = 0,
     tileX,
     tileY,
-    tileSize = 1024,
     fmt = "JPEG",
   } = params;
   const baseUrl = env.getApiBaseUrl();
@@ -323,7 +322,6 @@ export function getTileImageUrl(params: {
     `&level=${level}` +
     `&tile_x=${tileX}` +
     `&tile_y=${tileY}` +
-    `&tile_size=${tileSize}` +
     `&fmt=${fmt}`
   );
 }

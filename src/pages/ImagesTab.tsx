@@ -301,7 +301,6 @@ export function ImagesTab({
               tileSize={viewerTileSize}
               className="bg-slate-50"
               maxLevel={maxTileLevel}
-              fixedLevel={activeTileLevel}
               onPreferredLevelChange={onPreferredLevelChange}
               renderTile={renderTile}
               renderOverlay={renderOverlay}

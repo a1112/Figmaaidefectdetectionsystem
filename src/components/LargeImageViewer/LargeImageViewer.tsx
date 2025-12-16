@@ -85,6 +85,24 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
   const didInitRef = useRef(false);
   const lastPreferredLevelRef = useRef<number | null>(null);
 
+  const computePreferredLevel = useCallback(
+    (scale: number) => {
+      const computedMaxLevel = Math.max(
+        0,
+        Math.ceil(Math.log2(Math.max(1, imageWidth / tileSize))),
+      );
+      const maxLevel =
+        typeof maxLevelProp === 'number'
+          ? Math.max(0, Math.floor(maxLevelProp))
+          : computedMaxLevel;
+      let preferredLevel = Math.floor(Math.log2(1 / scale));
+      if (preferredLevel < 0) preferredLevel = 0;
+      if (preferredLevel > maxLevel) preferredLevel = maxLevel;
+      return preferredLevel;
+    },
+    [imageWidth, tileSize, maxLevelProp],
+  );
+
   const clampTransform = useCallback(
     (next: { x: number; y: number; scale: number }) => {
       if (
@@ -133,6 +151,44 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
     return { minScale, maxScale };
   }, [containerSize, imageWidth, imageHeight, fitToHeight]);
 
+  const ensureInitialized = useCallback(() => {
+    if (
+      didInitRef.current ||
+      containerSize.width === 0 ||
+      containerSize.height === 0
+    ) {
+      return;
+    }
+
+    const { minScale, maxScale } = getConstraints();
+    const requestedScale = initialScale === 'fit' ? minScale : initialScale;
+    const nextScale = clamp(requestedScale, minScale, maxScale);
+
+    transform.current = clampTransform({
+      scale: nextScale,
+      x: (containerSize.width - imageWidth * nextScale) / 2,
+      y: (containerSize.height - imageHeight * nextScale) / 2,
+    });
+    didInitRef.current = true;
+
+    if (onPreferredLevelChange) {
+      const preferredLevel = computePreferredLevel(nextScale);
+      lastPreferredLevelRef.current = preferredLevel;
+      onPreferredLevelChange(preferredLevel);
+    }
+
+    setTick(t => t + 1);
+  }, [
+    clampTransform,
+    computePreferredLevel,
+    containerSize,
+    getConstraints,
+    imageHeight,
+    imageWidth,
+    initialScale,
+    onPreferredLevelChange,
+  ]);
+
   // Main Draw Function
   const draw = useCallback(() => {
     const canvas = frontCanvasRef.current;
@@ -141,6 +197,8 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
 
     // 透明背景：仅清除内容，不填充底色，让父容器背景透出
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ensureInitialized();
 
     const { x, y, scale } = transform.current;
 
@@ -153,9 +211,7 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
       typeof maxLevelProp === 'number'
         ? Math.max(0, Math.floor(maxLevelProp))
         : computedMaxLevel;
-    let preferredLevel = Math.floor(Math.log2(1 / scale));
-    if (preferredLevel < 0) preferredLevel = 0;
-    if (preferredLevel > maxLevel) preferredLevel = maxLevel;
+    const preferredLevel = computePreferredLevel(scale);
     if (onPreferredLevelChange && lastPreferredLevelRef.current !== preferredLevel) {
       lastPreferredLevelRef.current = preferredLevel;
       onPreferredLevelChange(preferredLevel);
@@ -214,7 +270,19 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
     }
 
     ctx.restore();
-  }, [containerSize, imageWidth, imageHeight, tileSize, renderTile, renderOverlay]);
+  }, [
+    computePreferredLevel,
+    containerSize,
+    ensureInitialized,
+    fixedLevel,
+    imageHeight,
+    imageWidth,
+    maxLevelProp,
+    onPreferredLevelChange,
+    renderOverlay,
+    renderTile,
+    tileSize,
+  ]);
 
   // Animation Loop
   useEffect(() => {
