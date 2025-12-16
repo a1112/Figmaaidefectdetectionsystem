@@ -10,6 +10,7 @@ import {
   type SurfaceLayout,
 } from "../utils/imageOrientation";
 import { getTileImageUrl } from "../src/api/client";
+import { drawTileImage, tryDrawFallbackTile } from "../utils/tileFallback";
 
 const tileImageCache = new Map<string, HTMLImageElement>();
 const tileImageLoading = new Set<string>();
@@ -193,22 +194,26 @@ export function ImagesTab({
               fmt: "JPEG",
             });
             if (cached && cached.complete) {
-              if (imageOrientation === "horizontal") {
-                ctx.save();
-                ctx.translate(tile.x, tile.y);
-                ctx.transform(0, 1, 1, 0, 0, 0);
-                ctx.drawImage(cached, 0, 0, tile.height, tile.width);
-                ctx.restore();
-              } else {
-                ctx.drawImage(
-                  cached,
-                  tile.x,
-                  tile.y,
-                  tile.width,
-                  tile.height,
-                );
-              }
+              drawTileImage({
+                ctx,
+                img: cached,
+                tile,
+                orientation: imageOrientation,
+              });
             } else {
+              const drewFallback = tryDrawFallbackTile({
+                ctx,
+                tile,
+                orientation: imageOrientation,
+                cache: tileImageCache,
+                cacheKeyPrefix: imageOrientation,
+                surface: surfaceLayout.surface,
+                seqNo,
+                tileX: requestInfo.tileX,
+                tileY: requestInfo.tileY,
+                tileSize: tileSizeArg,
+                maxLevel: maxTileLevel,
+              });
               if (!tileImageLoading.has(cacheKey)) {
                 tileImageLoading.add(cacheKey);
                 const img = new Image();
@@ -221,11 +226,13 @@ export function ImagesTab({
                   tileImageLoading.delete(cacheKey);
                 };
               }
-              ctx.fillStyle = "#e2e8f0";
-              ctx.fillRect(tile.x, tile.y, tile.width, tile.height);
-              ctx.strokeStyle = "#94a3b8";
-              ctx.lineWidth = 1 / scale;
-              ctx.strokeRect(tile.x, tile.y, tile.width, tile.height);
+              if (!drewFallback) {
+                ctx.fillStyle = "#e2e8f0";
+                ctx.fillRect(tile.x, tile.y, tile.width, tile.height);
+                ctx.strokeStyle = "#94a3b8";
+                ctx.lineWidth = 1 / scale;
+                ctx.strokeRect(tile.x, tile.y, tile.width, tile.height);
+              }
             }
             const defectsInTile = defectWorldRects.filter((item) => {
               const { rect, surface } = item;

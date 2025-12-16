@@ -638,6 +638,9 @@ export default function App() {
 
   // 预取前后卷的缺陷数据和首块瓦片，以加速分布图加载
   useEffect(() => {
+    if (activeTab !== "defects") {
+      return;
+    }
     if (!selectedPlateId || steelPlates.length === 0) {
       return;
     }
@@ -683,7 +686,7 @@ export default function App() {
           // 预取失败忽略，不影响主流程
         });
     });
-  }, [selectedPlateId, steelPlates]);
+  }, [activeTab, selectedPlateId, steelPlates]);
 
 
   // 生成缺陷统计数据
