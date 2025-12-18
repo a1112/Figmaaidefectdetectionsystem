@@ -40,6 +40,7 @@ interface DefectImageViewProps {
   onDefectSelect: (id: string | null) => void;
   surfaceImageInfo?: SurfaceImageInfo[] | null;
   onViewportChange?: (info: ViewportInfo | null) => void;
+  centerTarget?: { x: number; y: number } | null;
   imageOrientation: ImageOrientation;
   defaultTileSize: number;
   maxTileLevel: number;
@@ -60,6 +61,7 @@ export function DefectImageView({
   onDefectSelect,
   surfaceImageInfo,
   onViewportChange,
+  centerTarget,
   imageOrientation,
   defaultTileSize,
   maxTileLevel,
@@ -470,6 +472,8 @@ export function DefectImageView({
       renderTile={renderTile}
       renderOverlay={renderOverlay}
       focusTarget={focusTarget}
+      centerTarget={centerTarget ?? null}
+      onViewportChange={(info) => onViewportChange?.(info)}
       panMargin={PAN_MARGIN}
       fitToHeight={imageOrientation === "vertical"}
     />

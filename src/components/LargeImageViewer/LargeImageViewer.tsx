@@ -48,6 +48,19 @@ interface LargeImageViewerProps {
   /**
    * 限制在图像边缘外还能多移动的像素（避免看见超出范围的区域）
    */
+  /**
+   * Pan Target - keep current zoom, only move the viewport center to the given world position.
+   */
+  centerTarget?: { x: number; y: number } | null;
+  /**
+   * Emits the current visible world-rect (for minimap / bird's-eye overlays).
+   */
+  onViewportChange?: (info: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }) => void;
   panMargin?: number;
   /**
    * 纵向布局时优先按照高度填充视口（避免将宽度过度压缩）
@@ -68,6 +81,8 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
   renderTile,
   renderOverlay,
   focusTarget,
+  centerTarget,
+  onViewportChange,
   panMargin,
   fitToHeight,
 }) => {
@@ -89,6 +104,13 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
 
   const didInitRef = useRef(false);
   const lastPreferredLevelRef = useRef<number | null>(null);
+  const lastViewportRef = useRef<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  const lastViewportEmitAtRef = useRef<number>(0);
 
   const computePreferredLevel = useCallback(
     (scale: number) => {
@@ -229,6 +251,22 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
       height: containerSize.height / scale,
     };
 
+    if (onViewportChange) {
+      const now = performance.now();
+      const last = lastViewportRef.current;
+      const shouldEmit =
+        !last ||
+        Math.abs(last.x - visibleRect.x) > 0.5 ||
+        Math.abs(last.y - visibleRect.y) > 0.5 ||
+        Math.abs(last.width - visibleRect.width) > 0.5 ||
+        Math.abs(last.height - visibleRect.height) > 0.5;
+      if (shouldEmit && now - lastViewportEmitAtRef.current > 80) {
+        lastViewportRef.current = visibleRect;
+        lastViewportEmitAtRef.current = now;
+        onViewportChange(visibleRect);
+      }
+    }
+
     const safeScale = Math.max(scale, 1e-6);
     const extra = Math.max(0, prefetchMargin) / safeScale;
     const paddedVisibleRect = extra
@@ -295,6 +333,7 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
     imageWidth,
     maxLevelProp,
     onPreferredLevelChange,
+    onViewportChange,
     prefetchMargin,
     renderOverlay,
     renderTile,
@@ -340,6 +379,30 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
     didInitRef.current = true;
     setTick(t => t + 1);
   }, [containerSize, imageWidth, imageHeight, getConstraints, clampTransform, initialScale]);
+
+  // Center Target - keep scale, only pan to a point
+  useEffect(() => {
+    if (
+      !centerTarget ||
+      containerSize.width === 0 ||
+      containerSize.height === 0
+    ) {
+      return;
+    }
+
+    const current = transform.current;
+    const viewportCenterX = containerSize.width / 2;
+    const viewportCenterY = containerSize.height / 2;
+
+    const newX = viewportCenterX - centerTarget.x * current.scale;
+    const newY = viewportCenterY - centerTarget.y * current.scale;
+    transform.current = clampTransform({
+      x: newX,
+      y: newY,
+      scale: current.scale,
+    });
+    setTick((t) => t + 1);
+  }, [centerTarget, clampTransform, containerSize]);
 
   // Resize Observer
   useEffect(() => {

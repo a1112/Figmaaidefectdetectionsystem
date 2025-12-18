@@ -1,10 +1,12 @@
 import React, { useMemo, useRef, useEffect, useState } from "react";
 import type { Defect } from "../types/app.types";
+import type { ImageOrientation } from "../types/app.types";
 import type {
   SurfaceImageInfo,
   Surface,
 } from "../src/api/types";
 import { getTileImageUrl } from "../src/api/client";
+import type { ViewportInfo } from "./DefectImageView";
 
 interface DefectDistributionChartProps {
   defects: Defect[];
@@ -18,6 +20,10 @@ interface DefectDistributionChartProps {
   seqNo?: number;
   defaultTileSize?: number;
   maxTileLevel?: number;
+  viewportInfo?: ViewportInfo | null;
+  viewportSurface?: Surface | null;
+  imageOrientation?: ImageOrientation;
+  onViewportCenterChange?: (center: { x: number; y: number } | null) => void;
 }
 
 const MAX_DEFECTS_TO_DRAW = 1000;
@@ -90,6 +96,11 @@ export function DefectDistributionChart({
   onDefectSelect,
   seqNo,
   defaultTileSize,
+  maxTileLevel,
+  viewportInfo,
+  viewportSurface,
+  imageOrientation,
+  onViewportCenterChange,
 }: DefectDistributionChartProps) {
   const getSeverityColor = (severity: string) => {
     switch (severity) {
@@ -128,21 +139,14 @@ export function DefectDistributionChart({
   // 横向布局：宽度 = 高度 × 单图比例 × 图像数量
   const plateHeight = 120; // 固定高度
 
-  const chooseTileLevel = (
-    worldHeight: number,
-    targetDisplayHeight: number,
-  ): number => {
-    if (worldHeight <= 0 || targetDisplayHeight <= 0) {
-      return 0;
-    }
-    const ratio = worldHeight / (targetDisplayHeight * 4);
-    const raw = Math.log2(Math.max(1, ratio));
-    const level = Math.ceil(raw);
+  const getDistributionTileLevel = (): number => {
+    const preferred = 4; // L4
+    const normalizedPreferred = Math.max(0, Math.floor(preferred));
     const cap =
       typeof maxTileLevel === "number" && Number.isFinite(maxTileLevel)
         ? Math.max(0, Math.floor(maxTileLevel))
-        : 8;
-    return Math.min(cap, Math.max(0, level));
+        : normalizedPreferred;
+    return Math.min(cap, normalizedPreferred);
   };
 
   const hasMeta =
@@ -385,6 +389,8 @@ export function DefectDistributionChart({
     const frameCount = meta?.frame_count || 1;
 
     const tileImages: JSX.Element[] = [];
+    const orientation: ImageOrientation =
+      imageOrientation ?? "horizontal";
 
     if (
       meta &&
@@ -392,10 +398,7 @@ export function DefectDistributionChart({
     ) {
       const worldWidth = meta.image_width;
       const worldHeight = meta.frame_count * meta.image_height;
-      const level = chooseTileLevel(
-        worldHeight,
-        perSurfaceHeight,
-      );
+      const level = getDistributionTileLevel();
       const scaledWidth = worldWidth / 2 ** level;
       const scaledHeight = worldHeight / 2 ** level;
       const tileSize = Math.max(
@@ -426,17 +429,28 @@ export function DefectDistributionChart({
             tileSize,
           });
 
+          const tileWorldWidth = Math.min(
+            tileSize,
+            Math.max(0, scaledWidth - tileX * tileSize),
+          );
+          const tileWorldHeight = Math.min(
+            tileSize,
+            Math.max(0, scaledHeight - tileY * tileSize),
+          );
+
           const left = tileX * tileSize * scaleX;
           const top = tileY * tileSize * scaleY;
-          const width = tileSize * scaleX;
-          const height = tileSize * scaleY;
+          const width = tileWorldWidth * scaleX;
+          const height = tileWorldHeight * scaleY;
 
           tileImages.push(
             <img
-              key={`tile-${surf}-${tileX}-${tileY}`}
+              key={`tile-${surf}-L${level}-${tileSize}-${tileX}-${tileY}`}
               src={url}
               alt="mosaic-tile"
               className="absolute"
+              draggable={false}
+              onDragStart={(e) => e.preventDefault()}
               style={{
                 left,
                 top,
@@ -449,6 +463,65 @@ export function DefectDistributionChart({
         }
       }
     }
+
+    const viewportBox = (() => {
+      if (
+        !meta ||
+        !viewportInfo ||
+        !viewportSurface ||
+        viewportSurface !== surf
+      ) {
+        return null;
+      }
+
+      const mosaicWidth = meta.image_width ?? 0;
+      const mosaicHeight = (meta.frame_count ?? 0) * (meta.image_height ?? 0);
+      if (mosaicWidth <= 0 || mosaicHeight <= 0) {
+        return null;
+      }
+
+      const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+      const mosaicRect =
+        orientation === "horizontal"
+          ? {
+              x: viewportInfo.y,
+              y: viewportInfo.x,
+              width: viewportInfo.height,
+              height: viewportInfo.width,
+            }
+          : {
+              x: viewportInfo.x,
+              y: viewportInfo.y,
+              width: viewportInfo.width,
+              height: viewportInfo.height,
+            };
+
+      const lengthStart = clamp01(mosaicRect.y / mosaicHeight);
+      const lengthEnd = clamp01((mosaicRect.y + mosaicRect.height) / mosaicHeight);
+      const widthStart = clamp01(mosaicRect.x / mosaicWidth);
+      const widthEnd = clamp01((mosaicRect.x + mosaicRect.width) / mosaicWidth);
+
+      const displayX = Math.min(lengthStart, lengthEnd) * plateWidth;
+      const displayWidth =
+        Math.max(0.002, Math.abs(lengthEnd - lengthStart)) * plateWidth;
+      const displayY = (1 - Math.max(widthStart, widthEnd)) * perSurfaceHeight;
+      const displayHeight =
+        Math.max(0.002, Math.abs(widthEnd - widthStart)) * perSurfaceHeight;
+
+      return (
+        <div
+          className="absolute border-2 pointer-events-none"
+          style={{
+            left: displayX,
+            top: displayY,
+            width: displayWidth,
+            height: displayHeight,
+            borderColor: "#3b82f6",
+            backgroundColor: "#12000000",
+          }}
+        />
+      );
+    })();
 
     // 生成刻度尺
     const renderRuler = (position: "top" | "bottom") => (
@@ -485,6 +558,69 @@ export function DefectDistributionChart({
         <div
           className="relative border-2 border-foreground/60 bg-muted/5 overflow-hidden"
           style={{ width: plateWidth, height: perSurfaceHeight }}
+          onDragStart={(e) => e.preventDefault()}
+          onClick={(e) => {
+            if (
+              !meta ||
+              !onViewportCenterChange ||
+              !viewportSurface ||
+              viewportSurface !== surf
+            ) {
+              return;
+            }
+
+            const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+            const relX = (e.clientX - rect.left) / Math.max(1, rect.width);
+            const relY = (e.clientY - rect.top) / Math.max(1, rect.height);
+            const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+
+            const mosaicWidth = meta.image_width ?? 0;
+            const mosaicHeight = (meta.frame_count ?? 0) * (meta.image_height ?? 0);
+            if (mosaicWidth <= 0 || mosaicHeight <= 0) {
+              return;
+            }
+
+            const lengthRatio = clamp01(relX);
+            const widthRatio = clamp01(1 - relY);
+            const mosaicX = widthRatio * mosaicWidth;
+            const mosaicY = lengthRatio * mosaicHeight;
+
+            const imageWorldWidth =
+              orientation === "horizontal" ? mosaicHeight : mosaicWidth;
+            const imageWorldHeight =
+              orientation === "horizontal" ? mosaicWidth : mosaicHeight;
+
+            let centerX =
+              orientation === "horizontal" ? mosaicY : mosaicX;
+            let centerY =
+              orientation === "horizontal" ? mosaicX : mosaicY;
+
+            if (viewportInfo) {
+              const halfW = viewportInfo.width / 2;
+              const halfH = viewportInfo.height / 2;
+              if (halfW * 2 <= imageWorldWidth) {
+                centerX = Math.min(
+                  imageWorldWidth - halfW,
+                  Math.max(halfW, centerX),
+                );
+              } else {
+                centerX = imageWorldWidth / 2;
+              }
+              if (halfH * 2 <= imageWorldHeight) {
+                centerY = Math.min(
+                  imageWorldHeight - halfH,
+                  Math.max(halfH, centerY),
+                );
+              } else {
+                centerY = imageWorldHeight / 2;
+              }
+            } else {
+              centerX = Math.min(imageWorldWidth, Math.max(0, centerX));
+              centerY = Math.min(imageWorldHeight, Math.max(0, centerY));
+            }
+
+            onViewportCenterChange({ x: centerX, y: centerY });
+          }}
         >
           <div className="absolute -top-4 left-0 right-0 text-center text-[10px] text-muted-foreground/50 font-mono">
             {title}
@@ -497,6 +633,9 @@ export function DefectDistributionChart({
 
           {/* 瓦片背景 */}
           {tileImages}
+
+          {/* 鸟瞰图视口框 */}
+          {viewportBox}
 
           {/* 帧刻度线（替换原有网格） */}
           <div className="absolute inset-0 opacity-20 pointer-events-none">
@@ -533,7 +672,10 @@ export function DefectDistributionChart({
             return (
               <div
                 key={defect.id}
-                onClick={() => onDefectSelect?.(defect.id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDefectSelect?.(defect.id);
+                }}
                 className={`absolute border-2 ${borderColor} ${showSampleData ? "opacity-40" : "opacity-30"} ${
                   isSelected
                     ? "ring-2 ring-offset-2 ring-primary/80 ring-offset-background"

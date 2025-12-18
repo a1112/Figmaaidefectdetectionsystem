@@ -102,6 +102,7 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
 
   const [viewportInfo, setViewportInfo] = useState<ViewportInfo | null>(null);
   const [viewerSurface, setViewerSurface] = useState<"top" | "bottom">("top");
+  const [centerTarget, setCenterTarget] = useState<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     const next =
@@ -181,10 +182,10 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
               <div className="flex items-center gap-2 text-[10px] font-normal">
                 {imageViewMode === "full" && viewportInfo && (
                   <div className="flex items-center gap-2 bg-black/30 rounded px-2 py-0.5 border border-white/10 font-mono">
-                    <span>X: {viewportInfo.x}</span>
-                    <span>Y: {viewportInfo.y}</span>
-                    <span>W: {viewportInfo.width}</span>
-                    <span>H: {viewportInfo.height}</span>
+                    <span>X: {Math.round(viewportInfo.x)}</span>
+                    <span>Y: {Math.round(viewportInfo.y)}</span>
+                    <span>W: {Math.round(viewportInfo.width)}</span>
+                    <span>H: {Math.round(viewportInfo.height)}</span>
                   </div>
                 )}
               </div>
@@ -201,6 +202,7 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
                   onDefectSelect={setSelectedDefectId}
                   surfaceImageInfo={surfaceImageInfo}
                   onViewportChange={setViewportInfo}
+                  centerTarget={centerTarget}
                   imageOrientation={imageOrientation}
                   defaultTileSize={defaultTileSize}
                   maxTileLevel={maxTileLevel}
@@ -222,6 +224,10 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
               surfaceImageInfo={surfaceImageInfo}
               selectedDefectId={selectedDefectId}
               onDefectSelect={setSelectedDefectId}
+              viewportInfo={viewportInfo}
+              viewportSurface={selectedDefect?.surface ?? null}
+              imageOrientation={imageOrientation}
+              onViewportCenterChange={setCenterTarget}
               defaultTileSize={defaultTileSize}
               maxTileLevel={maxTileLevel}
               seqNo={
