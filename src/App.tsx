@@ -169,6 +169,7 @@ export default function App() {
   const searchButtonRef = useRef<HTMLButtonElement>(null);
   const filterButtonRef = useRef<HTMLButtonElement>(null);
   const diagnosticButtonRef = useRef<HTMLButtonElement>(null);
+  const [startupReady, setStartupReady] = useState(false);
 
   // 图像标签页：选中的历史记录
   const [selectedHistoryImage, setSelectedHistoryImage] =
@@ -215,8 +216,73 @@ export default function App() {
     }
   }, [theme]);
 
+  // 启动时健康检查：若后端可连通，则默认切到 生产模式 + SMALL + 纵向
+  // 仅在用户未持久化保存 mode/api_profile 时自动初始化，避免覆盖用户选择
+  useEffect(() => {
+    let cancelled = false;
+
+    const bootstrap = async () => {
+      const storedMode = window.localStorage.getItem("app_mode");
+      const storedProfile =
+        window.localStorage.getItem("api_profile");
+      const storedOrientation = window.localStorage.getItem(
+        "image_orientation",
+      );
+
+      if (storedMode || storedProfile) {
+        if (!cancelled) setStartupReady(true);
+        return;
+      }
+
+      try {
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => {
+          controller.abort();
+        }, 900);
+
+        const response = await fetch("/health", {
+          signal: controller.signal,
+          cache: "no-store",
+        });
+        window.clearTimeout(timeoutId);
+
+        if (response.ok) {
+          let isHealthy = true;
+          try {
+            const payload = await response.json();
+            if (payload && typeof payload.status === "string") {
+              isHealthy =
+                payload.status === "healthy" ||
+                payload.status === "ok";
+            }
+          } catch {
+            // ignore non-json health payload
+          }
+
+          if (isHealthy) {
+            env.setMode("production");
+            env.setApiProfile("small");
+            if (!storedOrientation) {
+              handleImageOrientationChange("vertical");
+            }
+          }
+        }
+      } catch {
+        // backend unavailable; keep defaults
+      } finally {
+        if (!cancelled) setStartupReady(true);
+      }
+    };
+
+    bootstrap();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // 加载全局 Meta（包含缺陷字典与瓦片配置），在页面刷新时调用一次
   useEffect(() => {
+    if (!startupReady) return;
     let cancelled = false;
     const loadGlobalMeta = async () => {
       try {
@@ -281,7 +347,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [startupReady]);
 
   // 缺陷类型过滤
   const [selectedDefectTypes, setSelectedDefectTypes] =
@@ -512,6 +578,7 @@ export default function App() {
 
   // 初始加载钢板列表
   useEffect(() => {
+    if (!startupReady) return;
     loadSteelPlates();
 
     // 监听模式切换事件，重新加载数据
@@ -529,7 +596,7 @@ export default function App() {
         "app_mode_change",
         handleModeChange,
       );
-  }, []);
+  }, [startupReady]);
 
   // 列表仅应用筛选条件（查询结果已由服务端决定）
   const filteredSteelPlates = steelPlates.filter((plate) => {
