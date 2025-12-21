@@ -86,6 +86,18 @@ export async function listSteels(
   } catch (error) {
     console.error("❌ 加载钢板列表失败:", error);
 
+    // 针对跨域模式下的连接错误（通常是证书问题）
+    if (env.getMode() === "cors" && error instanceof TypeError && error.message === "Failed to fetch") {
+      const baseUrl = env.getApiBaseUrl();
+      const rootUrl = baseUrl.replace(/\/api$/, "");
+      throw new Error(
+        `无法连接到远程服务器。\n\n` +
+        `可能原因：\n` +
+        `1. 自签名证书未被信任。请在新标签页访问 ${rootUrl}/health 并点击“高级->继续访问”。\n` +
+        `2. 网络不通或被防火墙拦截。`
+      );
+    }
+
     // 如果是 JSON 解析错误，提供更友好的提示
     if (
       error instanceof SyntaxError &&
@@ -219,6 +231,14 @@ export async function getDefectsRaw(
   } catch (error) {
     console.error("❌ 加载缺陷数据失败:", error);
 
+    if (env.getMode() === "cors" && error instanceof TypeError && error.message === "Failed to fetch") {
+      const baseUrl = env.getApiBaseUrl();
+      const rootUrl = baseUrl.replace(/\/api$/, "");
+      throw new Error(
+        `无法连接到远程服务器。请尝试在新标签页访问 ${rootUrl}/health 并接受证书。`
+      );
+    }
+
     if (
       error instanceof SyntaxError &&
       error.message.includes("JSON")
@@ -274,24 +294,31 @@ export async function getSteelMeta(
   const url = `${baseUrl}/steel-meta/${seqNo}`;
   console.log(`🌐 [生产模式] 请求钢板图像元信息: ${url}`);
 
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(
-      `加载钢板图像元信息失败: ${response.status} ${response.statusText}`,
-    );
-  }
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(
+        `加载钢板图像元信息失败: ${response.status} ${response.statusText}`,
+      );
+    }
 
-  const contentType = response.headers.get("content-type");
-  if (
-    !contentType ||
-    !contentType.includes("application/json")
-  ) {
-    throw new Error(
-      `钢板图像元信息接口返回非 JSON 数据 (Content-Type: ${contentType})`,
-    );
-  }
+    const contentType = response.headers.get("content-type");
+    if (
+      !contentType ||
+      !contentType.includes("application/json")
+    ) {
+      throw new Error(
+        `钢板图像元信息接口返回非 JSON 数据 (Content-Type: ${contentType})`,
+      );
+    }
 
-  return response.json() as Promise<SteelMetaResponse>;
+    return await response.json() as Promise<SteelMetaResponse>;
+  } catch (error) {
+    if (env.getMode() === "cors" && error instanceof TypeError && error.message === "Failed to fetch") {
+       throw new Error("无法连接到远程服务器（可能是证书或网络问题）。");
+    }
+    throw error;
+  }
 }
 
 /**
@@ -356,24 +383,35 @@ export async function getGlobalMeta(): Promise<{
   const url = `${baseUrl}/meta`;
   console.log(`🌐 [生产模式] 请求全局 Meta: ${url}`);
 
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(
-      `加载全局 Meta 失败: ${response.status} ${response.statusText}`,
-    );
-  }
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(
+        `加载全局 Meta 失败: ${response.status} ${response.statusText}`,
+      );
+    }
 
-  const contentType = response.headers.get("content-type");
-  if (
-    !contentType ||
-    !contentType.includes("application/json")
-  ) {
-    throw new Error(
-      `全局 Meta 接口返回非 JSON 数据 (Content-Type: ${contentType})`,
-    );
-  }
+    const contentType = response.headers.get("content-type");
+    if (
+      !contentType ||
+      !contentType.includes("application/json")
+    ) {
+      throw new Error(
+        `全局 Meta 接口返回非 JSON 数据 (Content-Type: ${contentType})`,
+      );
+    }
 
-  return response.json();
+    return await response.json();
+  } catch (error) {
+    if (env.getMode() === "cors" && error instanceof TypeError && error.message === "Failed to fetch") {
+      const rootUrl = baseUrl.replace(/\/api$/, "");
+      throw new Error(
+        `无法连接到远程服务器。\n` +
+        `请尝试在新标签页访问 ${rootUrl}/health 并接受自签名证书。`
+      );
+    }
+    throw error;
+  }
 }
 
 /**
@@ -387,7 +425,17 @@ export async function healthCheck(): Promise<HealthResponse> {
 
   // 生产模式：调用真实 API
   try {
-    const response = await fetch("/health");
+    let url = "/health";
+    // 跨域模式下，需要使用完整的远程 URL
+    if (env.getMode() === "cors") {
+      // 假设 health 接口位于服务器根路径 /health
+      // BaseUrl 是 .../api，所以我们需要截取 root
+      const baseUrl = env.getApiBaseUrl(); // https://111.230.72.96:8230/api
+      const rootUrl = baseUrl.replace(/\/api$/, "");
+      url = `${rootUrl}/health`;
+    }
+
+    const response = await fetch(url);
 
     if (!response.ok) {
       throw new Error(
@@ -409,17 +457,22 @@ export async function healthCheck(): Promise<HealthResponse> {
  * 获取当前 API 模式的状态信息
  */
 export function getApiStatus(): {
-  mode: "development" | "production";
+  mode: "development" | "production" | "cors";
   description: string;
   baseUrl: string;
 } {
   const mode = env.getMode();
+  let description = "开发模式 - 使用模拟数据";
+  
+  if (mode === "production") {
+    description = "生产模式 - 连接真实后端";
+  } else if (mode === "cors") {
+    description = "跨域模式 - 连接远程后端";
+  }
+
   return {
     mode,
-    description:
-      mode === "development"
-        ? "开发模式 - 使用模拟数据"
-        : "生产模式 - 连接真实后端",
+    description,
     baseUrl: env.getApiBaseUrl() || "Mock Data",
   };
 }

@@ -216,7 +216,7 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
           </div>
 
           {/* 缺陷缩略分布图（小钢板示意） */}
-          <div className="bg-card border border-border">
+          <div className={`bg-card border border-border ${isMobileDevice ? "hidden" : ""}`}>
             <DefectDistributionChart
               defects={filteredDefectsByControls}
               surface={surfaceFilter}
