@@ -1,4 +1,10 @@
-import { ChevronUp, ChevronLeft, ChevronRight, Play, Pause } from "lucide-react";
+import {
+  ChevronUp,
+  ChevronLeft,
+  ChevronRight,
+  Play,
+  Pause,
+} from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
 interface DefectNavigationBarProps {

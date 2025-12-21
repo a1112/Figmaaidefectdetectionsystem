@@ -12,7 +12,6 @@ import {
 } from "./components/FilterDialog";
 import { SystemDiagnosticDialog } from "./components/SystemDiagnosticDialog";
 import { ModeSwitch } from "./components/ModeSwitch";
-import { BackendErrorPanel } from "./components/BackendErrorPanel";
 import { DefectImageView } from "./components/DefectImageView";
 // 引入 API 客户端和环境配置
 import { env } from "./src/config/env";
@@ -78,6 +77,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from "./components/ui/dropdown-menu";
+import { Toaster } from "./components/ui/sonner";
+import { toast } from "sonner@2.0.3";
 import { TitleBar } from "./components/layout/TitleBar";
 import { MobileNavBar } from "./components/layout/MobileNavBar";
 import { Sidebar } from "./components/layout/Sidebar";
@@ -100,7 +101,7 @@ export default function App() {
   const [history, setHistory] = useState<DetectionRecord[]>([]);
   const [activeTab, setActiveTab] = useState<AppTab>("defects");
   const [isSidebarCollapsed, setIsSidebarCollapsed] =
-    useState(false);
+    useState(true);
   const [showPlatesPanel, setShowPlatesPanel] = useState(false); // 手机模式：是否显示钢板面板
   const [selectedPlateId, setSelectedPlateId] = useState<
     string | null
@@ -169,7 +170,7 @@ export default function App() {
   const searchButtonRef = useRef<HTMLButtonElement>(null);
   const filterButtonRef = useRef<HTMLButtonElement>(null);
   const diagnosticButtonRef = useRef<HTMLButtonElement>(null);
-  const [startupReady, setStartupReady] = useState(false);
+  const [startupReady, setStartupReady] = useState(true);
 
   // 图像标签页：选中的历史记录
   const [selectedHistoryImage, setSelectedHistoryImage] =
@@ -238,7 +239,7 @@ export default function App() {
         const controller = new AbortController();
         const timeoutId = window.setTimeout(() => {
           controller.abort();
-        }, 900);
+        }, 5000);
 
         const response = await fetch("/health", {
           signal: controller.signal,
@@ -344,8 +345,18 @@ export default function App() {
     };
 
     loadGlobalMeta();
+
+    // 监听模式切换事件，重新加载 Meta
+    const handleModeChange = () => {
+      console.log("🔄 检测到模式切换，重新加载全局 Meta...");
+      loadGlobalMeta();
+    };
+
+    window.addEventListener("app_mode_change", handleModeChange);
+
     return () => {
       cancelled = true;
+      window.removeEventListener("app_mode_change", handleModeChange);
     };
   }, [startupReady]);
 
@@ -546,14 +557,22 @@ export default function App() {
       }
     } catch (error) {
       console.error("❌ 加载钢板列表失败:", error);
-      setSteelsLoadError(
-        error instanceof Error ? error.message : "加载失败",
-      );
-
-      // 生产模式失败时使用空数组，开发模式已经在 mock 层处理
+      // 不再使用全屏错误提示，改用 Toast
+      const errMsg = error instanceof Error ? error.message : "加载失败";
+      
+      // 仅在生产模式下提示连接失败
       if (env.isProduction()) {
+        toast.error("无法连接到后端服务器", {
+            description: errMsg,
+            action: {
+                label: "切回开发模式",
+                onClick: () => env.setMode("development"),
+            },
+            duration: 5000,
+        });
         setSteelPlates([]);
       }
+      setSteelsLoadError(errMsg);
     } finally {
       setIsLoadingSteels(false);
     }
@@ -853,7 +872,7 @@ export default function App() {
 
           {/* Scrollable Content */}
           <div
-            className={`flex-1 min-h-0 overflow-auto ${isMobileDevice ? "p-2" : "p-4"}`}
+            className="flex-1 min-h-0 overflow-auto p-[2px]"
           >
             {showPlatesPanel ? (
               <PlateOverlayPanel
@@ -1071,6 +1090,7 @@ export default function App() {
         onClose={() => setIsDiagnosticDialogOpen(false)}
         triggerRef={diagnosticButtonRef}
       />
+      <Toaster />
     </div>
   );
 }

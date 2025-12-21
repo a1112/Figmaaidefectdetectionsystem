@@ -27,6 +27,11 @@ import type {
   SteelPlate,
 } from "../../types/app.types";
 
+import { useState } from "react";
+import { LoginModal } from "../auth/LoginModal";
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
+import { User as UserIcon, LogOut, LogIn } from "lucide-react";
+
 interface TitleBarProps {
   activeTab: ActiveTab;
   setActiveTab: (tab: ActiveTab) => void;
@@ -56,6 +61,12 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   setIsDiagnosticDialogOpen,
   diagnosticButtonRef,
 }) => {
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<{ name: string; role: string } | null>({
+    name: "Admin",
+    role: "操作员",
+  });
+
   const handlePrevPlate = () => {
     if (filteredSteelPlates.length === 0) return;
     const currentIndex = filteredSteelPlates.findIndex(
@@ -292,6 +303,69 @@ export const TitleBar: React.FC<TitleBarProps> = ({
           >
             <Settings className="w-4 h-4" />
           </button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="relative ml-2 focus:outline-none rounded-full">
+                <Avatar className="h-8 w-8 hover:ring-2 hover:ring-primary/50 transition-all cursor-pointer">
+                  <AvatarImage src="" alt="@user" />
+                  <AvatarFallback className="bg-primary/10 text-primary">
+                    {currentUser ? currentUser.name[0].toUpperCase() : <UserIcon className="w-4 h-4" />}
+                  </AvatarFallback>
+                </Avatar>
+                {/* Online Status Indicator */}
+                <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-background ${currentUser ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 bg-card border-border text-foreground">
+              <DropdownMenuLabel>
+                {currentUser ? (
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{currentUser.name}</p>
+                    <p className="text-xs leading-none text-muted-foreground">{currentUser.role}</p>
+                  </div>
+                ) : (
+                  "未登录"
+                )}
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator className="bg-border" />
+              <DropdownMenuItem 
+                onClick={() => { setActiveTab("settings"); setShowPlatesPanel(false); }}
+                className="cursor-pointer focus:bg-accent focus:text-accent-foreground"
+              >
+                <Settings className="mr-2 h-4 w-4" />
+                <span>用户设置</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer focus:bg-accent focus:text-accent-foreground">
+                <Database className="mr-2 h-4 w-4" />
+                <span>切换数据源</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="bg-border" />
+              {currentUser ? (
+                <DropdownMenuItem 
+                  onClick={() => setCurrentUser(null)}
+                  className="cursor-pointer focus:bg-accent focus:text-accent-foreground text-red-500 focus:text-red-500"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>退出登录</span>
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem 
+                  onClick={() => setIsLoginOpen(true)}
+                  className="cursor-pointer focus:bg-accent focus:text-accent-foreground"
+                >
+                  <LogIn className="mr-2 h-4 w-4" />
+                  <span>登录</span>
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <LoginModal 
+            isOpen={isLoginOpen} 
+            onClose={() => setIsLoginOpen(false)}
+            onLogin={(name) => setCurrentUser({ name, role: "操作员" })} 
+          />
 
           <div className="w-px h-4 bg-border mx-1 hidden xl:block"></div>
 

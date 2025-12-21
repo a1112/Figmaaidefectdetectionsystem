@@ -139,7 +139,10 @@ const defectTypeDescriptions = defectClassItems
  */
 function generateSteelNo(seqNo: number): string {
   // 基于 seq_no 生成伪随机但稳定的钢板号
-  const randomPart = String(seqNo * 123456 + 411000000).slice(0, 9);
+  const randomPart = String(seqNo * 123456 + 411000000).slice(
+    0,
+    9,
+  );
   return `H${randomPart}`;
 }
 
@@ -154,7 +157,9 @@ function generateMockSteel(seqNo: number): SteelItemRaw {
     seq_no: seqNo,
     steel_no: generateSteelNo(seqNo),
     steel_type:
-      steelGrades[Math.floor(Math.random() * steelGrades.length)],
+      steelGrades[
+        Math.floor(Math.random() * steelGrades.length)
+      ],
     length: Math.floor(Math.random() * 2000) + 6000, // 6000-8000mm（基于真实数据）
     width: Math.floor(Math.random() * 1000) + 3000, // 3000-4000mm
     thickness: Math.floor(Math.random() * 200) + 100, // 100-300mm

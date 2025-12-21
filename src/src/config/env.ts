@@ -3,13 +3,13 @@
  * 用于切换开发模式（Mock数据）和生产模式（真实API）
  */
 
-export type AppMode = "development" | "production";
+export type AppMode = "development" | "production" | "cors";
 export type ApiProfile = "default" | "small";
 
 // 从 localStorage 读取用户偏好，默认为开发模式
 const getInitialMode = (): AppMode => {
-  const stored = localStorage.getItem("app_mode");
-  return stored === "production" || stored === "development"
+  const stored = localStorage.getItem("app_mode") as AppMode;
+  return ["development", "production", "cors"].includes(stored)
     ? stored
     : "development";
 };
@@ -76,10 +76,10 @@ class EnvironmentConfig {
   }
 
   /**
-   * 是否为生产模式
+   * 是否为生产模式 (连接真实后端，包括本地生产和跨域模式)
    */
   isProduction(): boolean {
-    return this.mode === "production";
+    return this.mode === "production" || this.mode === "cors";
   }
 
   /**
@@ -87,8 +87,13 @@ class EnvironmentConfig {
    */
   getApiBaseUrl(): string {
     // 开发模式使用 mock
-    if (this.mode !== "production") {
+    if (this.mode === "development") {
       return "";
+    }
+
+    // 跨域模式：使用指定远程地址
+    if (this.mode === "cors") {
+      return "https://111.230.72.96:8230/api";
     }
 
     // 生产模式：根据 apiProfile 选择标准实例或 small 实例

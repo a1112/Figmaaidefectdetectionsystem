@@ -615,8 +615,14 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
+        onTouchStart={(e) => {
+          if (e.cancelable && e.nativeEvent.cancelable) e.preventDefault();
+          handleTouchStart(e);
+        }}
+        onTouchMove={(e) => {
+          if (e.cancelable && e.nativeEvent.cancelable) e.preventDefault();
+          handleTouchMove(e);
+        }}
         onTouchEnd={handleTouchEnd}
       />
     </div>

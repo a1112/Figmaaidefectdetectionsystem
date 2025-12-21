@@ -76,10 +76,10 @@ export function DefectToolbar({
             })}
           </div>
 
-          <div className="absolute top-2 right-2 sm:right-4">
+          <div className="absolute top-1/2 right-2 sm:right-4 -translate-y-1/2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="p-1.5 hover:bg-accent rounded transition-colors">
+                <button className="flex items-center justify-center p-1.5 hover:bg-accent rounded transition-colors">
                   <MoreVertical className="w-4 h-4" />
                 </button>
               </DropdownMenuTrigger>
