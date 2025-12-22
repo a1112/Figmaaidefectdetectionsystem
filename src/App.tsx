@@ -799,7 +799,7 @@ export default function App() {
 
   return (
     <div
-      className={`h-screen w-screen bg-background text-foreground flex flex-col overflow-hidden selection:bg-primary selection:text-primary-foreground font-mono ${theme === "dark" ? "dark" : ""}`}
+      className={`h-screen w-full bg-background text-foreground flex flex-col overflow-hidden selection:bg-primary selection:text-primary-foreground font-mono ${theme === "dark" ? "dark" : ""}`}
     >
       {/* Custom Window Title Bar - 仅桌面端显示 */}
       {!isMobileDevice && (

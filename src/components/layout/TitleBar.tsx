@@ -131,6 +131,12 @@ export const TitleBar: React.FC<TitleBarProps> = ({
             <DropdownMenuLabel>主菜单</DropdownMenuLabel>
             <DropdownMenuSeparator className="bg-border" />
             <DropdownMenuItem
+              onClick={() => window.location.reload()}
+              className="cursor-pointer focus:bg-accent focus:text-accent-foreground text-xs"
+            >
+              网页刷新
+            </DropdownMenuItem>
+            <DropdownMenuItem
               className="cursor-pointer focus:bg-accent focus:text-accent-foreground text-xs"
             >
               文件
@@ -206,7 +212,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
       </div>
 
       {/* Right: Status and Window Controls */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 shrink-0">
         {/* 钢板导航 */}
         {filteredSteelPlates.length > 0 && (
           <div className="flex items-center gap-2 px-2 py-1 bg-background/50 border border-border rounded">
@@ -306,15 +312,15 @@ export const TitleBar: React.FC<TitleBarProps> = ({
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="relative ml-2 focus:outline-none rounded-full">
-                <Avatar className="h-8 w-8 hover:ring-2 hover:ring-primary/50 transition-all cursor-pointer">
+              <button className="relative ml-2 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-9999 p-0 shadow-sm shadow-black/30 focus:outline-none">
+                <Avatar className="h-8 w-8 shrink-0 rounded-9999 avatar-hover-ring transition-all cursor-pointer">
                   <AvatarImage src="" alt="@user" />
-                  <AvatarFallback className="bg-primary/10 text-primary">
+                  <AvatarFallback className="bg-primary/10 text-primary leading-none text-center rounded-9999">
                     {currentUser ? currentUser.name[0].toUpperCase() : <UserIcon className="w-4 h-4" />}
                   </AvatarFallback>
                 </Avatar>
                 {/* Online Status Indicator */}
-                <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-background ${currentUser ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+                <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-9999 border-2 border-primary/50 ${currentUser ? 'bg-green-500' : 'bg-gray-400'}`}></span>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 bg-card border-border text-foreground">
@@ -367,10 +373,10 @@ export const TitleBar: React.FC<TitleBarProps> = ({
             onLogin={(name) => setCurrentUser({ name, role: "操作员" })} 
           />
 
-          <div className="w-px h-4 bg-border mx-1 hidden xl:block"></div>
+          <div className="w-px h-4 bg-border mx-1 hidden"></div>
 
           {/* 窗口控制按钮 - 仅桌面版本显示 */}
-          <div className="hidden xl:flex items-center gap-2">
+          <div className="hidden">
             <button className="p-1.5 hover:bg-white/10 rounded">
               <Minus className="w-4 h-4" />
             </button>

@@ -1238,9 +1238,6 @@
     border-radius: .25rem;
   }
 
-  .rounded-full {
-    border-radius: 3.40282e38px;
-  }
 
   .rounded-lg {
     border-radius: .625rem;
@@ -3018,6 +3015,18 @@
   :is(.data-\[variant\=destructive\]\:\*\:\[svg\]\:\!text-destructive[data-variant="destructive"] > *):is(svg) {
     color: oklch(.577 .245 27.325) !important;
   }
+}
+
+.rounded-9999 {
+  border-radius: 9999px;
+}
+
+.avatar-hover-ring {
+  box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+}
+
+.avatar-hover-ring:hover {
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
 }
 
 @property --tw-translate-x {
