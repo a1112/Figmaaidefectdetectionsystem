@@ -60,6 +60,11 @@ export default defineConfig({
         host: '0.0.0.0',
         allowedHosts: ['n9yhdrvz.zjz-service.cn'],
         proxy: {
+            '/api_list': {
+                target: 'http://localhost:8120',
+                changeOrigin: true,
+                secure: false,
+            },
             '/api': {
                 target: 'http://localhost:8120',
                 changeOrigin: true,
@@ -76,6 +81,18 @@ export default defineConfig({
                 target: 'http://localhost:8120',
                 changeOrigin: true,
                 secure: false,
+            },
+            '^/[^/]+/api': {
+                target: 'http://localhost:8120',
+                changeOrigin: true,
+                secure: false,
+                rewrite: (path) => path.replace(/^\/[^/]+\/api/, '/api'),
+            },
+            '^/[^/]+/small-api': {
+                target: 'http://localhost:8130',
+                changeOrigin: true,
+                secure: false,
+                rewrite: (path) => path.replace(/^\/[^/]+\/small-api/, '/api'),
             },
         },
     },

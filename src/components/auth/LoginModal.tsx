@@ -38,7 +38,7 @@ export function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps) {
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[400px] bg-card border-border">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-xl">
+          <DialogTitle className="flex items-center gap-2 text-2xl text-blue-600">
             <Lock className="w-5 h-5 text-primary" />
             系统登录
           </DialogTitle>

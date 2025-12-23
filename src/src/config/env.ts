@@ -5,6 +5,7 @@
 
 export type AppMode = "development" | "production" | "cors";
 export type ApiProfile = "default" | "small";
+const LINE_COOKIE = "line_name";
 
 // 从 localStorage 读取用户偏好，默认为开发模式
 const getInitialMode = (): AppMode => {
@@ -20,13 +21,35 @@ const getInitialApiProfile = (): ApiProfile => {
   return stored === "small" ? "small" : "default";
 };
 
+const getCookieValue = (name: string): string | null => {
+  const cookies = document.cookie ? document.cookie.split(";") : [];
+  for (const cookie of cookies) {
+    const [rawKey, ...rest] = cookie.trim().split("=");
+    if (rawKey === name) {
+      return decodeURIComponent(rest.join("="));
+    }
+  }
+  return null;
+};
+
+const setCookieValue = (name: string, value: string, days: number = 30): void => {
+  const expires = new Date(Date.now() + days * 86400000).toUTCString();
+  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/`;
+};
+
+const getInitialLineName = (): string => {
+  return getCookieValue(LINE_COOKIE) || "";
+};
+
 class EnvironmentConfig {
   private mode: AppMode;
   private apiProfile: ApiProfile;
+  private lineName: string;
 
   constructor() {
     this.mode = getInitialMode();
     this.apiProfile = getInitialApiProfile();
+    this.lineName = getInitialLineName();
   }
 
   /**
@@ -68,6 +91,22 @@ class EnvironmentConfig {
     );
   }
 
+  getLineName(): string {
+    return this.lineName;
+  }
+
+  setLineName(name: string): void {
+    this.lineName = name;
+    if (name) {
+      setCookieValue(LINE_COOKIE, name);
+    }
+    window.dispatchEvent(
+      new CustomEvent("line_change", {
+        detail: name,
+      }),
+    );
+  }
+
   /**
    * 是否为开发模式
    */
@@ -96,8 +135,12 @@ class EnvironmentConfig {
       return "https://111.230.72.96:8230/api";
     }
 
-    // 生产模式：根据 apiProfile 选择标准实例或 small 实例
-    return this.apiProfile === "small" ? "/small-api" : "/api";
+    // 生产模式：根据产线与 apiProfile 选择标准实例或 small 实例
+    const suffix = this.apiProfile === "small" ? "/small-api" : "/api";
+    if (this.lineName) {
+      return `/${encodeURIComponent(this.lineName)}${suffix}`;
+    }
+    return suffix;
   }
 }
 

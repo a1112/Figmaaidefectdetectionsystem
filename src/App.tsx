@@ -22,12 +22,14 @@ import {
   getTileImageUrl,
   getGlobalMeta,
   getSteelMeta,
+  getApiList,
 } from "./src/api/client";
 import type {
   SteelItem,
   DefectItem,
   DefectClassItem,
   SurfaceImageInfo,
+  ApiNode,
 } from "./src/api/types";
 import type {
   Defect,
@@ -171,6 +173,8 @@ export default function App() {
   const filterButtonRef = useRef<HTMLButtonElement>(null);
   const diagnosticButtonRef = useRef<HTMLButtonElement>(null);
   const [startupReady, setStartupReady] = useState(true);
+  const [apiNodes, setApiNodes] = useState<ApiNode[]>([]);
+  const [activeLineName, setActiveLineName] = useState(env.getLineName());
 
   // 图像标签页：选中的历史记录
   const [selectedHistoryImage, setSelectedHistoryImage] =
@@ -281,6 +285,51 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!startupReady || !env.isProduction()) return;
+    let cancelled = false;
+
+    const loadApiNodes = async () => {
+      try {
+        const nodes = await getApiList();
+        if (cancelled) return;
+        setApiNodes(nodes);
+        if (nodes.length === 0) {
+          return;
+        }
+        const current = env.getLineName();
+        const names = nodes.map((node) => node.name);
+        if (!current || !names.includes(current)) {
+          env.setLineName(nodes[0].name);
+          setActiveLineName(nodes[0].name);
+        } else {
+          setActiveLineName(current);
+        }
+      } catch (error) {
+        console.warn("⚠️ 加载产线列表失败:", error);
+      }
+    };
+
+    const handleLineChange = (event: CustomEvent) => {
+      setActiveLineName(event.detail || "");
+    };
+
+    loadApiNodes();
+    window.addEventListener("line_change", handleLineChange as EventListener);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("line_change", handleLineChange as EventListener);
+    };
+  }, [startupReady]);
+
+  useEffect(() => {
+    if (activeLineName) {
+      document.title = `${activeLineName} - Web Defect Detection`;
+    } else {
+      document.title = "Web Defect Detection";
+    }
+  }, [activeLineName]);
+
   // 加载全局 Meta（包含缺陷字典与瓦片配置），在页面刷新时调用一次
   useEffect(() => {
     if (!startupReady) return;
@@ -353,10 +402,12 @@ export default function App() {
     };
 
     window.addEventListener("app_mode_change", handleModeChange);
+    window.addEventListener("line_change", handleModeChange);
 
     return () => {
       cancelled = true;
       window.removeEventListener("app_mode_change", handleModeChange);
+      window.removeEventListener("line_change", handleModeChange);
     };
   }, [startupReady]);
 
@@ -610,11 +661,17 @@ export default function App() {
       "app_mode_change",
       handleModeChange,
     );
-    return () =>
+    window.addEventListener("line_change", handleModeChange);
+    return () => {
       window.removeEventListener(
         "app_mode_change",
         handleModeChange,
       );
+      window.removeEventListener(
+        "line_change",
+        handleModeChange,
+      );
+    };
   }, [startupReady]);
 
   // 列表仅应用筛选条件（查询结果已由服务端决定）
@@ -816,6 +873,9 @@ export default function App() {
           setShowPlatesPanel={setShowPlatesPanel}
           setIsDiagnosticDialogOpen={setIsDiagnosticDialogOpen}
           diagnosticButtonRef={diagnosticButtonRef}
+          lineName={activeLineName}
+          apiNodes={apiNodes}
+          onLineChange={(name) => env.setLineName(name)}
         />
       )}
 
@@ -964,6 +1024,9 @@ export default function App() {
                     setTheme={setTheme}
                     imageOrientation={imageOrientation}
                     setImageOrientation={handleImageOrientationChange}
+                    apiNodes={apiNodes}
+                    lineName={activeLineName}
+                    onLineChange={(name) => env.setLineName(name)}
                   />
                 )}
 

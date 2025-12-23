@@ -12,6 +12,8 @@ import type {
   DefectItem,
   Surface,
   SteelMetaResponse,
+  ApiListResponse,
+  ApiNode,
 } from "./types";
 import * as mock from "./mock";
 
@@ -475,6 +477,21 @@ export function getApiStatus(): {
     description,
     baseUrl: env.getApiBaseUrl() || "Mock Data",
   };
+}
+
+/**
+ * 获取可用产线/节点列表
+ */
+export async function getApiList(): Promise<ApiNode[]> {
+  if (env.isDevelopment()) {
+    return [];
+  }
+  const response = await fetch("/api_list", { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`加载 API 列表失败: ${response.status} ${response.statusText}`);
+  }
+  const data: ApiListResponse = await response.json();
+  return data.items ?? [];
 }
 
 /**

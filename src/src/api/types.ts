@@ -45,6 +45,21 @@ export interface SteelListResponse {
   total: number;
 }
 
+// ==================== API 节点列表 ====================
+
+export interface ApiNode {
+  name: string;
+  mode?: string;
+  path?: string;
+  profile?: "default" | "small";
+  port?: number;
+  ip?: string;
+}
+
+export interface ApiListResponse {
+  items: ApiNode[];
+}
+
 // ==================== 缺陷相关类型 ====================
 
 /**

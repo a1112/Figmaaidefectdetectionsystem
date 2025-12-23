@@ -31,6 +31,8 @@ import { useState } from "react";
 import { LoginModal } from "../auth/LoginModal";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { User as UserIcon, LogOut, LogIn } from "lucide-react";
+import { DataSourceModal } from "../modals/DataSourceModal";
+import type { ApiNode } from "../../src/api/types";
 
 interface TitleBarProps {
   activeTab: ActiveTab;
@@ -45,6 +47,9 @@ interface TitleBarProps {
   setShowPlatesPanel: (show: boolean) => void;
   setIsDiagnosticDialogOpen: (open: boolean) => void;
   diagnosticButtonRef: React.RefObject<HTMLButtonElement>;
+  lineName?: string;
+  apiNodes: ApiNode[];
+  onLineChange: (name: string) => void;
 }
 
 export const TitleBar: React.FC<TitleBarProps> = ({
@@ -60,8 +65,12 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   setShowPlatesPanel,
   setIsDiagnosticDialogOpen,
   diagnosticButtonRef,
+  lineName,
+  apiNodes,
+  onLineChange,
 }) => {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [isDataSourceOpen, setIsDataSourceOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<{ name: string; role: string } | null>({
     name: "Admin",
     role: "操作员",
@@ -207,7 +216,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
       <div className="hidden xl:flex items-center gap-2 flex-1 justify-center px-4">
         <Scan className="w-5 h-5 text-primary" />
         <span className="text-sm font-medium tracking-wider">
-          STEEL-EYE PRO v2.0.1
+          {lineName || "STEEL-EYE PRO v2.0.1"}
         </span>
       </div>
 
@@ -342,7 +351,10 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                 <Settings className="mr-2 h-4 w-4" />
                 <span>用户设置</span>
               </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer focus:bg-accent focus:text-accent-foreground">
+              <DropdownMenuItem
+                onClick={() => setIsDataSourceOpen(true)}
+                className="cursor-pointer focus:bg-accent focus:text-accent-foreground"
+              >
                 <Database className="mr-2 h-4 w-4" />
                 <span>切换数据源</span>
               </DropdownMenuItem>
@@ -371,6 +383,13 @@ export const TitleBar: React.FC<TitleBarProps> = ({
             isOpen={isLoginOpen} 
             onClose={() => setIsLoginOpen(false)}
             onLogin={(name) => setCurrentUser({ name, role: "操作员" })} 
+          />
+          <DataSourceModal
+            isOpen={isDataSourceOpen}
+            onClose={() => setIsDataSourceOpen(false)}
+            nodes={apiNodes}
+            currentLineName={lineName || ""}
+            onConfirm={(name) => onLineChange(name)}
           />
 
           <div className="w-px h-4 bg-border mx-1 hidden"></div>
