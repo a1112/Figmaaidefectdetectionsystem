@@ -855,6 +855,7 @@ export default function App() {
           surfaceFilter={surfaceFilter}
           setSurfaceFilter={setSurfaceFilter}
           setShowPlatesPanel={setShowPlatesPanel}
+          lineLabel={activeLineLabel}
         />
       )}
 

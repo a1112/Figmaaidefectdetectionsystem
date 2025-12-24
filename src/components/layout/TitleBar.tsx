@@ -217,8 +217,8 @@ export const TitleBar: React.FC<TitleBarProps> = ({
         </button>
       </div>
 
-      {/* Center: App Title - 仅在桌面大屏显示 */}
-      <div className="hidden xl:flex items-center gap-2 flex-1 justify-center px-4">
+      {/* Center: App Title */}
+      <div className="flex items-center gap-2 flex-1 justify-center px-4">
         <Scan className="w-5 h-5 text-primary" />
         <button
           type="button"
@@ -259,7 +259,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
         )}
         <div className="flex items-center gap-1 px-3 py-1 bg-background/50 border border-border rounded text-xs text-muted-foreground">
           <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-          SYSTEM READY
+          READY
         </div>
 
         {/* 表面切换 - 缺陷和图像界面都显示 */}

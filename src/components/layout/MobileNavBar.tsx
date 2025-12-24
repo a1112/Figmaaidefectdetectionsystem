@@ -19,6 +19,7 @@ interface MobileNavBarProps {
   surfaceFilter: SurfaceFilter;
   setSurfaceFilter: (filter: SurfaceFilter) => void;
   setShowPlatesPanel: (show: boolean) => void;
+  lineLabel?: string;
 }
 
 export const MobileNavBar: React.FC<MobileNavBarProps> = ({
@@ -30,6 +31,7 @@ export const MobileNavBar: React.FC<MobileNavBarProps> = ({
   surfaceFilter,
   setSurfaceFilter,
   setShowPlatesPanel,
+  lineLabel,
 }) => {
   const handleTabSwitch = () => {
     if (activeTab === "defects") {
@@ -88,6 +90,11 @@ export const MobileNavBar: React.FC<MobileNavBarProps> = ({
 
       {/* 中间区域：缺陷/图像切换 + 钢板切换 + 表面切换 */}
       <div className="flex items-center gap-2 flex-1 min-w-0 justify-center">
+        {lineLabel && (
+          <span className="max-w-[120px] truncate text-[10px] text-muted-foreground border border-border/50 bg-muted/40 px-2 py-0.5 rounded">
+            {lineLabel}
+          </span>
+        )}
         {/* 缺陷/图像切换 */}
         <button
           onClick={handleTabSwitch}
