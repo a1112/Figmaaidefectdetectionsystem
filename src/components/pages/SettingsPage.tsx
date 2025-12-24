@@ -38,19 +38,31 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     env.getApiProfile(),
   );
   const [mode, setMode] = useState(env.getMode());
+  const [corsBaseUrl, setCorsBaseUrl] = useState(env.getCorsBaseUrl());
 
   useEffect(() => {
     const handleModeChange = (e: CustomEvent) => {
       setMode(e.detail);
     };
+    const handleCorsBaseUrlChange = (e: CustomEvent) => {
+      setCorsBaseUrl(e.detail || "");
+    };
     window.addEventListener(
       "app_mode_change",
       handleModeChange as EventListener,
+    );
+    window.addEventListener(
+      "cors_base_url_change",
+      handleCorsBaseUrlChange as EventListener,
     );
     return () => {
       window.removeEventListener(
         "app_mode_change",
         handleModeChange as EventListener,
+      );
+      window.removeEventListener(
+        "cors_base_url_change",
+        handleCorsBaseUrlChange as EventListener,
       );
     };
   }, []);
@@ -83,6 +95,39 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       <ModeSwitch />
 
       <div className="space-y-4">
+        {mode === "cors" && (
+          <div className="bg-card border border-border rounded-lg p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium">
+                  CORS / 跨域地址
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  输入远程服务器地址，自动追加 /api
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                className="flex-1 px-3 py-2 text-xs bg-background border border-border rounded-sm focus:outline-none focus:border-primary"
+                value={corsBaseUrl}
+                onChange={(event) =>
+                  setCorsBaseUrl(event.target.value)
+                }
+                onBlur={() => env.setCorsBaseUrl(corsBaseUrl)}
+                placeholder="http://9qwygl8e.zjz-service.cn:80"
+              />
+              <button
+                type="button"
+                className="px-3 py-2 text-xs border border-border rounded-sm hover:bg-accent transition-colors"
+                onClick={() => env.setCorsBaseUrl(corsBaseUrl)}
+              >
+                应用
+              </button>
+            </div>
+          </div>
+        )}
         {mode === "production" && apiNodes.length > 0 && (
           <div className="bg-card border border-border rounded-lg p-4 space-y-3">
             <div className="flex items-center justify-between">

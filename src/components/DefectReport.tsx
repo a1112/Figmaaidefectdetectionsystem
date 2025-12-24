@@ -538,13 +538,13 @@ export function DefectReport({
                     key={plate.plateId}
                     onClick={() =>
                       setSelectedPlateId(
-                        selectedPlateId === plate.plateId
+                        selectedPlateId === plate.serialNumber
                           ? null
-                          : plate.plateId,
+                          : plate.serialNumber,
                       )
                     }
                     className={`border-b border-border cursor-pointer transition-all ${
-                      selectedPlateId === plate.plateId
+                      selectedPlateId === plate.serialNumber
                         ? "bg-primary/20 border-primary shadow-lg shadow-primary/10"
                         : index % 2 === 0
                           ? "bg-muted/10 hover:bg-accent/30"

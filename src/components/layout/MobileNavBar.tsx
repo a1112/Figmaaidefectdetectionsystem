@@ -44,33 +44,33 @@ export const MobileNavBar: React.FC<MobileNavBarProps> = ({
   const handlePrevPlate = () => {
     if (filteredSteelPlates.length === 0) return;
     const currentIndex = filteredSteelPlates.findIndex(
-      (p) => p.plateId === selectedPlateId,
+      (p) => p.serialNumber === selectedPlateId,
     );
     const prevIndex =
       currentIndex > 0
         ? currentIndex - 1
         : filteredSteelPlates.length - 1;
     const prevPlate = filteredSteelPlates[prevIndex];
-    if (prevPlate) setSelectedPlateId(prevPlate.plateId);
+    if (prevPlate) setSelectedPlateId(prevPlate.serialNumber);
   };
 
   const handleNextPlate = () => {
     if (filteredSteelPlates.length === 0) return;
     const currentIndex = filteredSteelPlates.findIndex(
-      (p) => p.plateId === selectedPlateId,
+      (p) => p.serialNumber === selectedPlateId,
     );
     const nextIndex =
       currentIndex < filteredSteelPlates.length - 1
         ? currentIndex + 1
         : 0;
     const nextPlate = filteredSteelPlates[nextIndex];
-    if (nextPlate) setSelectedPlateId(nextPlate.plateId);
+    if (nextPlate) setSelectedPlateId(nextPlate.serialNumber);
   };
 
   const currentPlateId = (() => {
     const currentPlate =
       filteredSteelPlates.find(
-        (p) => p.plateId === selectedPlateId,
+        (p) => p.serialNumber === selectedPlateId,
       ) || filteredSteelPlates[0];
     return currentPlate?.plateId || "-";
   })();

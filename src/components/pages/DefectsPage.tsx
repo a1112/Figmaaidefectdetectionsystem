@@ -90,7 +90,7 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
 
   const selectedPlate: SteelPlate | undefined =
     filteredSteelPlates.find(
-      (p) => p.plateId === selectedPlateId,
+      (p) => p.serialNumber === selectedPlateId,
     ) || filteredSteelPlates[0];
 
   const selectedDefect =

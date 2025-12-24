@@ -94,9 +94,9 @@ export function PlateListContent({
           {filteredSteelPlates.map((plate) => (
             <div
               key={plate.plateId}
-              onClick={() => onPlateSelect(plate.plateId)}
+              onClick={() => onPlateSelect(plate.serialNumber)}
               className={`bg-card border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md ${
-                selectedPlateId === plate.plateId
+                selectedPlateId === plate.serialNumber
                   ? "border-primary shadow-lg shadow-primary/20"
                   : "border-border hover:border-primary/50"
               }`}

@@ -6,6 +6,7 @@
 export type AppMode = "development" | "production" | "cors";
 export type ApiProfile = "default" | "small";
 const LINE_COOKIE = "line_name";
+const DEFAULT_CORS_BASE_URL = "http://9qwygl8e.zjz-service.cn:80";
 
 // 从 localStorage 读取用户偏好，默认为开发模式
 const getInitialMode = (): AppMode => {
@@ -19,6 +20,11 @@ const getInitialMode = (): AppMode => {
 const getInitialApiProfile = (): ApiProfile => {
   const stored = localStorage.getItem("api_profile");
   return stored === "small" ? "small" : "default";
+};
+
+const getInitialCorsBaseUrl = (): string => {
+  const stored = localStorage.getItem("cors_base_url");
+  return stored && stored.trim() ? stored.trim() : DEFAULT_CORS_BASE_URL;
 };
 
 const getCookieValue = (name: string): string | null => {
@@ -45,11 +51,13 @@ class EnvironmentConfig {
   private mode: AppMode;
   private apiProfile: ApiProfile;
   private lineName: string;
+  private corsBaseUrl: string;
 
   constructor() {
     this.mode = getInitialMode();
     this.apiProfile = getInitialApiProfile();
     this.lineName = getInitialLineName();
+    this.corsBaseUrl = getInitialCorsBaseUrl();
   }
 
   /**
@@ -121,6 +129,32 @@ class EnvironmentConfig {
     return this.mode === "production" || this.mode === "cors";
   }
 
+  getCorsBaseUrl(): string {
+    return this.corsBaseUrl;
+  }
+
+  setCorsBaseUrl(url: string): void {
+    this.corsBaseUrl = url.trim();
+    localStorage.setItem("cors_base_url", this.corsBaseUrl);
+    window.dispatchEvent(
+      new CustomEvent("cors_base_url_change", { detail: this.corsBaseUrl }),
+    );
+  }
+
+  private getCorsApiBaseUrl(): string {
+    const raw = this.corsBaseUrl.trim();
+    if (!raw) {
+      return `${DEFAULT_CORS_BASE_URL}/api`;
+    }
+    if (raw.endsWith("/api")) {
+      return raw;
+    }
+    if (raw.endsWith("/api/")) {
+      return raw.slice(0, -1);
+    }
+    return `${raw.replace(/\/+$/, "")}/api`;
+  }
+
   /**
    * 获取 API 基础路径
    */
@@ -132,7 +166,11 @@ class EnvironmentConfig {
 
     // 跨域模式：使用指定远程地址
     if (this.mode === "cors") {
-      return "https://111.230.72.96:8230/api";
+      const base = this.getCorsApiBaseUrl();
+      if (this.lineName) {
+        return `${base}/${encodeURIComponent(this.lineName)}`;
+      }
+      return base;
     }
 
     // 生产模式：根据产线与 apiProfile 选择标准实例或 small 实例

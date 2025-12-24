@@ -23,7 +23,7 @@ export const useDefects = (selectedPlateId: string | null, steelPlates: SteelPla
       
       try {
         // 从 plateId 中提取 seq_no（去除前导零）
-        const selectedPlate = steelPlates.find(p => p.plateId === selectedPlateId);
+        const selectedPlate = steelPlates.find(p => p.serialNumber === selectedPlateId);
         if (!selectedPlate) {
           console.warn('未找到选中的钢板:', selectedPlateId);
           setPlateDefects([]);

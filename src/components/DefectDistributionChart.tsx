@@ -7,6 +7,11 @@ import type {
 } from "../src/api/types";
 import { getTileImageUrl } from "../src/api/client";
 import type { ViewportInfo } from "./DefectImageView";
+import type { Tile } from "./LargeImageViewer/utils";
+import {
+  buildOrientationLayout,
+  computeTileRequestInfo,
+} from "../utils/imageOrientation";
 
 interface DefectDistributionChartProps {
   defects: Defect[];
@@ -99,7 +104,7 @@ export function DefectDistributionChart({
   maxTileLevel,
   viewportInfo,
   viewportSurface,
-  imageOrientation,
+  imageOrientation: _imageOrientation,
   onViewportCenterChange,
 }: DefectDistributionChartProps) {
   const getSeverityColor = (severity: string) => {
@@ -389,63 +394,101 @@ export function DefectDistributionChart({
     const frameCount = meta?.frame_count || 1;
 
     const tileImages: JSX.Element[] = [];
-    const orientation: ImageOrientation =
-      imageOrientation ?? "horizontal";
+    const orientation: ImageOrientation = "horizontal";
 
     if (
       meta &&
       typeof (seqNo as number | undefined) === "number"
     ) {
-      const worldWidth = meta.image_width;
-      const worldHeight = meta.frame_count * meta.image_height;
       const level = getDistributionTileLevel();
-      const scaledWidth = worldWidth / 2 ** level;
-      const scaledHeight = worldHeight / 2 ** level;
       const tileSize = Math.max(
         defaultTileSize ?? 0,
         meta.image_height ?? 0,
         512,
       );
+      const layout = buildOrientationLayout({
+        orientation,
+        surfaceFilter: surf,
+        topMeta: surf === "top" ? meta : undefined,
+        bottomMeta: surf === "bottom" ? meta : undefined,
+        surfaceGap: 0,
+      });
+      const surfaceLayout = layout.surfaces.find(
+        (s) => s.surface === surf,
+      );
+      if (!surfaceLayout) {
+        return (
+          <div key={surf} className="flex flex-col gap-0" />
+        );
+      }
+
+      const virtualTileSize = tileSize * Math.pow(2, level);
       const tilesX = Math.max(
         1,
-        Math.ceil(scaledWidth / tileSize),
+        Math.ceil(surfaceLayout.worldWidth / virtualTileSize),
       );
       const tilesY = Math.max(
         1,
-        Math.ceil(scaledHeight / tileSize),
+        Math.ceil(surfaceLayout.worldHeight / virtualTileSize),
       );
 
-      const scaleX = plateWidth / scaledWidth;
-      const scaleY = perSurfaceHeight / scaledHeight;
+      for (let row = 0; row < tilesY; row += 1) {
+        for (let col = 0; col < tilesX; col += 1) {
+          const x = surfaceLayout.offsetX + col * virtualTileSize;
+          const y = surfaceLayout.offsetY + row * virtualTileSize;
+          const width =
+            col === tilesX - 1
+              ? surfaceLayout.worldWidth - col * virtualTileSize
+              : virtualTileSize;
+          const height =
+            row === tilesY - 1
+              ? surfaceLayout.worldHeight - row * virtualTileSize
+              : virtualTileSize;
 
-      for (let tileY = 0; tileY < tilesY; tileY += 1) {
-        for (let tileX = 0; tileX < tilesX; tileX += 1) {
+          const tile: Tile = {
+            level,
+            row,
+            col,
+            x,
+            y,
+            width,
+            height,
+          };
+
+          const requestInfo = computeTileRequestInfo({
+            surface: surfaceLayout,
+            tile,
+            orientation,
+            virtualTileSize,
+            tileSize,
+          });
+          if (!requestInfo) {
+            continue;
+          }
+
           const url = getTileImageUrl({
             surface: surf,
             seqNo: seqNo as number,
             level,
-            tileX,
-            tileY,
+            tileX: requestInfo.tileX,
+            tileY: requestInfo.tileY,
             tileSize,
           });
 
-          const tileWorldWidth = Math.min(
-            tileSize,
-            Math.max(0, scaledWidth - tileX * tileSize),
-          );
-          const tileWorldHeight = Math.min(
-            tileSize,
-            Math.max(0, scaledHeight - tileY * tileSize),
-          );
-
-          const left = tileX * tileSize * scaleX;
-          const top = tileY * tileSize * scaleY;
-          const width = tileWorldWidth * scaleX;
-          const height = tileWorldHeight * scaleY;
+          const localX = x - surfaceLayout.offsetX;
+          const localY = y - surfaceLayout.offsetY;
+          const left =
+            (localX / surfaceLayout.worldWidth) * plateWidth;
+          const top =
+            (localY / surfaceLayout.worldHeight) * perSurfaceHeight;
+          const displayWidth =
+            (width / surfaceLayout.worldWidth) * plateWidth;
+          const displayHeight =
+            (height / surfaceLayout.worldHeight) * perSurfaceHeight;
 
           tileImages.push(
             <img
-              key={`tile-${surf}-L${level}-${tileSize}-${tileX}-${tileY}`}
+              key={`tile-${surf}-L${level}-${tileSize}-${col}-${row}`}
               src={url}
               alt="mosaic-tile"
               className="absolute"
@@ -454,8 +497,8 @@ export function DefectDistributionChart({
               style={{
                 left,
                 top,
-                width,
-                height,
+                width: displayWidth,
+                height: displayHeight,
                 objectFit: "fill",
               }}
             />,
@@ -701,11 +744,6 @@ export function DefectDistributionChart({
 
   return (
     <div className="h-full flex flex-col" ref={containerRef}>
-      {defects.length === 0 && (
-        <div className="text-center text-[10px] text-muted-foreground/50 mb-2 py-1 border-b border-border/30">
-          SHOWING SAMPLE DATA
-        </div>
-      )}
 
       {/* 横向滚动容器 - 支持横向滚动查看长钢板 */}
       <div className="flex-1 overflow-x-auto overflow-y-hidden">

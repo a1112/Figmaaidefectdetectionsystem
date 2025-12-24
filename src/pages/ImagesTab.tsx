@@ -51,7 +51,7 @@ export function ImagesTab({
       <div className="flex-1 min-h-0 bg-card border border-border relative">
         {(() => {
           const selectedPlate = selectedPlateId
-            ? steelPlates.find((plate) => plate.plateId === selectedPlateId)
+            ? steelPlates.find((plate) => plate.serialNumber === selectedPlateId)
             : undefined;
           if (!selectedPlate) {
             return (

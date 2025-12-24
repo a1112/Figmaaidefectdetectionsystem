@@ -57,7 +57,7 @@
     ) : (
       <DefectImageView
         selectedPlate={steelPlates.find(
-          (p) => p.plateId === selectedPlateId,
+          (p) => p.serialNumber === selectedPlateId,
         )}
         defects={plateDefects.filter(
           (d) =>

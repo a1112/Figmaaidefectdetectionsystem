@@ -61,12 +61,12 @@ export default defineConfig({
         allowedHosts: ['n9yhdrvz.zjz-service.cn', '9qwygl8e.zjz-service.cn'],
         proxy: {
             '/config': {
-                target: 'http://127.0.0.1:80',
+                target: 'http://9qwygl8e.zjz-service.cn:80',
                 changeOrigin: true,
                 secure: false,
             },
             '/api': {
-                target: 'http://127.0.0.1:80',
+                target: 'http://9qwygl8e.zjz-service.cn:80',
                 changeOrigin: true,
                 secure: false,
             },

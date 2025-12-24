@@ -17,6 +17,7 @@ interface DataSourceModalProps {
   nodes: ApiNode[];
   currentLineName: string;
   onConfirm: (lineKey: string) => void;
+  onRefresh: () => void;
 }
 
 export function DataSourceModal({
@@ -25,6 +26,7 @@ export function DataSourceModal({
   nodes,
   currentLineName,
   onConfirm,
+  onRefresh,
 }: DataSourceModalProps) {
   const [selected, setSelected] = useState("");
 
@@ -63,35 +65,40 @@ export function DataSourceModal({
               暂无可用数据源，请确认后端已启动并提供 /config/api_list。
             </div>
           )}
-          {nodes.map((node) => (
-            <label
-              key={node.key}
-              className={`flex items-center justify-between rounded-md border px-3 py-2 text-sm cursor-pointer transition-colors ${
-                selected === node.key
-                  ? "border-primary bg-primary/5"
-                  : "border-border hover:bg-muted/50"
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="data-source"
-                  value={node.key}
-                  checked={selected === node.key}
-                  onChange={() => setSelected(node.key)}
-                />
-                <span className="font-medium">
-                  {node.name} ({node.key})
-                </span>
-              </div>
-              <div className="text-xs text-muted-foreground">
-                {node.ip ? node.ip : "-"}:{node.port ?? "-"}
-              </div>
-            </label>
-          ))}
+          <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
+            {nodes.map((node) => (
+              <label
+                key={node.key}
+                className={`flex items-center justify-between rounded-md border px-3 py-2 text-sm cursor-pointer transition-colors ${
+                  selected === node.key
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:bg-muted/50"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="data-source"
+                    value={node.key}
+                    checked={selected === node.key}
+                    onChange={() => setSelected(node.key)}
+                  />
+                  <span className="font-medium">
+                    {node.name} ({node.key})
+                  </span>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {node.ip ? node.ip : "-"}:{node.port ?? "-"}
+                </div>
+              </label>
+            ))}
+          </div>
         </div>
 
         <DialogFooter className="pt-2">
+          <Button variant="outline" type="button" onClick={onRefresh}>
+            刷新
+          </Button>
           <Button variant="outline" type="button" onClick={onClose}>
             取消
           </Button>

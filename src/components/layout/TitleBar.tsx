@@ -7,6 +7,7 @@ import {
   Activity,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   AlertCircle,
   Images,
   BarChart3,
@@ -50,6 +51,7 @@ interface TitleBarProps {
   lineName?: string;
   apiNodes: ApiNode[];
   onLineChange: (name: string) => void;
+  onRefreshApiNodes: () => void;
 }
 
 export const TitleBar: React.FC<TitleBarProps> = ({
@@ -68,6 +70,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   lineName,
   apiNodes,
   onLineChange,
+  onRefreshApiNodes,
 }) => {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isDataSourceOpen, setIsDataSourceOpen] = useState(false);
@@ -79,33 +82,33 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   const handlePrevPlate = () => {
     if (filteredSteelPlates.length === 0) return;
     const currentIndex = filteredSteelPlates.findIndex(
-      (p) => p.plateId === selectedPlateId,
+      (p) => p.serialNumber === selectedPlateId,
     );
     const prevIndex =
       currentIndex > 0
         ? currentIndex - 1
         : filteredSteelPlates.length - 1;
     const prevPlate = filteredSteelPlates[prevIndex];
-    if (prevPlate) setSelectedPlateId(prevPlate.plateId);
+    if (prevPlate) setSelectedPlateId(prevPlate.serialNumber);
   };
 
   const handleNextPlate = () => {
     if (filteredSteelPlates.length === 0) return;
     const currentIndex = filteredSteelPlates.findIndex(
-      (p) => p.plateId === selectedPlateId,
+      (p) => p.serialNumber === selectedPlateId,
     );
     const nextIndex =
       currentIndex < filteredSteelPlates.length - 1
         ? currentIndex + 1
         : 0;
     const nextPlate = filteredSteelPlates[nextIndex];
-    if (nextPlate) setSelectedPlateId(nextPlate.plateId);
+    if (nextPlate) setSelectedPlateId(nextPlate.serialNumber);
   };
 
   const currentPlateId = (() => {
     const currentPlate =
       filteredSteelPlates.find(
-        (p) => p.plateId === selectedPlateId,
+        (p) => p.serialNumber === selectedPlateId,
       ) || filteredSteelPlates[0];
     return currentPlate?.plateId || "-";
   })();
@@ -215,9 +218,15 @@ export const TitleBar: React.FC<TitleBarProps> = ({
       {/* Center: App Title - 仅在桌面大屏显示 */}
       <div className="hidden xl:flex items-center gap-2 flex-1 justify-center px-4">
         <Scan className="w-5 h-5 text-primary" />
-        <span className="text-sm font-medium tracking-wider">
+        <button
+          type="button"
+          onClick={() => setIsDataSourceOpen(true)}
+          className="flex items-center gap-1 text-sm font-medium tracking-wider hover:text-primary transition-colors cursor-pointer"
+          title="切换数据源"
+        >
           {lineName || "STEEL-EYE PRO v2.0.1"}
-        </span>
+          <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+        </button>
       </div>
 
       {/* Right: Status and Window Controls */}
@@ -390,6 +399,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
             nodes={apiNodes}
             currentLineName={lineName || ""}
             onConfirm={(name) => onLineChange(name)}
+            onRefresh={onRefreshApiNodes}
           />
 
           <div className="w-px h-4 bg-border mx-1 hidden"></div>

@@ -186,14 +186,14 @@ export const PlatesPanel: React.FC<PlatesPanelProps> = ({
               <div
                 key={plate.plateId}
                 onClick={() => {
-                  setSelectedPlateId(plate.plateId);
+                  setSelectedPlateId(plate.serialNumber);
                   if (isMobileDevice) {
                     // 手机模式下点击后关闭钢板面板
                     setShowPlatesPanel(false);
                   }
                 }}
                 className={`bg-card border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md ${
-                  selectedPlateId === plate.plateId
+                  selectedPlateId === plate.serialNumber
                     ? "border-primary shadow-lg shadow-primary/20"
                     : "border-border hover:border-primary/50"
                 }`}

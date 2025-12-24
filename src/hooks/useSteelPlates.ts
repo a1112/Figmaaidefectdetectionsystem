@@ -56,7 +56,7 @@ export const useSteelPlates = (
         !selectedPlateId
       ) {
         const firstPlate = mapped[0];
-        setSelectedPlateId(firstPlate.plateId);
+        setSelectedPlateId(firstPlate.serialNumber);
         console.log(
           `🎯 开发模式：自动选择钢板 ${firstPlate.plateId}`,
         );

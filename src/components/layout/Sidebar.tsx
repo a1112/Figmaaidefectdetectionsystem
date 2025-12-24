@@ -38,7 +38,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   if (isCollapsed) return null;
 
-  const currentPlate = filteredSteelPlates.find(p => p.plateId === selectedPlateId) || 
+  const currentPlate = filteredSteelPlates.find(p => p.serialNumber === selectedPlateId) || 
                        filteredSteelPlates[0] || 
                        steelPlates[0];
 
@@ -191,9 +191,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
           filteredSteelPlates.map((plate, index) => (
           <div 
             key={`${plate.plateId}-${plate.serialNumber}-${index}`}
-            onClick={() => setSelectedPlateId(plate.plateId)}
+            onClick={() => setSelectedPlateId(plate.serialNumber)}
             className={`p-1.5 border transition-all cursor-pointer ${
-              selectedPlateId === plate.plateId 
+              selectedPlateId === plate.serialNumber 
                 ? 'bg-primary/20 border-primary shadow-lg shadow-primary/20' 
                 : 'bg-card/50 border-border/50 hover:bg-accent/30 hover:border-border'
             }`}
@@ -212,7 +212,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </span>
             </div>
             <div className="flex items-center justify-between gap-1">
-              <span className={`text-xs font-mono font-bold ${selectedPlateId === plate.plateId ? 'text-primary-foreground' : ''}`}>
+              <span className={`text-xs font-mono font-bold ${selectedPlateId === plate.serialNumber ? 'text-primary-foreground' : ''}`}>
                 {plate.plateId}
               </span>
               <span className="text-[9px] font-mono text-muted-foreground">

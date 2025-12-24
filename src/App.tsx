@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { DefectReport } from "./components/DefectReport";
 import {
   SearchDialog,
@@ -236,6 +236,34 @@ export default function App() {
     };
   }, []);
 
+  const applyApiNodes = useCallback((nodes: ApiNode[]) => {
+    setApiNodes(nodes);
+    if (nodes.length === 0) {
+      return;
+    }
+    const current = env.getLineName();
+    const keys = nodes.map((node) => node.key);
+    if (!current || !keys.includes(current)) {
+      env.setLineName(nodes[0].key);
+      setActiveLineKey(nodes[0].key);
+    } else {
+      setActiveLineKey(current);
+    }
+  }, []);
+
+  const refreshApiNodes = useCallback(async () => {
+    if (!env.isProduction()) {
+      setApiNodes([]);
+      return;
+    }
+    try {
+      const nodes = await getApiList();
+      applyApiNodes(nodes);
+    } catch (error) {
+      console.warn("⚠️ 加载产线列表失败:", error);
+    }
+  }, [applyApiNodes]);
+
   useEffect(() => {
     if (!startupReady || !env.isProduction()) return;
     let cancelled = false;
@@ -244,18 +272,7 @@ export default function App() {
       try {
         const nodes = await getApiList();
         if (cancelled) return;
-        setApiNodes(nodes);
-        if (nodes.length === 0) {
-          return;
-        }
-        const current = env.getLineName();
-        const keys = nodes.map((node) => node.key);
-        if (!current || !keys.includes(current)) {
-          env.setLineName(nodes[0].key);
-          setActiveLineKey(nodes[0].key);
-        } else {
-          setActiveLineKey(current);
-        }
+        applyApiNodes(nodes);
       } catch (error) {
         console.warn("⚠️ 加载产线列表失败:", error);
       }
@@ -271,7 +288,7 @@ export default function App() {
       cancelled = true;
       window.removeEventListener("line_change", handleLineChange as EventListener);
     };
-  }, [startupReady]);
+  }, [startupReady, applyApiNodes]);
 
   const activeLineLabel =
     apiNodes.find((node) => node.key === activeLineKey)?.name || activeLineKey;
@@ -492,14 +509,14 @@ export default function App() {
       setSteelPlates(mapped);
       const hasSelection =
         selectedPlateId &&
-        mapped.some((p) => p.plateId === selectedPlateId);
+        mapped.some((p) => p.serialNumber === selectedPlateId);
       if (hasCriteria || forceSearch) {
         setSelectedPlateId(
-          mapped.length > 0 ? mapped[0].plateId : null,
+          mapped.length > 0 ? mapped[0].serialNumber : null,
         );
       } else if (!hasSelection) {
         setSelectedPlateId(
-          mapped.length > 0 ? mapped[0].plateId : null,
+          mapped.length > 0 ? mapped[0].serialNumber : null,
         );
       }
       console.log(
@@ -513,7 +530,7 @@ export default function App() {
         !selectedPlateId
       ) {
         const firstPlate = mapped[0];
-        setSelectedPlateId(firstPlate.plateId);
+        setSelectedPlateId(firstPlate.serialNumber);
         console.log(
           `🎯 开发模式：自动选择钢板 ${firstPlate.plateId}`,
         );
@@ -647,7 +664,7 @@ export default function App() {
       try {
         // 从 plateId 中提取 seq_no（去除前导零）
         const selectedPlate = steelPlates.find(
-          (p) => p.plateId === selectedPlateId,
+          (p) => p.serialNumber === selectedPlateId,
         );
         if (!selectedPlate) {
           console.warn("未找到选中的钢板:", selectedPlateId);
@@ -724,7 +741,7 @@ export default function App() {
     }
 
     const index = steelPlates.findIndex(
-      (p) => p.plateId === selectedPlateId,
+      (p) => p.serialNumber === selectedPlateId,
     );
     if (index === -1) {
       return;
@@ -811,6 +828,7 @@ export default function App() {
           lineName={activeLineLabel}
           apiNodes={apiNodes}
           onLineChange={(key) => env.setLineName(key)}
+          onRefreshApiNodes={refreshApiNodes}
         />
       )}
 
