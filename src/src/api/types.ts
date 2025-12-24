@@ -209,7 +209,7 @@ export interface HealthResponse {
  */
 export function mapSteelItem(raw: SteelItemRaw): SteelItem {
   return {
-    serialNumber: raw.seq_no.toString().padStart(8, "0"),
+    serialNumber: raw.seq_no.toString(),
     plateId: raw.steel_no,
     steelGrade: raw.steel_type,
     dimensions: {

@@ -222,6 +222,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="text-[9px] text-muted-foreground font-mono mt-0.5">
               {plate.dimensions.length}×{plate.dimensions.width}×{plate.dimensions.thickness}
             </div>
+            <div className="text-[9px] text-muted-foreground font-mono">
+              Defects: {plate.defectCount}
+            </div>
           </div>
           ))
         )}

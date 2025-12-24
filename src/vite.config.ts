@@ -58,7 +58,7 @@ export default defineConfig({
         port: 3000,
         open: true,
         host: '0.0.0.0',
-        allowedHosts: ['n9yhdrvz.zjz-service.cn'],
+    allowedHosts: ['n9yhdrvz.zjz-service.cn', '9qwygl8e.zjz-service.cn'],
         proxy: {
             '/api': {
                 target: 'http://localhost:8120',

@@ -58,9 +58,23 @@ export default defineConfig({
         port: 3000,
         open: true,
         host: '0.0.0.0',
-        allowedHosts: ['n9yhdrvz.zjz-service.cn'],
+        allowedHosts: ['n9yhdrvz.zjz-service.cn', '9qwygl8e.zjz-service.cn'],
         proxy: {
-
+            '/config': {
+                target: 'http://127.0.0.1:80',
+                changeOrigin: true,
+                secure: false,
+            },
+            '/api': {
+                target: 'http://127.0.0.1:80',
+                changeOrigin: true,
+                secure: false,
+            },
+            '/small--api': {
+                target: 'http://127.0.0.1:80',
+                changeOrigin: true,
+                secure: false,
+            },
         },
     },
 });
