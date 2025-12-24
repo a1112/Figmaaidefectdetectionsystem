@@ -16,7 +16,7 @@ interface DataSourceModalProps {
   onClose: () => void;
   nodes: ApiNode[];
   currentLineName: string;
-  onConfirm: (lineName: string) => void;
+  onConfirm: (lineKey: string) => void;
 }
 
 export function DataSourceModal({
@@ -35,7 +35,7 @@ export function DataSourceModal({
       return;
     }
     if (nodes.length > 0) {
-      setSelected(nodes[0].name);
+      setSelected(nodes[0].key);
     }
   }, [isOpen, currentLineName, nodes]);
 
@@ -60,14 +60,14 @@ export function DataSourceModal({
         <div className="space-y-3 py-4">
           {nodes.length === 0 && (
             <div className="text-sm text-muted-foreground">
-              暂无可用数据源，请确认后端已启动并提供 /api_list。
+              暂无可用数据源，请确认后端已启动并提供 /config/api_list。
             </div>
           )}
           {nodes.map((node) => (
             <label
-              key={node.name}
+              key={node.key}
               className={`flex items-center justify-between rounded-md border px-3 py-2 text-sm cursor-pointer transition-colors ${
-                selected === node.name
+                selected === node.key
                   ? "border-primary bg-primary/5"
                   : "border-border hover:bg-muted/50"
               }`}
@@ -76,11 +76,13 @@ export function DataSourceModal({
                 <input
                   type="radio"
                   name="data-source"
-                  value={node.name}
-                  checked={selected === node.name}
-                  onChange={() => setSelected(node.name)}
+                  value={node.key}
+                  checked={selected === node.key}
+                  onChange={() => setSelected(node.key)}
                 />
-                <span className="font-medium">{node.name}</span>
+                <span className="font-medium">
+                  {node.name} ({node.key})
+                </span>
               </div>
               <div className="text-xs text-muted-foreground">
                 {node.ip ? node.ip : "-"}:{node.port ?? "-"}

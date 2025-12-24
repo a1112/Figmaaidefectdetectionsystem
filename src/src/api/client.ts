@@ -95,7 +95,7 @@ export async function listSteels(
       throw new Error(
         `无法连接到远程服务器。\n\n` +
         `可能原因：\n` +
-        `1. 自签名证书未被信任。请在新标签页访问 ${rootUrl}/health 并点击“高级->继续访问”。\n` +
+        `1. 自签名证书未被信任。请在新标签页访问 ${rootUrl}/api/health 并点击“高级->继续访问”。\n` +
         `2. 网络不通或被防火墙拦截。`
       );
     }
@@ -110,7 +110,7 @@ export async function listSteels(
           "📋 请检查：\n" +
           "1. 后端是否正在运行？\n" +
           "   → 执行: python run_server.bat\n" +
-          "   → 访问: http://localhost:8120/health\n\n" +
+          "   → 访问: http://localhost:8120/api/health\n\n" +
           "2. Vite 开发服务器是否正确配置了代理？\n" +
           "   → 检查: vite.config.ts\n\n" +
           "3. 如果以上都正常，请切换回开发模式继续开发\n" +
@@ -237,7 +237,7 @@ export async function getDefectsRaw(
       const baseUrl = env.getApiBaseUrl();
       const rootUrl = baseUrl.replace(/\/api$/, "");
       throw new Error(
-        `无法连接到远程服务器。请尝试在新标签页访问 ${rootUrl}/health 并接受证书。`
+        `无法连接到远程服务器。请尝试在新标签页访问 ${rootUrl}/api/health 并接受证书。`
       );
     }
 
@@ -409,7 +409,7 @@ export async function getGlobalMeta(): Promise<{
       const rootUrl = baseUrl.replace(/\/api$/, "");
       throw new Error(
         `无法连接到远程服务器。\n` +
-        `请尝试在新标签页访问 ${rootUrl}/health 并接受自签名证书。`
+        `请尝试在新标签页访问 ${rootUrl}/api/health 并接受自签名证书。`
       );
     }
     throw error;
@@ -427,14 +427,14 @@ export async function healthCheck(): Promise<HealthResponse> {
 
   // 生产模式：调用真实 API
   try {
-    let url = "/health";
+    let url = "/api/health";
     // 跨域模式下，需要使用完整的远程 URL
     if (env.getMode() === "cors") {
-      // 假设 health 接口位于服务器根路径 /health
+      // 假设 health 接口位于服务器根路径 /api/health
       // BaseUrl 是 .../api，所以我们需要截取 root
       const baseUrl = env.getApiBaseUrl(); // https://111.230.72.96:8230/api
       const rootUrl = baseUrl.replace(/\/api$/, "");
-      url = `${rootUrl}/health`;
+      url = `${rootUrl}/api/health`;
     }
 
     const response = await fetch(url);
@@ -486,7 +486,7 @@ export async function getApiList(): Promise<ApiNode[]> {
   if (env.isDevelopment()) {
     return [];
   }
-  const response = await fetch("/api_list", { cache: "no-store" });
+  const response = await fetch("/config/api_list", { cache: "no-store" });
   if (!response.ok) {
     throw new Error(`加载 API 列表失败: ${response.status} ${response.statusText}`);
   }

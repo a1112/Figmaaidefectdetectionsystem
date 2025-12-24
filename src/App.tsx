@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { DefectList } from "./components/DefectList";
 import { DefectReport } from "./components/DefectReport";
-import { DefectDistributionChart } from "./components/DefectDistributionChart";
 import {
   SearchDialog,
   SearchCriteria,
@@ -11,8 +9,6 @@ import {
   FilterCriteria,
 } from "./components/FilterDialog";
 import { SystemDiagnosticDialog } from "./components/SystemDiagnosticDialog";
-import { ModeSwitch } from "./components/ModeSwitch";
-import { DefectImageView } from "./components/DefectImageView";
 // 引入 API 客户端和环境配置
 import { env } from "./src/config/env";
 import {
@@ -27,7 +23,6 @@ import {
 import type {
   SteelItem,
   DefectItem,
-  DefectClassItem,
   SurfaceImageInfo,
   ApiNode,
 } from "./src/api/types";
@@ -43,49 +38,18 @@ import {
   defectAccentColors,
   generateRandomDefects,
 } from "./utils/defects";
-import { getLevelText } from "./utils/steelPlates";
 import {
-  LayoutDashboard,
-  FileImage,
   Settings,
-  Menu,
-  Maximize2,
-  Minus,
-  X,
-  Scan,
   Activity,
-  Database,
   Server,
   Wifi,
-  ChevronLeft,
-  ChevronRight,
-  AlertCircle,
-  Images,
   BarChart3,
-  List,
-  PieChart,
-  Moon,
-  Sun,
-  Search,
-  Filter,
-  RotateCcw,
-  MoreVertical,
 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-  DropdownMenuLabel,
-} from "./components/ui/dropdown-menu";
 import { Toaster } from "./components/ui/sonner";
 import { toast } from "sonner@2.0.3";
 import { TitleBar } from "./components/layout/TitleBar";
 import { MobileNavBar } from "./components/layout/MobileNavBar";
 import { Sidebar } from "./components/layout/Sidebar";
-import { PlatesPanel } from "./components/layout/PlatesPanel";
-import { StatusBar } from "./components/layout/StatusBar";
 import { SettingsPage } from "./components/pages/SettingsPage";
 import { DefectsPage } from "./components/pages/DefectsPage";
 import { MockDataEditorPage } from "./components/pages/MockDataEditorPage";
@@ -96,8 +60,6 @@ import { PlatesTab } from "./pages/PlatesTab";
 import { ImagesTab } from "./pages/ImagesTab";
 
 // 简单的瓦片图像缓存，避免重复加载同一瓦片
-const tileImageCache = new Map<string, HTMLImageElement>();
-const tileImageLoading = new Set<string>();
 
 export default function App() {
   const [history, setHistory] = useState<DetectionRecord[]>([]);
@@ -114,8 +76,7 @@ export default function App() {
   const [plateDefects, setPlateDefects] = useState<Defect[]>(
     [],
   ); // 当前选中钢板的缺陷
-  const [isLoadingDefects, setIsLoadingDefects] =
-    useState(false);
+  
   const [selectedDefectId, setSelectedDefectId] = useState<
     string | null
   >(null); // 选中的缺陷ID
@@ -159,32 +120,22 @@ export default function App() {
     useState<FilterCriteria>({ levels: [] });
   const [availableDefectTypes, setAvailableDefectTypes] =
     useState<string[]>(defectTypes);
-  const [defectColorMap, setDefectColorMap] =
-    useState(defectColors);
+  const [defectColorMap] = useState(defectColors);
   const [defectAccentMap, setDefectAccentMap] = useState(
     defectAccentColors,
   );
-  const [defectClasses, setDefectClasses] = useState<
-    DefectClassItem[] | null
-  >(null);
-  const [steelLimit, setSteelLimit] = useState<number>(50);
-  const [searchLimit, setSearchLimit] = useState<number>(200);
+  const [steelLimit] = useState<number>(50);
+  const [searchLimit] = useState<number>(200);
   const searchButtonRef = useRef<HTMLButtonElement>(null);
   const filterButtonRef = useRef<HTMLButtonElement>(null);
   const diagnosticButtonRef = useRef<HTMLButtonElement>(null);
   const [startupReady, setStartupReady] = useState(true);
   const [apiNodes, setApiNodes] = useState<ApiNode[]>([]);
-  const [activeLineName, setActiveLineName] = useState(env.getLineName());
+  const [activeLineKey, setActiveLineKey] = useState(env.getLineName());
 
   // 图像标签页：选中的历史记录
-  const [selectedHistoryImage, setSelectedHistoryImage] =
-    useState<DetectionRecord | null>(null);
 
   // 移动设备侧边栏状态
-  const [
-    isMobileHistorySidebarOpen,
-    setIsMobileHistorySidebarOpen,
-  ] = useState(false);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
 
   // 图像 Tab：瓦片 LOD 双层控制
@@ -245,7 +196,7 @@ export default function App() {
           controller.abort();
         }, 5000);
 
-        const response = await fetch("/health", {
+        const response = await fetch("/api/health", {
           signal: controller.signal,
           cache: "no-store",
         });
@@ -298,12 +249,12 @@ export default function App() {
           return;
         }
         const current = env.getLineName();
-        const names = nodes.map((node) => node.name);
-        if (!current || !names.includes(current)) {
-          env.setLineName(nodes[0].name);
-          setActiveLineName(nodes[0].name);
+        const keys = nodes.map((node) => node.key);
+        if (!current || !keys.includes(current)) {
+          env.setLineName(nodes[0].key);
+          setActiveLineKey(nodes[0].key);
         } else {
-          setActiveLineName(current);
+          setActiveLineKey(current);
         }
       } catch (error) {
         console.warn("⚠️ 加载产线列表失败:", error);
@@ -311,7 +262,7 @@ export default function App() {
     };
 
     const handleLineChange = (event: CustomEvent) => {
-      setActiveLineName(event.detail || "");
+      setActiveLineKey(event.detail || "");
     };
 
     loadApiNodes();
@@ -322,13 +273,16 @@ export default function App() {
     };
   }, [startupReady]);
 
+  const activeLineLabel =
+    apiNodes.find((node) => node.key === activeLineKey)?.name || activeLineKey;
+
   useEffect(() => {
-    if (activeLineName) {
-      document.title = `${activeLineName} - Web Defect Detection`;
+    if (activeLineLabel) {
+      document.title = `${activeLineLabel} - Web Defect Detection`;
     } else {
       document.title = "Web Defect Detection";
     }
-  }, [activeLineName]);
+  }, [activeLineLabel]);
 
   // 加载全局 Meta（包含缺陷字典与瓦片配置），在页面刷新时调用一次
   useEffect(() => {
@@ -341,7 +295,6 @@ export default function App() {
 
         const defectPayload = res.defect_classes;
         const items = defectPayload?.items ?? [];
-        setDefectClasses(items);
 
         const names = items
           .map(
@@ -415,12 +368,6 @@ export default function App() {
   const [selectedDefectTypes, setSelectedDefectTypes] =
     useState<string[]>(defectTypes);
   const activeDefects = plateDefects;
-  const filteredDefectsByControls = activeDefects.filter(
-    (defect) =>
-      (surfaceFilter === "all" ||
-        defect.surface === surfaceFilter) &&
-      selectedDefectTypes.includes(defect.type),
-  );
 
   const handleToggleDefectType = (type: string) => {
     setSelectedDefectTypes((prev) =>
@@ -449,10 +396,7 @@ export default function App() {
     [],
   );
   const [isLoadingSteels, setIsLoadingSteels] = useState(false);
-  const [steelsLoadError, setSteelsLoadError] = useState<
-    string | null
-  >(null);
-  const [surfaceImageInfo, setSurfaceImageInfo] = useState<
+    const [surfaceImageInfo, setSurfaceImageInfo] = useState<
     SurfaceImageInfo[] | null
   >(null);
 
@@ -463,7 +407,6 @@ export default function App() {
     forceSearch?: boolean,
   ) => {
     setIsLoadingSteels(true);
-    setSteelsLoadError(null);
 
     try {
       const hasCriteria = Object.keys(criteria).length > 0;
@@ -623,7 +566,6 @@ export default function App() {
         });
         setSteelPlates([]);
       }
-      setSteelsLoadError(errMsg);
     } finally {
       setIsLoadingSteels(false);
     }
@@ -640,11 +582,6 @@ export default function App() {
     );
   };
 
-  const handleRefreshSteels = () => {
-    setSearchCriteria({});
-    setFilterCriteria({ levels: [] });
-    loadSteelPlates({}, steelLimit, false);
-  };
 
   // 初始加载钢板列表
   useEffect(() => {
@@ -706,7 +643,6 @@ export default function App() {
     }
 
     const loadPlateDefects = async () => {
-      setIsLoadingDefects(true);
 
       try {
         // 从 plateId 中提取 seq_no（去除前导零）
@@ -772,7 +708,6 @@ export default function App() {
         setPlateDefects([]);
         setSurfaceImageInfo(null);
       } finally {
-        setIsLoadingDefects(false);
       }
     };
 
@@ -873,9 +808,9 @@ export default function App() {
           setShowPlatesPanel={setShowPlatesPanel}
           setIsDiagnosticDialogOpen={setIsDiagnosticDialogOpen}
           diagnosticButtonRef={diagnosticButtonRef}
-          lineName={activeLineName}
+          lineName={activeLineLabel}
           apiNodes={apiNodes}
-          onLineChange={(name) => env.setLineName(name)}
+          onLineChange={(key) => env.setLineName(key)}
         />
       )}
 
@@ -1025,8 +960,8 @@ export default function App() {
                     imageOrientation={imageOrientation}
                     setImageOrientation={handleImageOrientationChange}
                     apiNodes={apiNodes}
-                    lineName={activeLineName}
-                    onLineChange={(name) => env.setLineName(name)}
+                    lineName={activeLineKey}
+                    onLineChange={(key) => env.setLineName(key)}
                   />
                 )}
 

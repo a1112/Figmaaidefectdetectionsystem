@@ -48,11 +48,13 @@ export interface SteelListResponse {
 // ==================== API 节点列表 ====================
 
 export interface ApiNode {
+  key: string;
   name: string;
   mode?: string;
   path?: string;
   profile?: "default" | "small";
   port?: number;
+  small_port?: number;
   ip?: string;
 }
 

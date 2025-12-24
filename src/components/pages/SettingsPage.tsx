@@ -22,7 +22,7 @@ interface SettingsPageProps {
   setImageOrientation: (value: ImageOrientation) => void;
   apiNodes: ApiNode[];
   lineName: string;
-  onLineChange: (name: string) => void;
+  onLineChange: (key: string) => void;
 }
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({
@@ -101,8 +101,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               onChange={(event) => onLineChange(event.target.value)}
             >
               {apiNodes.map((node) => (
-                <option key={node.name} value={node.name}>
-                  {node.name}
+                <option key={node.key} value={node.key}>
+                  {node.name} ({node.key})
                 </option>
               ))}
             </select>

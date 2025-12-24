@@ -136,11 +136,11 @@ class EnvironmentConfig {
     }
 
     // 生产模式：根据产线与 apiProfile 选择标准实例或 small 实例
-    const suffix = this.apiProfile === "small" ? "/small-api" : "/api";
+    const base = this.apiProfile === "small" ? "/small--api" : "/api";
     if (this.lineName) {
-      return `/${encodeURIComponent(this.lineName)}${suffix}`;
+      return `${base}/${encodeURIComponent(this.lineName)}`;
     }
-    return suffix;
+    return base;
   }
 }
 
