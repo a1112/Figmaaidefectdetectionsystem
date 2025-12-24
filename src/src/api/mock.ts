@@ -16,6 +16,7 @@ import type {
   DefectClassesResponse,
   DefectClassItem,
   SurfaceImageInfo,
+  ApiNode,
 } from "./types";
 import { DEFECT_TYPES, mapDefectItem } from "./types";
 
@@ -361,4 +362,47 @@ export async function mockGetDefectClasses(): Promise<DefectClassesResponse> {
     num: defectClassItems.length,
     items: defectClassItems,
   };
+}
+
+/**
+ * Mock: API 节点列表
+ */
+export async function mockGetApiList(): Promise<ApiNode[]> {
+  await new Promise((resolve) => setTimeout(resolve, 120));
+  const now = new Date();
+  return [
+    {
+      key: "mock-line-a",
+      name: "模拟产线 A",
+      mode: "mock",
+      profile: "default",
+      ip: "127.0.0.1",
+      port: 8120,
+      online: true,
+      latest_timestamp: now.toISOString(),
+      latest_age_seconds: 15,
+    },
+    {
+      key: "mock-line-b",
+      name: "模拟产线 B",
+      mode: "mock",
+      profile: "small",
+      ip: "127.0.0.1",
+      port: 8121,
+      online: true,
+      latest_timestamp: now.toISOString(),
+      latest_age_seconds: 45,
+    },
+    {
+      key: "mock-line-c",
+      name: "模拟产线 C",
+      mode: "mock",
+      profile: "default",
+      ip: "127.0.0.1",
+      port: 8122,
+      online: false,
+      latest_timestamp: now.toISOString(),
+      latest_age_seconds: 3600,
+    },
+  ];
 }

@@ -37,6 +37,9 @@ export function ModeSwitch() {
       env.setMode(newMode);
       setMode(newMode);
       setApiStatus(getApiStatus());
+      if (window.confirm("API 模式已切换，刷新后生效，是否立即刷新？")) {
+        window.location.reload();
+      }
     }
   };
 

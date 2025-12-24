@@ -56,6 +56,9 @@ export interface ApiNode {
   port?: number;
   small_port?: number;
   ip?: string;
+  online?: boolean;
+  latest_timestamp?: string;
+  latest_age_seconds?: number;
 }
 
 export interface ApiListResponse {

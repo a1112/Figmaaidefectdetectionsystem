@@ -48,7 +48,8 @@ interface TitleBarProps {
   setShowPlatesPanel: (show: boolean) => void;
   setIsDiagnosticDialogOpen: (open: boolean) => void;
   diagnosticButtonRef: React.RefObject<HTMLButtonElement>;
-  lineName?: string;
+  lineKey?: string;
+  lineLabel?: string;
   apiNodes: ApiNode[];
   onLineChange: (name: string) => void;
   onRefreshApiNodes: () => void;
@@ -67,7 +68,8 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   setShowPlatesPanel,
   setIsDiagnosticDialogOpen,
   diagnosticButtonRef,
-  lineName,
+  lineKey,
+  lineLabel,
   apiNodes,
   onLineChange,
   onRefreshApiNodes,
@@ -224,7 +226,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
           className="flex items-center gap-1 text-sm font-medium tracking-wider hover:text-primary transition-colors cursor-pointer"
           title="切换数据源"
         >
-          {lineName || "STEEL-EYE PRO v2.0.1"}
+          {lineLabel || "STEEL-EYE PRO v2.0.1"}
           <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
         </button>
       </div>
@@ -397,7 +399,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
             isOpen={isDataSourceOpen}
             onClose={() => setIsDataSourceOpen(false)}
             nodes={apiNodes}
-            currentLineName={lineName || ""}
+            currentLineKey={lineKey || ""}
             onConfirm={(name) => onLineChange(name)}
             onRefresh={onRefreshApiNodes}
           />

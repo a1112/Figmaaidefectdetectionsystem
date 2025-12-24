@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -15,7 +15,7 @@ interface DataSourceModalProps {
   isOpen: boolean;
   onClose: () => void;
   nodes: ApiNode[];
-  currentLineName: string;
+  currentLineKey: string;
   onConfirm: (lineKey: string) => void;
   onRefresh: () => void;
 }
@@ -24,28 +24,54 @@ export function DataSourceModal({
   isOpen,
   onClose,
   nodes,
-  currentLineName,
+  currentLineKey,
   onConfirm,
   onRefresh,
 }: DataSourceModalProps) {
   const [selected, setSelected] = useState("");
+  const hasUserSelectedRef = useRef(false);
+
+  useEffect(() => {
+    if (!isOpen) {
+      hasUserSelectedRef.current = false;
+      return;
+    }
+    onRefresh();
+    if (currentLineKey) {
+      setSelected(currentLineKey);
+    } else if (nodes.length > 0) {
+      setSelected(nodes[0].key);
+    } else {
+      setSelected("");
+    }
+  }, [isOpen, onRefresh]);
 
   useEffect(() => {
     if (!isOpen) return;
-    if (currentLineName) {
-      setSelected(currentLineName);
-      return;
-    }
-    if (nodes.length > 0) {
+    if (hasUserSelectedRef.current) return;
+    if (!selected && nodes.length > 0) {
       setSelected(nodes[0].key);
     }
-  }, [isOpen, currentLineName, nodes]);
+  }, [isOpen, nodes, selected]);
 
   const handleConfirm = () => {
     if (selected) {
       onConfirm(selected);
     }
     onClose();
+  };
+
+  const formatAge = (seconds?: number) => {
+    if (seconds == null || !Number.isFinite(seconds)) return "-";
+    if (seconds < 60) return "刚刚";
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes} 分钟前`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} 小时前`;
+    const days = Math.floor(hours / 24);
+    if (days < 30) return `${days} 天前`;
+    const months = Math.floor(days / 30);
+    return `${months} 个月前`;
   };
 
   return (
@@ -81,11 +107,19 @@ export function DataSourceModal({
                     name="data-source"
                     value={node.key}
                     checked={selected === node.key}
-                    onChange={() => setSelected(node.key)}
+                    onChange={() => {
+                      hasUserSelectedRef.current = true;
+                      setSelected(node.key);
+                    }}
                   />
-                  <span className="font-medium">
-                    {node.name} ({node.key})
-                  </span>
+                  <div className="flex flex-col">
+                    <span className="font-medium">
+                      {node.name} ({node.key})
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">
+                      {node.online ? "在线" : "离线"} · 最新数据 {formatAge(node.latest_age_seconds)}
+                    </span>
+                  </div>
                 </div>
                 <div className="text-xs text-muted-foreground">
                   {node.ip ? node.ip : "-"}:{node.port ?? "-"}

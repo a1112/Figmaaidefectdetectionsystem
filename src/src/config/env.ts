@@ -43,6 +43,10 @@ const setCookieValue = (name: string, value: string, days: number = 30): void =>
   document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/`;
 };
 
+const clearCookieValue = (name: string): void => {
+  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+};
+
 const getInitialLineName = (): string => {
   return getCookieValue(LINE_COOKIE) || "";
 };
@@ -107,6 +111,8 @@ class EnvironmentConfig {
     this.lineName = name;
     if (name) {
       setCookieValue(LINE_COOKIE, name);
+    } else {
+      clearCookieValue(LINE_COOKIE);
     }
     window.dispatchEvent(
       new CustomEvent("line_change", {

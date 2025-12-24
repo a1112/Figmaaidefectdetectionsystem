@@ -488,9 +488,13 @@ export function getApiStatus(): {
  */
 export async function getApiList(): Promise<ApiNode[]> {
   if (env.isDevelopment()) {
-    return [];
+    return mock.mockGetApiList();
   }
-  const response = await fetch("/config/api_list", { cache: "no-store" });
+  const url =
+    env.getMode() === "cors"
+      ? `${env.getCorsBaseUrl().replace(/\/+$/, "")}/config/api_list`
+      : "/config/api_list";
+  const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) {
     throw new Error(`加载 API 列表失败: ${response.status} ${response.statusText}`);
   }

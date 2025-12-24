@@ -252,10 +252,6 @@ export default function App() {
   }, []);
 
   const refreshApiNodes = useCallback(async () => {
-    if (!env.isProduction()) {
-      setApiNodes([]);
-      return;
-    }
     try {
       const nodes = await getApiList();
       applyApiNodes(nodes);
@@ -265,7 +261,7 @@ export default function App() {
   }, [applyApiNodes]);
 
   useEffect(() => {
-    if (!startupReady || !env.isProduction()) return;
+    if (!startupReady) return;
     let cancelled = false;
 
     const loadApiNodes = async () => {
@@ -290,6 +286,19 @@ export default function App() {
     };
   }, [startupReady, applyApiNodes]);
 
+  useEffect(() => {
+    const handleModeChange = () => {
+      setApiNodes([]);
+      setActiveLineKey("");
+      env.setLineName("");
+      refreshApiNodes();
+    };
+    window.addEventListener("app_mode_change", handleModeChange);
+    return () => {
+      window.removeEventListener("app_mode_change", handleModeChange);
+    };
+  }, [refreshApiNodes]);
+
   const activeLineLabel =
     apiNodes.find((node) => node.key === activeLineKey)?.name || activeLineKey;
 
@@ -304,6 +313,7 @@ export default function App() {
   // 加载全局 Meta（包含缺陷字典与瓦片配置），在页面刷新时调用一次
   useEffect(() => {
     if (!startupReady) return;
+    if (env.isProduction() && apiNodes.length === 0) return;
     let cancelled = false;
     const loadGlobalMeta = async () => {
       try {
@@ -379,7 +389,7 @@ export default function App() {
       window.removeEventListener("app_mode_change", handleModeChange);
       window.removeEventListener("line_change", handleModeChange);
     };
-  }, [startupReady]);
+  }, [startupReady, apiNodes]);
 
   // 缺陷类型过滤
   const [selectedDefectTypes, setSelectedDefectTypes] =
@@ -603,6 +613,7 @@ export default function App() {
   // 初始加载钢板列表
   useEffect(() => {
     if (!startupReady) return;
+    if (env.isProduction() && apiNodes.length === 0) return;
     loadSteelPlates();
 
     // 监听模式切换事件，重新加载数据
@@ -626,7 +637,7 @@ export default function App() {
         handleModeChange,
       );
     };
-  }, [startupReady]);
+  }, [startupReady, apiNodes]);
 
   // 列表仅应用筛选条件（查询结果已由服务端决定）
   const filteredSteelPlates = steelPlates.filter((plate) => {
@@ -825,7 +836,8 @@ export default function App() {
           setShowPlatesPanel={setShowPlatesPanel}
           setIsDiagnosticDialogOpen={setIsDiagnosticDialogOpen}
           diagnosticButtonRef={diagnosticButtonRef}
-          lineName={activeLineLabel}
+          lineKey={activeLineKey}
+          lineLabel={activeLineLabel}
           apiNodes={apiNodes}
           onLineChange={(key) => env.setLineName(key)}
           onRefreshApiNodes={refreshApiNodes}
