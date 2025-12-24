@@ -417,92 +417,101 @@ export function DefectDistributionChart({
         (s) => s.surface === surf,
       );
       if (!surfaceLayout) {
-        return (
-          <div key={surf} className="flex flex-col gap-0" />
+        // no layout available; skip tile rendering
+      } else {
+        const virtualTileSize = tileSize * Math.pow(2, level);
+        const tilesX = Math.max(
+          1,
+          Math.ceil(surfaceLayout.worldWidth / virtualTileSize),
         );
-      }
+        const tilesY = Math.max(
+          1,
+          Math.ceil(surfaceLayout.worldHeight / virtualTileSize),
+        );
 
-      const virtualTileSize = tileSize * Math.pow(2, level);
-      const tilesX = Math.max(
-        1,
-        Math.ceil(surfaceLayout.worldWidth / virtualTileSize),
-      );
-      const tilesY = Math.max(
-        1,
-        Math.ceil(surfaceLayout.worldHeight / virtualTileSize),
-      );
+        for (let row = 0; row < tilesY; row += 1) {
+          for (let col = 0; col < tilesX; col += 1) {
+            const x = surfaceLayout.offsetX + col * virtualTileSize;
+            const y = surfaceLayout.offsetY + row * virtualTileSize;
+            const width =
+              col === tilesX - 1
+                ? surfaceLayout.worldWidth - col * virtualTileSize
+                : virtualTileSize;
+            const height =
+              row === tilesY - 1
+                ? surfaceLayout.worldHeight - row * virtualTileSize
+                : virtualTileSize;
 
-      for (let row = 0; row < tilesY; row += 1) {
-        for (let col = 0; col < tilesX; col += 1) {
-          const x = surfaceLayout.offsetX + col * virtualTileSize;
-          const y = surfaceLayout.offsetY + row * virtualTileSize;
-          const width =
-            col === tilesX - 1
-              ? surfaceLayout.worldWidth - col * virtualTileSize
-              : virtualTileSize;
-          const height =
-            row === tilesY - 1
-              ? surfaceLayout.worldHeight - row * virtualTileSize
-              : virtualTileSize;
+            const tile: Tile = {
+              level,
+              row,
+              col,
+              x,
+              y,
+              width,
+              height,
+            };
 
-          const tile: Tile = {
-            level,
-            row,
-            col,
-            x,
-            y,
-            width,
-            height,
-          };
+            const requestInfo = computeTileRequestInfo({
+              surface: surfaceLayout,
+              tile,
+              orientation,
+              virtualTileSize,
+              tileSize,
+            });
+            if (!requestInfo) {
+              continue;
+            }
 
-          const requestInfo = computeTileRequestInfo({
-            surface: surfaceLayout,
-            tile,
-            orientation,
-            virtualTileSize,
-            tileSize,
-          });
-          if (!requestInfo) {
-            continue;
+            const tileX =
+              orientation === "horizontal"
+                ? requestInfo.tileY
+                : requestInfo.tileX;
+            const tileY =
+              orientation === "horizontal"
+                ? requestInfo.tileX
+                : requestInfo.tileY;
+
+            const url = getTileImageUrl({
+              surface: surf,
+              seqNo: seqNo as number,
+              level,
+              tileX,
+              tileY,
+              tileSize,
+              view: "horizontal",
+            });
+
+            const localX = x - surfaceLayout.offsetX;
+            const localY = y - surfaceLayout.offsetY;
+            const left =
+              (localX / surfaceLayout.worldWidth) * plateWidth;
+            const top =
+              (localY / surfaceLayout.worldHeight) * perSurfaceHeight;
+            const displayWidth =
+              (width / surfaceLayout.worldWidth) * plateWidth;
+            const displayHeight =
+              (height / surfaceLayout.worldHeight) *
+              perSurfaceHeight;
+
+            tileImages.push(
+              <img
+                key={`tile-${surf}-L${level}-${tileSize}-${col}-${row}`}
+                src={url}
+                alt="mosaic-tile"
+                className="absolute"
+                draggable={false}
+                onDragStart={(e) => e.preventDefault()}
+                style={{
+                  left,
+                  top,
+                  width: displayWidth,
+                  height: displayHeight,
+                  objectFit: "fill",
+                }}
+              />,
+            );
           }
-
-          const url = getTileImageUrl({
-            surface: surf,
-            seqNo: seqNo as number,
-            level,
-            tileX: requestInfo.tileX,
-            tileY: requestInfo.tileY,
-            tileSize,
-          });
-
-          const localX = x - surfaceLayout.offsetX;
-          const localY = y - surfaceLayout.offsetY;
-          const left =
-            (localX / surfaceLayout.worldWidth) * plateWidth;
-          const top =
-            (localY / surfaceLayout.worldHeight) * perSurfaceHeight;
-          const displayWidth =
-            (width / surfaceLayout.worldWidth) * plateWidth;
-          const displayHeight =
-            (height / surfaceLayout.worldHeight) * perSurfaceHeight;
-
-          tileImages.push(
-            <img
-              key={`tile-${surf}-L${level}-${tileSize}-${col}-${row}`}
-              src={url}
-              alt="mosaic-tile"
-              className="absolute"
-              draggable={false}
-              onDragStart={(e) => e.preventDefault()}
-              style={{
-                left,
-                top,
-                width: displayWidth,
-                height: displayHeight,
-                objectFit: "fill",
-              }}
-            />,
-          );
         }
       }
     }

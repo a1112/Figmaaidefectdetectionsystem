@@ -334,6 +334,7 @@ export function getTileImageUrl(params: {
   tileY: number;
   tileSize?: number;
   fmt?: string;
+  view?: string;
 }): string {
   const {
     surface,
@@ -342,8 +343,10 @@ export function getTileImageUrl(params: {
     tileX,
     tileY,
     fmt = "JPEG",
+    view,
   } = params;
   const baseUrl = env.getApiBaseUrl();
+  const viewParam = view ? `&view=${encodeURIComponent(view)}` : "";
   return (
     `${baseUrl}/images/tile` +
     `?surface=${surface}` +
@@ -351,7 +354,8 @@ export function getTileImageUrl(params: {
     `&level=${level}` +
     `&tile_x=${tileX}` +
     `&tile_y=${tileY}` +
-    `&fmt=${fmt}`
+    `&fmt=${fmt}` +
+    viewParam
   );
 }
 
