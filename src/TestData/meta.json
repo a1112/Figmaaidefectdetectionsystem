@@ -1,4 +1,4 @@
-{
+﻿{
     "defect_classes":  {
                            "num":  12,
                            "items":  [
@@ -11,7 +11,7 @@
                                                            "green":  255,
                                                            "blue":  64
                                                        },
-                                             "desc":  "未命名",
+                                             "desc":  "æªå½å",
                                              "parent":  [
 
                                                         ]
@@ -25,7 +25,7 @@
                                                            "green":  0,
                                                            "blue":  0
                                                        },
-                                             "desc":  "纵向裂纹",
+                                             "desc":  "çºµåè£çº¹",
                                              "parent":  [
 
                                                         ]
@@ -39,7 +39,7 @@
                                                            "green":  64,
                                                            "blue":  64
                                                        },
-                                             "desc":  "横向裂纹",
+                                             "desc":  "æ¨ªåè£çº¹",
                                              "parent":  [
 
                                                         ]
@@ -53,7 +53,7 @@
                                                            "green":  0,
                                                            "blue":  128
                                                        },
-                                             "desc":  "异物压入",
+                                             "desc":  "å¼ç©åå\u0085¥",
                                              "parent":  [
 
                                                         ]
@@ -67,7 +67,7 @@
                                                            "green":  128,
                                                            "blue":  64
                                                        },
-                                             "desc":  "划伤",
+                                             "desc":  "åä¼¤",
                                              "parent":  [
 
                                                         ]
@@ -81,7 +81,7 @@
                                                            "green":  165,
                                                            "blue":  54
                                                        },
-                                             "desc":  "凹坑",
+                                             "desc":  "å¹å",
                                              "parent":  [
 
                                                         ]
@@ -95,7 +95,7 @@
                                                            "green":  85,
                                                            "blue":  57
                                                        },
-                                             "desc":  "压痕",
+                                             "desc":  "åç",
                                              "parent":  [
 
                                                         ]
@@ -109,7 +109,7 @@
                                                            "green":  79,
                                                            "blue":  209
                                                        },
-                                             "desc":  "夹杂",
+                                             "desc":  "å¤¹æ",
                                              "parent":  [
 
                                                         ]
@@ -123,7 +123,7 @@
                                                            "green":  199,
                                                            "blue":  114
                                                        },
-                                             "desc":  "氧化铁皮",
+                                             "desc":  "æ°§åéç®",
                                              "parent":  [
 
                                                         ]
@@ -137,7 +137,7 @@
                                                            "green":  51,
                                                            "blue":  213
                                                        },
-                                             "desc":  "结疤",
+                                             "desc":  "ç»ç¤",
                                              "parent":  [
 
                                                         ]
@@ -151,7 +151,7 @@
                                                            "green":  80,
                                                            "blue":  145
                                                        },
-                                             "desc":  "起皮",
+                                             "desc":  "èµ·ç®",
                                              "parent":  [
 
                                                         ]
@@ -165,7 +165,7 @@
                                                            "green":  201,
                                                            "blue":  102
                                                        },
-                                             "desc":  "边裂",
+                                             "desc":  "è¾¹è£",
                                              "parent":  [
 
                                                         ]
@@ -173,16 +173,8 @@
                                      ]
                        },
     "tile":  {
-                 "max_level":  2,
+                 "max_level":  4,
                  "min_level":  0,
-                 "default_tile_size":  1024
-             },
-    "image":  {
-                  "frame_width":  16384,
-                  "frame_height":  1024
-              }
-}
-
                  "default_tile_size":  1024
              },
     "image":  {
