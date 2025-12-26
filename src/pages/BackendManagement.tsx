@@ -10,12 +10,9 @@ import {
   ChevronRight,
   Database
 } from "lucide-react";
-import { UserPermissions } from "../components/backend/UserPermissions";
 import { UISettings } from "../components/backend/UISettings";
-import { ProductionLineEditor } from "../components/backend/ProductionLineEditor";
-import { ProxySettings } from "../components/backend/ProxySettings";
 import { MockDataEditor } from "../components/backend/MockDataEditor";
-import { useTheme } from "../contexts/ThemeContext";
+import { useTheme } from "../components/ThemeContext";
 
 type MenuKey = "permissions" | "ui" | "production" | "proxy" | "mockdata";
 
@@ -45,13 +42,13 @@ export const BackendManagement: React.FC = () => {
   const renderContent = () => {
     switch (activeMenu) {
       case "permissions":
-        return <UserPermissions />;
+        return null;
       case "ui":
         return <UISettings />;
       case "production":
-        return <ProductionLineEditor />;
+        return null;
       case "proxy":
-        return <ProxySettings />;
+        return null;
       case "mockdata":
         return <MockDataEditor />;
       default:

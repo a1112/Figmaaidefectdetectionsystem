@@ -15,7 +15,7 @@ import type {
 } from "../../types/app.types";
 import { env, type ApiProfile } from "../../src/config/env";
 import type { ApiNode } from "../../src/api/types";
-import { useTheme, themePresets } from "../../contexts/ThemeContext";
+import { useTheme, themePresets } from "../ThemeContext";
 import { Button } from "../ui/button";
 
 interface SettingsPageProps {

@@ -1,7 +1,7 @@
 import MainApplication from "./MainApplication";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { BackendManagement } from "./pages/BackendManagement";
-import { ThemeProvider } from "./contexts/ThemeContext";
+import { ThemeProvider } from "./src/components/ThemeContext";
 
 export default function App() {
   return (

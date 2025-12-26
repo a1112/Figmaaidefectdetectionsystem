@@ -15,7 +15,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Separator } from "../ui/separator";
 import { toast } from "sonner@2.0.3";
-import { useTheme, themePresets } from "../../contexts/ThemeContext";
+import { useTheme, themePresets } from "../ThemeContext";
 
 interface UIConfig {
   themePreset: string;
