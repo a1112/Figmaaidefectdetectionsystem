@@ -6,6 +6,7 @@ import {
   Minimize2,
   Rows3,
   Columns3,
+  Palette,
 } from "lucide-react";
 import { ModeSwitch } from "../ModeSwitch";
 import type {
@@ -14,6 +15,8 @@ import type {
 } from "../../types/app.types";
 import { env, type ApiProfile } from "../../src/config/env";
 import type { ApiNode } from "../../src/api/types";
+import { useTheme, themePresets } from "../../contexts/ThemeContext";
+import { Button } from "../ui/button";
 
 interface SettingsPageProps {
   theme: Theme;
@@ -39,6 +42,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   );
   const [mode, setMode] = useState(env.getMode());
   const [corsBaseUrl, setCorsBaseUrl] = useState(env.getCorsBaseUrl());
+  const { currentTheme, applyTheme } = useTheme();
 
   useEffect(() => {
     const handleModeChange = (e: CustomEvent) => {
@@ -128,7 +132,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             </div>
           </div>
         )}
-        {mode === "production" && apiNodes.length > 0 && (
+        {mode === "production" && apiNodes && apiNodes.length > 0 && (
           <div className="bg-card border border-border rounded-lg p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div>
@@ -143,7 +147,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             <select
               className="w-full px-3 py-2 text-xs bg-background border border-border rounded-sm focus:outline-none focus:border-primary"
               value={lineName || ""}
-              onChange={(event) => onLineChange(event.target.value)}
+              onChange={(event) => onLineChange?.(event.target.value)}
             >
               {apiNodes.map((node) => (
                 <option key={node.key} value={node.key}>
@@ -224,9 +228,60 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         )}
 
         {/* 主题设置 */}
+        <div className="bg-card border border-border rounded-lg p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-medium flex items-center gap-2">
+                <Palette className="w-4 h-4" />
+                COLOR THEME / 配色主题
+              </div>
+              <div className="text-xs text-muted-foreground mt-0.5">
+                当前主题: {currentTheme.name}
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2 mt-3">
+            {themePresets.slice(0, 6).map((preset) => (
+              <button
+                key={preset.id}
+                onClick={() => applyTheme(preset)}
+                className={`relative p-3 rounded-lg border-2 transition-all hover:scale-105 ${
+                  currentTheme.id === preset.id
+                    ? "border-primary shadow-lg shadow-primary/20"
+                    : "border-border hover:border-muted-foreground"
+                }`}
+                style={{
+                  background: `linear-gradient(135deg, ${preset.colors.background} 0%, ${preset.colors.muted} 100%)`,
+                }}
+                title={preset.description}
+              >
+                <div className="flex gap-1 mb-2">
+                  <div
+                    className="w-4 h-4 rounded"
+                    style={{ backgroundColor: preset.colors.primary }}
+                  />
+                  <div
+                    className="w-4 h-4 rounded"
+                    style={{ backgroundColor: preset.colors.accent }}
+                  />
+                </div>
+                <div
+                  className="text-[10px] font-medium"
+                  style={{ color: preset.colors.foreground }}
+                >
+                  {preset.name}
+                </div>
+              </button>
+            ))}
+          </div>
+          <div className="text-xs text-muted-foreground/80 mt-2">
+            在后台管理中可查看全部 {themePresets.length} 个主题预设
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 items-center gap-4">
           <label className="text-sm font-medium">
-            THEME / 主题
+            THEME MODE / 明暗模式
           </label>
           <div className="flex items-center gap-2 bg-background border border-border rounded-sm p-1">
             <button

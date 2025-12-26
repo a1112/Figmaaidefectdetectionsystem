@@ -13,6 +13,7 @@ import {
   BarChart3,
   Settings,
   Database,
+  Shield,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -34,6 +35,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { User as UserIcon, LogOut, LogIn } from "lucide-react";
 import { DataSourceModal } from "../modals/DataSourceModal";
 import type { ApiNode } from "../../src/api/types";
+import { useNavigate } from "react-router-dom";
 
 interface TitleBarProps {
   activeTab: ActiveTab;
@@ -80,6 +82,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
     name: "Admin",
     role: "操作员",
   });
+  const navigate = useNavigate();
 
   const handlePrevPlate = () => {
     if (filteredSteelPlates.length === 0) return;
@@ -151,29 +154,11 @@ export const TitleBar: React.FC<TitleBarProps> = ({
               网页刷新
             </DropdownMenuItem>
             <DropdownMenuItem
-              className="cursor-pointer focus:bg-accent focus:text-accent-foreground text-xs"
-            >
-              文件
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="cursor-pointer focus:bg-accent focus:text-accent-foreground text-xs"
-            >
-              视图
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="cursor-pointer focus:bg-accent focus:text-accent-foreground text-xs"
-            >
-              检测
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => {
-                setActiveTab("mockdata");
-                setShowPlatesPanel(false);
-              }}
+              onClick={() => navigate("/BackendManagement")}
               className="cursor-pointer focus:bg-accent focus:text-accent-foreground text-xs flex items-center gap-2"
             >
-              <Database className="w-3.5 h-3.5" />
-              测试数据编辑器
+              <Shield className="w-3.5 h-3.5" />
+              后台管理
             </DropdownMenuItem>
             <DropdownMenuSeparator className="bg-border" />
             <DropdownMenuItem
@@ -355,7 +340,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                 )}
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-border" />
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 onClick={() => { setActiveTab("settings"); setShowPlatesPanel(false); }}
                 className="cursor-pointer focus:bg-accent focus:text-accent-foreground"
               >
@@ -371,7 +356,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-border" />
               {currentUser ? (
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   onClick={() => setCurrentUser(null)}
                   className="cursor-pointer focus:bg-accent focus:text-accent-foreground text-red-500 focus:text-red-500"
                 >
@@ -379,7 +364,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                   <span>退出登录</span>
                 </DropdownMenuItem>
               ) : (
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   onClick={() => setIsLoginOpen(true)}
                   className="cursor-pointer focus:bg-accent focus:text-accent-foreground"
                 >
@@ -390,10 +375,10 @@ export const TitleBar: React.FC<TitleBarProps> = ({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <LoginModal 
-            isOpen={isLoginOpen} 
+          <LoginModal
+            isOpen={isLoginOpen}
             onClose={() => setIsLoginOpen(false)}
-            onLogin={(name) => setCurrentUser({ name, role: "操作员" })} 
+            onLogin={(name) => setCurrentUser({ name, role: "操作员" })}
           />
           <DataSourceModal
             isOpen={isDataSourceOpen}
