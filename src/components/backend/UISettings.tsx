@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Save, RotateCcw, Check, Palette } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Separator } from "../ui/separator";
 import { toast } from "sonner@2.0.3";
 import { useTheme, themePresets } from "../ThemeContext";
+import { getUiSettings, saveUiSettings } from "../../src/api/admin";
 
 interface UIConfig {
   themePreset: string;
@@ -54,6 +55,31 @@ export const UISettings: React.FC = () => {
     accentColor: currentTheme.colors.accent,
   }));
   const [hasChanges, setHasChanges] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadConfig = async () => {
+      try {
+        const payload = await getUiSettings(defaultConfig);
+        if (cancelled) return;
+        setConfig(payload);
+        setHasChanges(false);
+      } catch (error) {
+        if (cancelled) return;
+        const message =
+          error instanceof Error ? error.message : "加载 UI 设置失败";
+        toast.error(message);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+    loadConfig();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleChange = <K extends keyof UIConfig>(
     key: K,
@@ -77,11 +103,19 @@ export const UISettings: React.FC = () => {
     }
   };
 
-  const handleSave = () => {
-    // 这里应该调用后端API保存配置
-    console.log("Saving UI config:", config);
-    toast.success("UI设置已保存");
-    setHasChanges(false);
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await saveUiSettings(config);
+      toast.success("UI设置已保存");
+      setHasChanges(false);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "保存 UI 设置失败";
+      toast.error(message);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleReset = () => {
@@ -101,6 +135,14 @@ export const UISettings: React.FC = () => {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="p-6 text-sm text-muted-foreground">
+        正在加载 UI 设置...
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -118,11 +160,11 @@ export const UISettings: React.FC = () => {
           <Button
             onClick={handleSave}
             size="sm"
-            disabled={!hasChanges}
+            disabled={!hasChanges || isSaving}
             className="flex items-center gap-2"
           >
             <Save className="w-4 h-4" />
-            保存设置
+            {isSaving ? "保存中..." : "保存设置"}
           </Button>
         </div>
       </div>

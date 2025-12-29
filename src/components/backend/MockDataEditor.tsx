@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Save, RotateCcw, Database, Plus, Trash2, Copy } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
+import { getMockDataConfig, saveMockDataConfig } from "../../src/api/admin";
 
 interface MockDataConfig {
   steelPlateCount: number;
@@ -81,6 +82,34 @@ export const MockDataEditor: React.FC = () => {
   const [templates, setTemplates] = useState<DefectTemplate[]>(defaultTemplates);
   const [hasChanges, setHasChanges] = useState(false);
   const [newDefectType, setNewDefectType] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadConfig = async () => {
+      try {
+        const payload = await getMockDataConfig({
+          config: defaultConfig,
+          templates: defaultTemplates,
+        });
+        if (cancelled) return;
+        setConfig(payload.config ?? defaultConfig);
+        setTemplates(payload.templates ?? defaultTemplates);
+        setHasChanges(false);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "加载测试数据配置失败";
+        toast.error(message);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+    loadConfig();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleConfigChange = <K extends keyof MockDataConfig>(
     key: K,
@@ -90,10 +119,19 @@ export const MockDataEditor: React.FC = () => {
     setHasChanges(true);
   };
 
-  const handleSave = () => {
-    console.log("Saving mock data config:", config, templates);
-    toast.success("测试数据配置已保存");
-    setHasChanges(false);
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await saveMockDataConfig({ config, templates });
+      toast.success("测试数据配置已保存");
+      setHasChanges(false);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "保存测试数据配置失败";
+      toast.error(message);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleReset = () => {
@@ -189,6 +227,14 @@ export const MockDataEditor: React.FC = () => {
     toast.success("配置已导出");
   };
 
+  if (isLoading) {
+    return (
+      <div className="p-6 text-sm text-muted-foreground">
+        正在加载测试数据配置...
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -223,11 +269,11 @@ export const MockDataEditor: React.FC = () => {
           <Button
             onClick={handleSave}
             size="sm"
-            disabled={!hasChanges}
+            disabled={!hasChanges || isSaving}
             className="flex items-center gap-2"
           >
             <Save className="w-4 h-4" />
-            保存配置
+            {isSaving ? "保存中..." : "保存配置"}
           </Button>
         </div>
       </div>

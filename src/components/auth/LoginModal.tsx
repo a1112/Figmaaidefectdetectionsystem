@@ -10,44 +10,60 @@ import {
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
-import { Lock, User } from "lucide-react";
+import { Lock, User, Eye, EyeOff } from "lucide-react";
+import { toast } from "sonner@2.0.3";
+import { login, type AuthUser } from "../../src/api/admin";
 
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onLogin: (username: string) => void;
+  onLogin: (user: AuthUser) => void;
 }
 
 export function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps) {
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage("");
     setIsLoading(true);
-    // 模拟登录请求
-    setTimeout(() => {
-      setIsLoading(false);
-      onLogin(username);
+    try {
+      const user = await login(username.trim(), password);
+      onLogin(user);
+      toast.success(`欢迎回来，${user.username}`);
       onClose();
-    }, 1000);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "登录失败";
+      setErrorMessage(message);
+      toast.error(message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[400px] bg-card border-border">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-2xl text-blue-600">
-            <Lock className="w-5 h-5 text-primary" />
-            系统登录
-          </DialogTitle>
-          <DialogDescription>
-            请输入您的凭据以访问钢板缺陷检测系统
-          </DialogDescription>
+        <DialogContent className="sm:max-w-[420px] bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-2xl text-blue-600">
+              <Lock className="w-5 h-5 text-primary" />
+              系统登录
+            </DialogTitle>
+            <DialogDescription>
+              请输入您的凭据以访问钢板缺陷检测系统
+            </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleLogin} className="space-y-4 py-4">
+          {errorMessage && (
+            <div className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-500">
+              {errorMessage}
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="username">用户名</Label>
             <div className="relative">
@@ -68,12 +84,24 @@ export function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps) {
               <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 id="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 placeholder="请输入密码"
-                className="pl-9"
+                className="pl-9 pr-10"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute right-2 top-2.5 text-muted-foreground hover:text-foreground transition-colors"
+                aria-label={showPassword ? "隐藏密码" : "显示密码"}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
             </div>
           </div>
 

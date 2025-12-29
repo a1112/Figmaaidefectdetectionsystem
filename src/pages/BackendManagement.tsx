@@ -8,13 +8,18 @@ import {
   X, 
   ArrowLeft,
   ChevronRight,
-  Database
+  Database,
+  Server
 } from "lucide-react";
 import { UISettings } from "../components/backend/UISettings";
 import { MockDataEditor } from "../components/backend/MockDataEditor";
+import { PermissionsPanel } from "../components/backend/PermissionsPanel";
+import { LineConfigTable } from "../components/backend/LineConfigTable";
+import { ProxySettings } from "../components/backend/ProxySettings";
+import { SystemInfoPanel } from "../components/backend/SystemInfoPanel";
 import { useTheme } from "../components/ThemeContext";
 
-type MenuKey = "permissions" | "ui" | "production" | "proxy" | "mockdata";
+type MenuKey = "system" | "permissions" | "ui" | "production" | "proxy" | "mockdata";
 
 interface MenuItem {
   key: MenuKey;
@@ -23,6 +28,7 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
+  { key: "system", label: "系统信息", icon: <Server className="w-5 h-5" /> },
   { key: "permissions", label: "用户权限", icon: <Shield className="w-5 h-5" /> },
   { key: "ui", label: "UI设置", icon: <Palette className="w-5 h-5" /> },
   { key: "production", label: "产线编辑", icon: <Factory className="w-5 h-5" /> },
@@ -33,7 +39,7 @@ const menuItems: MenuItem[] = [
 export const BackendManagement: React.FC = () => {
   const navigate = useNavigate();
   const { currentTheme } = useTheme();
-  const [activeMenu, setActiveMenu] = useState<MenuKey>("permissions");
+  const [activeMenu, setActiveMenu] = useState<MenuKey>("system");
 
   const handleClose = () => {
     navigate("/");
@@ -42,13 +48,15 @@ export const BackendManagement: React.FC = () => {
   const renderContent = () => {
     switch (activeMenu) {
       case "permissions":
-        return null;
+        return <PermissionsPanel />;
+      case "system":
+        return <SystemInfoPanel />;
       case "ui":
         return <UISettings />;
       case "production":
-        return null;
+        return <LineConfigTable />;
       case "proxy":
-        return null;
+        return <ProxySettings />;
       case "mockdata":
         return <MockDataEditor />;
       default:

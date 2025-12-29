@@ -36,6 +36,7 @@ import { User as UserIcon, LogOut, LogIn } from "lucide-react";
 import { DataSourceModal } from "../modals/DataSourceModal";
 import type { ApiNode } from "../../src/api/types";
 import { useNavigate } from "react-router-dom";
+import type { AuthUser } from "../../src/api/admin";
 
 interface TitleBarProps {
   activeTab: ActiveTab;
@@ -78,11 +79,23 @@ export const TitleBar: React.FC<TitleBarProps> = ({
 }) => {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isDataSourceOpen, setIsDataSourceOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState<{ name: string; role: string } | null>({
-    name: "Admin",
-    role: "操作员",
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
+    const raw = window.localStorage.getItem("auth_user");
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as AuthUser;
+    } catch {
+      return null;
+    }
   });
   const navigate = useNavigate();
+  const saveUser = (user: AuthUser | null) => {
+    if (!user) {
+      window.localStorage.removeItem("auth_user");
+      return;
+    }
+    window.localStorage.setItem("auth_user", JSON.stringify(user));
+  };
 
   const handlePrevPlate = () => {
     if (filteredSteelPlates.length === 0) return;
@@ -321,7 +334,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                 <Avatar className="h-8 w-8 shrink-0 rounded-9999 avatar-hover-ring transition-all cursor-pointer">
                   <AvatarImage src="" alt="@user" />
                   <AvatarFallback className="bg-primary/10 text-primary leading-none text-center rounded-9999">
-                    {currentUser ? currentUser.name[0].toUpperCase() : <UserIcon className="w-4 h-4" />}
+                    {currentUser ? currentUser.username[0].toUpperCase() : <UserIcon className="w-4 h-4" />}
                   </AvatarFallback>
                 </Avatar>
                 {/* Online Status Indicator */}
@@ -332,7 +345,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
               <DropdownMenuLabel>
                 {currentUser ? (
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{currentUser.name}</p>
+                    <p className="text-sm font-medium leading-none">{currentUser.username}</p>
                     <p className="text-xs leading-none text-muted-foreground">{currentUser.role}</p>
                   </div>
                 ) : (
@@ -357,7 +370,10 @@ export const TitleBar: React.FC<TitleBarProps> = ({
               <DropdownMenuSeparator className="bg-border" />
               {currentUser ? (
                 <DropdownMenuItem
-                  onClick={() => setCurrentUser(null)}
+                  onClick={() => {
+                    setCurrentUser(null);
+                    saveUser(null);
+                  }}
                   className="cursor-pointer focus:bg-accent focus:text-accent-foreground text-red-500 focus:text-red-500"
                 >
                   <LogOut className="mr-2 h-4 w-4" />
@@ -378,7 +394,10 @@ export const TitleBar: React.FC<TitleBarProps> = ({
           <LoginModal
             isOpen={isLoginOpen}
             onClose={() => setIsLoginOpen(false)}
-            onLogin={(name) => setCurrentUser({ name, role: "操作员" })}
+            onLogin={(user) => {
+              setCurrentUser(user);
+              saveUser(user);
+            }}
           />
           <DataSourceModal
             isOpen={isDataSourceOpen}
