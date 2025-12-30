@@ -517,6 +517,11 @@ export async function getConfigApiList(): Promise<ConfigApiNode[]> {
   return (data.items ?? []) as ConfigApiNode[];
 }
 
+export const getConfigSpeedTestUrl = (): string => {
+  const base = getAdminBaseUrl() || "/config";
+  return `${base}/speed_test`;
+};
+
 export async function getNginxConfig(): Promise<NginxConfigPayload> {
   if (env.isDevelopment()) {
     return {
@@ -573,7 +578,7 @@ export async function getSystemInfo(): Promise<SystemInfoPayload> {
       },
     };
   }
-  const url = `${getAdminBaseUrl()}/config/system-info`;
+  const url = `${getAdminBaseUrl()}/system-info`;
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) {
     const data = await response.json().catch(() => null);
