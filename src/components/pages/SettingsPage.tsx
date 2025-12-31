@@ -43,6 +43,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [mode, setMode] = useState(env.getMode());
   const [corsBaseUrl, setCorsBaseUrl] = useState(env.getCorsBaseUrl());
   const { currentTheme, applyTheme } = useTheme();
+  const activeNode =
+    apiNodes.find((node) => node.key === lineName) ?? apiNodes[0];
+  const isFullAvailable = Boolean(activeNode?.port);
+  const isSmallAvailable = Boolean(activeNode?.small_port);
 
   useEffect(() => {
     const handleModeChange = (e: CustomEvent) => {
@@ -177,11 +181,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 onClick={() =>
                   handleApiProfileChange("default")
                 }
+                disabled={!isFullAvailable}
                 className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-xs rounded-lg border-2 transition-colors ${
                   apiProfile === "default"
                     ? "bg-primary/10 border-primary text-primary"
                     : "bg-muted/30 border-border text-muted-foreground hover:border-primary/50"
-                }`}
+                } ${!isFullAvailable ? "pointer-events-none cursor-not-allowed opacity-50" : ""}`}
               >
                 <div className="flex items-center gap-2">
                   <HardDrive className="w-4 h-4" />
@@ -197,11 +202,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               </button>
               <button
                 onClick={() => handleApiProfileChange("small")}
+                disabled={!isSmallAvailable}
                 className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-xs rounded-lg border-2 transition-colors ${
                   apiProfile === "small"
                     ? "bg-primary/10 border-primary text-primary"
                     : "bg-muted/30 border-border text-muted-foreground hover:border-primary/50"
-                }`}
+                } ${!isSmallAvailable ? "pointer-events-none cursor-not-allowed opacity-50" : ""}`}
               >
                 <div className="flex items-center gap-2">
                   <Minimize2 className="w-4 h-4" />

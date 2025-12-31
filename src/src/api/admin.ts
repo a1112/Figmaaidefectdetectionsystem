@@ -119,6 +119,50 @@ export interface SystemInfoPayload {
     network_tx_bytes_per_sec: number | null;
     notes?: string[];
   };
+  disks?: SystemDiskUsage[];
+  network_interfaces?: NetworkInterfaceMetrics[];
+}
+
+export interface SystemDiskUsage {
+  device: string;
+  mountpoint: string;
+  fstype: string;
+  total_bytes: number;
+  used_bytes: number;
+  free_bytes: number;
+  percent: number;
+}
+
+export interface NetworkInterfaceMetrics {
+  name: string;
+  is_up: boolean;
+  speed_mbps: number | null;
+  rx_bytes_per_sec: number | null;
+  tx_bytes_per_sec: number | null;
+}
+
+export interface SystemMetricsPayload {
+  timestamp: string;
+  resources: SystemInfoPayload["resources"];
+  disks: SystemDiskUsage[];
+  network_interfaces: NetworkInterfaceMetrics[];
+}
+
+export interface ConfigMateMeta {
+  connection_mode?: "development" | "production" | "cors" | string;
+  api_base_url?: string;
+  service_name?: string;
+}
+
+export interface ConfigMatePayload {
+  meta?: ConfigMateMeta;
+  defaults?: Record<string, any>;
+  lines?: Record<string, any>[];
+}
+
+export interface ConfigMateResponse {
+  path: string;
+  payload: ConfigMatePayload | ConfigMatePayload[] | Record<string, any>;
 }
 
 const UI_SETTINGS_KEY = "admin_ui_settings";
@@ -132,6 +176,26 @@ const getAdminBaseUrl = (): string => {
     return "/config";
   }
   return "";
+};
+
+const toWebSocketUrl = (base: string): string => {
+  if (base.startsWith("wss://") || base.startsWith("ws://")) {
+    return base;
+  }
+  if (base.startsWith("https://")) {
+    return `wss://${base.slice(8)}`;
+  }
+  if (base.startsWith("http://")) {
+    return `ws://${base.slice(7)}`;
+  }
+  return `ws://${base.replace(/^\/\//, "")}`;
+};
+
+const getAdminWsBaseUrl = (): string => {
+  if (env.getMode() === "cors") {
+    return `${toWebSocketUrl(env.getCorsBaseUrl().replace(/\/+$/, ""))}/config`;
+  }
+  return `${toWebSocketUrl(window.location.origin)}/config`;
 };
 
 const loadLocalJson = (key: string) => {
@@ -517,9 +581,16 @@ export async function getConfigApiList(): Promise<ConfigApiNode[]> {
   return (data.items ?? []) as ConfigApiNode[];
 }
 
-export const getConfigSpeedTestUrl = (): string => {
+export const getConfigSpeedTestUrl = (options?: {
+  chunkKb?: number;
+  totalMb?: number;
+}): string => {
   const base = getAdminBaseUrl() || "/config";
-  return `${base}/speed_test`;
+  const params = new URLSearchParams();
+  if (options?.chunkKb) params.set("chunk_kb", String(options.chunkKb));
+  if (options?.totalMb) params.set("total_mb", String(options.totalMb));
+  const query = params.toString();
+  return query ? `${base}/speed_test?${query}` : `${base}/speed_test`;
 };
 
 export async function getNginxConfig(): Promise<NginxConfigPayload> {
@@ -576,6 +647,26 @@ export async function getSystemInfo(): Promise<SystemInfoPayload> {
         network_tx_bytes_per_sec: 800,
         notes: [],
       },
+      disks: [
+        {
+          device: "C:",
+          mountpoint: "C:\\",
+          fstype: "NTFS",
+          total_bytes: 512 * 1024 * 1024 * 1024,
+          used_bytes: 245 * 1024 * 1024 * 1024,
+          free_bytes: 267 * 1024 * 1024 * 1024,
+          percent: 47.8,
+        },
+      ],
+      network_interfaces: [
+        {
+          name: "Ethernet",
+          is_up: true,
+          speed_mbps: 1000,
+          rx_bytes_per_sec: 2.1 * 1024 * 1024,
+          tx_bytes_per_sec: 1.6 * 1024 * 1024,
+        },
+      ],
     };
   }
   const url = `${getAdminBaseUrl()}/system-info`;
@@ -585,6 +676,35 @@ export async function getSystemInfo(): Promise<SystemInfoPayload> {
     throw new Error(data?.detail || "Failed to load system info");
   }
   return (await response.json()) as SystemInfoPayload;
+}
+
+export const getSystemMetricsWsUrl = (): string => {
+  return `${getAdminWsBaseUrl()}/ws/system-metrics`;
+};
+
+export async function getConfigMate(): Promise<ConfigMatePayload> {
+  if (env.isDevelopment()) {
+    return {
+      meta: {
+        connection_mode: "development",
+        api_base_url: "http://127.0.0.1:8120/api",
+        service_name: "Defect Detection",
+      },
+      lines: [],
+      defaults: {},
+    };
+  }
+  const url = `${getAdminBaseUrl()}/mate`;
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error("Failed to load config mate");
+  }
+  const data = (await response.json()) as ConfigMateResponse;
+  const payload = data.payload;
+  if (Array.isArray(payload)) {
+    return { lines: payload };
+  }
+  return payload as ConfigMatePayload;
 }
 
 export async function restartLine(lineKey: string): Promise<void> {

@@ -142,10 +142,13 @@ export function DataSourceModal({
     }, SPEED_TEST_DURATION_MS);
 
     try {
-      const response = await fetch(getConfigSpeedTestUrl(), {
+      const response = await fetch(
+        getConfigSpeedTestUrl({ chunkKb: 1024, totalMb: 1024 }),
+        {
         cache: "no-store",
         signal: controller.signal,
-      });
+        },
+      );
       if (!response.ok || !response.body) {
         throw new Error("测速接口不可用");
       }
@@ -286,8 +289,21 @@ export function DataSourceModal({
                     </span>
                   </div>
                 </div>
-                <div className={`text-xs ${isOffline ? "text-red-500" : "text-muted-foreground"}`}>
-                  {node.ip ? node.ip : "-"}:{node.port ?? "-"}
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`rounded-full border px-1.5 py-0.5 text-[10px] ${
+                      node.small_port
+                        ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600"
+                        : "border-red-500/30 bg-red-500/10 text-red-500"
+                    }`}
+                  >
+                    SMALL
+                  </span>
+                  <div
+                    className={`text-xs ${isOffline ? "text-red-500" : "text-muted-foreground"}`}
+                  >
+                    {node.ip ? node.ip : "-"}:{node.port ?? "-"}
+                  </div>
                 </div>
               </label>
               );

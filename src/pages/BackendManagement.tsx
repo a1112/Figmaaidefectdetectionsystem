@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   Shield, 
@@ -18,6 +18,7 @@ import { LineConfigTable } from "../components/backend/LineConfigTable";
 import { ProxySettings } from "../components/backend/ProxySettings";
 import { SystemInfoPanel } from "../components/backend/SystemInfoPanel";
 import { useTheme } from "../components/ThemeContext";
+import { getConfigMate, type ConfigMatePayload } from "../src/api/admin";
 
 type MenuKey = "system" | "permissions" | "ui" | "production" | "proxy" | "mockdata";
 
@@ -40,6 +41,31 @@ export const BackendManagement: React.FC = () => {
   const navigate = useNavigate();
   const { currentTheme } = useTheme();
   const [activeMenu, setActiveMenu] = useState<MenuKey>("system");
+  const [mate, setMate] = useState<ConfigMatePayload | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    getConfigMate()
+      .then((payload) => {
+        if (active) setMate(payload);
+      })
+      .catch(() => {
+        if (active) setMate(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const meta = mate?.meta;
+  const modeLabel =
+    meta?.connection_mode === "development"
+      ? "测试"
+      : meta?.connection_mode === "production"
+        ? "生产"
+        : meta?.connection_mode === "cors"
+          ? "跨域"
+          : "未知";
 
   const handleClose = () => {
     navigate("/");
@@ -78,13 +104,20 @@ export const BackendManagement: React.FC = () => {
           </button>
           <span className="text-sm tracking-wider">后台管理系统</span>
         </div>
-        <button
-          onClick={handleClose}
-          className="p-1 hover:bg-red-500/80 rounded transition-colors"
-          title="关闭"
-        >
-          <X className="w-5 h-5" />
-        </button>
+        <div className="flex items-center gap-4">
+          <div className="text-[11px] text-muted-foreground leading-tight text-right">
+            <div>????: {modeLabel}</div>
+            <div>?? API: {meta?.api_base_url || "-"}</div>
+            <div>????: {meta?.service_name || "-"}</div>
+          </div>
+          <button
+            onClick={handleClose}
+            className="p-1 hover:bg-red-500/80 rounded transition-colors"
+            title="???"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       {/* Main Content */}

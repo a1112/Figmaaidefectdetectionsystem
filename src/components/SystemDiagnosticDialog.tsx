@@ -2,9 +2,6 @@ import { RefObject, useEffect, useState } from "react";
 import {
   X,
   Camera,
-  HardDrive,
-  Cpu,
-  Wifi,
   RefreshCw,
   Power,
   RotateCcw,
@@ -12,6 +9,12 @@ import {
   CheckCircle2,
   Activity,
 } from "lucide-react";
+import { useSystemMetrics } from "../hooks/useSystemMetrics";
+import {
+  DiskUsagePanel,
+  NetworkStatusPanel,
+  ServerResourcesPanel,
+} from "./system/SystemMetricsBlocks";
 
 interface SystemDiagnosticDialogProps {
   isOpen: boolean;
@@ -31,21 +34,7 @@ export function SystemDiagnosticDialog({
     resolution: "1920x1080",
     temperature: 42,
   });
-  const [diskUsage, setDiskUsage] = useState({
-    used: 458,
-    total: 1024,
-    percentage: 45,
-  });
-  const [serverResources, setServerResources] = useState({
-    cpu: 35,
-    memory: 62,
-    temperature: 58,
-  });
-  const [network, setNetwork] = useState({
-    status: "connected",
-    latency: 12,
-    bandwidth: 95.6,
-  });
+  const { metrics } = useSystemMetrics({ enabled: isOpen });
 
   // 模拟实时数据更新
   useEffect(() => {
@@ -57,35 +46,6 @@ export function SystemDiagnosticDialog({
         ...prev,
         fps: 30 + Math.floor(Math.random() * 2),
         temperature: 42 + Math.floor(Math.random() * 3),
-      }));
-
-      setServerResources((prev) => ({
-        cpu: Math.max(
-          30,
-          Math.min(40, prev.cpu + (Math.random() - 0.5) * 5),
-        ),
-        memory: Math.max(
-          60,
-          Math.min(65, prev.memory + (Math.random() - 0.5) * 3),
-        ),
-        temperature: Math.max(
-          55,
-          Math.min(
-            62,
-            prev.temperature + (Math.random() - 0.5) * 4,
-          ),
-        ),
-      }));
-
-      setNetwork((prev) => ({
-        ...prev,
-        latency: Math.max(
-          10,
-          Math.min(
-            15,
-            prev.latency + (Math.random() - 0.5) * 2,
-          ),
-        ),
       }));
     }, 2000);
 
@@ -231,221 +191,14 @@ export function SystemDiagnosticDialog({
             </button>
           </div>
 
-          {/* 磁盘使用 */}
-          <div className="bg-muted/30 border border-border/50 p-3">
-            <div className="flex items-center gap-2 mb-3">
-              <HardDrive className="w-4 h-4 text-purple-400" />
-              <h4 className="font-bold text-xs uppercase tracking-wide">
-                磁盘使用 / DISK USAGE
-              </h4>
-            </div>
+          {/* Disk Usage */}
+          <DiskUsagePanel disks={metrics?.disks} maxHeightClass="max-h-36" />
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs mb-1">
-                <span className="text-muted-foreground">
-                  已用空间
-                </span>
-                <span className="font-mono font-bold">
-                  {diskUsage.used}GB / {diskUsage.total}GB
-                </span>
-              </div>
+          {/* Server Resources */}
+          <ServerResourcesPanel resources={metrics?.resources ?? null} />
 
-              {/* Progress Bar */}
-              <div className="w-full h-6 bg-background border border-border/50 rounded-sm overflow-hidden relative">
-                <div
-                  className={`h-full transition-all duration-500 ${
-                    diskUsage.percentage > 80
-                      ? "bg-red-500/70"
-                      : diskUsage.percentage > 60
-                        ? "bg-yellow-500/70"
-                        : "bg-green-500/70"
-                  }`}
-                  style={{ width: `${diskUsage.percentage}%` }}
-                />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-xs font-mono font-bold text-foreground drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-                    {diskUsage.percentage}%
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2 text-xs mt-3">
-                <div className="bg-background/50 border border-border/30 p-2 text-center">
-                  <div className="text-muted-foreground mb-1">
-                    可用
-                  </div>
-                  <div className="font-mono font-bold text-green-400">
-                    {diskUsage.total - diskUsage.used}GB
-                  </div>
-                </div>
-                <div className="bg-background/50 border border-border/30 p-2 text-center">
-                  <div className="text-muted-foreground mb-1">
-                    已用
-                  </div>
-                  <div className="font-mono font-bold text-yellow-400">
-                    {diskUsage.used}GB
-                  </div>
-                </div>
-                <div className="bg-background/50 border border-border/30 p-2 text-center">
-                  <div className="text-muted-foreground mb-1">
-                    总容量
-                  </div>
-                  <div className="font-mono font-bold">
-                    {diskUsage.total}GB
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 服务器资源 */}
-          <div className="bg-muted/30 border border-border/50 p-3">
-            <div className="flex items-center gap-2 mb-3">
-              <Cpu className="w-4 h-4 text-orange-400" />
-              <h4 className="font-bold text-xs uppercase tracking-wide">
-                服务器资源 / SERVER RESOURCES
-              </h4>
-            </div>
-
-            <div className="space-y-3">
-              {/* CPU */}
-              <div>
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="text-muted-foreground">
-                    CPU使用率
-                  </span>
-                  <span className="font-mono font-bold">
-                    {serverResources.cpu.toFixed(1)}%
-                  </span>
-                </div>
-                <div className="w-full h-4 bg-background border border-border/50 rounded-sm overflow-hidden relative">
-                  <div
-                    className="h-full bg-blue-500/70 transition-all duration-500"
-                    style={{ width: `${serverResources.cpu}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Memory */}
-              <div>
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="text-muted-foreground">
-                    内存使用率
-                  </span>
-                  <span className="font-mono font-bold">
-                    {serverResources.memory.toFixed(1)}%
-                  </span>
-                </div>
-                <div className="w-full h-4 bg-background border border-border/50 rounded-sm overflow-hidden relative">
-                  <div
-                    className="h-full bg-purple-500/70 transition-all duration-500"
-                    style={{
-                      width: `${serverResources.memory}%`,
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Temperature */}
-              <div>
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="text-muted-foreground">
-                    服务器温度
-                  </span>
-                  <span
-                    className={`font-mono font-bold ${
-                      serverResources.temperature > 70
-                        ? "text-red-400"
-                        : serverResources.temperature > 60
-                          ? "text-yellow-400"
-                          : "text-green-400"
-                    }`}
-                  >
-                    {serverResources.temperature.toFixed(0)}°C
-                  </span>
-                </div>
-                <div className="w-full h-4 bg-background border border-border/50 rounded-sm overflow-hidden relative">
-                  <div
-                    className={`h-full transition-all duration-500 ${
-                      serverResources.temperature > 70
-                        ? "bg-red-500/70"
-                        : serverResources.temperature > 60
-                          ? "bg-yellow-500/70"
-                          : "bg-green-500/70"
-                    }`}
-                    style={{
-                      width: `${(serverResources.temperature / 100) * 100}%`,
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={handleRestartServer}
-              className="w-full mt-3 px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold border border-red-500/50 transition-colors flex items-center justify-center gap-2"
-            >
-              <Power className="w-3.5 h-3.5" />
-              重启服务器
-            </button>
-          </div>
-
-          {/* 网络状态 */}
-          <div className="bg-muted/30 border border-border/50 p-3">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Wifi className="w-4 h-4 text-green-400" />
-                <h4 className="font-bold text-xs uppercase tracking-wide">
-                  网络状态 / NETWORK
-                </h4>
-              </div>
-              <div className="flex items-center gap-1 text-green-400 text-xs">
-                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                <span>已连接</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="bg-background/50 border border-border/30 p-2">
-                <div className="text-muted-foreground mb-1">
-                  延迟 PING
-                </div>
-                <div
-                  className={`font-mono font-bold text-lg ${
-                    network.latency < 20
-                      ? "text-green-400"
-                      : network.latency < 50
-                        ? "text-yellow-400"
-                        : "text-red-400"
-                  }`}
-                >
-                  {network.latency.toFixed(0)} ms
-                </div>
-              </div>
-              <div className="bg-background/50 border border-border/30 p-2">
-                <div className="text-muted-foreground mb-1">
-                  带宽
-                </div>
-                <div className="font-mono font-bold text-lg text-blue-400">
-                  {network.bandwidth} Mbps
-                </div>
-              </div>
-              <div className="bg-background/50 border border-border/30 p-2">
-                <div className="text-muted-foreground mb-1">
-                  协议
-                </div>
-                <div className="font-mono font-bold">
-                  TCP/IP
-                </div>
-              </div>
-              <div className="bg-background/50 border border-border/30 p-2">
-                <div className="text-muted-foreground mb-1">
-                  端口
-                </div>
-                <div className="font-mono font-bold">8080</div>
-              </div>
-            </div>
-          </div>
+          {/* Network Status */}
+          <NetworkStatusPanel interfaces={metrics?.network_interfaces} />
         </div>
 
         {/* Footer Actions */}
