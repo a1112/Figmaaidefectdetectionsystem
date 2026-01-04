@@ -103,8 +103,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       <ModeSwitch />
 
       <div className="space-y-4">
-        {mode === "cors" && (
-          <div className="bg-card border border-border rounded-lg p-4 space-y-3">
+        <div className="bg-card border border-border rounded-lg p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm font-medium">
@@ -135,7 +134,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               </button>
             </div>
           </div>
-        )}
         {mode === "production" && apiNodes && apiNodes.length > 0 && (
           <div className="bg-card border border-border rounded-lg p-4 space-y-3">
             <div className="flex items-center justify-between">
