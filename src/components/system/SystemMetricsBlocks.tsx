@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { HardDrive, Gauge, LineChart, Network, ArrowDown, ArrowUp } from "lucide-react";
-import { Line, LineChart as RechartsLineChart, XAxis, YAxis } from "recharts@2.15.2";
+import { Area, AreaChart as RechartsAreaChart, XAxis, YAxis } from "recharts@2.15.2";
 import { Progress } from "../ui/progress";
 import {
   ChartContainer,
@@ -96,68 +96,116 @@ export const ServerResourcesPanel = ({
     );
 
   return (
-    <div className="bg-muted/30 border border-border/50 p-3">
-      <SectionHeader icon={headerIcon} title="Server Resources" />
-      {variant === "chart" ? (
-        <div className="space-y-3">
-          <ChartContainer
-            config={{
-              cpu: { label: "CPU", color: "hsl(var(--chart-1))" },
-              memory: { label: "Memory", color: "hsl(var(--chart-2))" },
-            }}
-            className="h-40 w-full"
-          >
-            <RechartsLineChart data={history}>
-              <XAxis dataKey="timestamp" hide />
-              <YAxis domain={[0, 100]} hide />
-              <ChartTooltip content={<ChartTooltipContent />} />
-              <Line
-                type="monotone"
-                dataKey="cpu"
-                stroke="var(--color-cpu)"
-                strokeWidth={2}
-                dot={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="memory"
-                stroke="var(--color-memory)"
-                strokeWidth={2}
-                dot={false}
-              />
-            </RechartsLineChart>
-          </ChartContainer>
-          <div className="grid grid-cols-2 gap-3 text-xs">
-            <div className="bg-background/50 border border-border/30 p-2">
-              <div className="text-muted-foreground mb-1">CPU</div>
-              <div className="font-mono font-bold">{formatPercent(resources?.cpu_percent ?? null)}</div>
-            </div>
-            <div className="bg-background/50 border border-border/30 p-2">
-              <div className="text-muted-foreground mb-1">Memory</div>
-              <div className="font-mono font-bold">{formatPercent(resources?.memory_percent ?? null)}</div>
+    <div className="grid grid-cols-2 gap-3">
+      <div className="bg-muted/30 border border-border/50 p-3">
+        <SectionHeader
+          icon={
+            variant === "chart" ? (
+              <LineChart className="w-4 h-4 text-orange-400" />
+            ) : (
+              <Gauge className="w-4 h-4 text-orange-400" />
+            )
+          }
+          title="CPU Resources"
+        />
+        {variant === "chart" ? (
+          <div className="space-y-3">
+            <ChartContainer
+              config={{
+                cpu: { label: "CPU", color: "hsl(var(--chart-1))" },
+              }}
+              className="h-40 w-full"
+            >
+              <RechartsAreaChart data={history}>
+                <XAxis dataKey="timestamp" hide />
+                <YAxis domain={[0, 100]} hide />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Area
+                  type="monotone"
+                  dataKey="cpu"
+                  stroke="var(--color-cpu)"
+                  fill="var(--color-cpu)"
+                  fillOpacity={0.2}
+                  strokeWidth={2}
+                />
+              </RechartsAreaChart>
+            </ChartContainer>
+            <div className="bg-background/50 border border-border/30 p-2 text-xs">
+              <div className="text-muted-foreground mb-1">CPU Usage</div>
+              <div className="font-mono font-bold">
+                {formatPercent(resources?.cpu_percent ?? null)}
+              </div>
             </div>
           </div>
-        </div>
-      ) : (
-        <div className="space-y-3 text-xs">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">CPU Usage</span>
-              <span className="font-mono font-bold">{formatPercent(resources?.cpu_percent ?? null)}</span>
+        ) : (
+          <div className="space-y-3 text-xs">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">CPU Usage</span>
+                <span className="font-mono font-bold">
+                  {formatPercent(resources?.cpu_percent ?? null)}
+                </span>
+              </div>
+              <Progress value={resources?.cpu_percent ?? 0} />
             </div>
-            <Progress value={resources?.cpu_percent ?? 0} />
           </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Memory Usage</span>
-              <span className="font-mono font-bold">
+        )}
+      </div>
+
+      <div className="bg-muted/30 border border-border/50 p-3">
+        <SectionHeader
+          icon={
+            variant === "chart" ? (
+              <LineChart className="w-4 h-4 text-blue-400" />
+            ) : (
+              <Gauge className="w-4 h-4 text-blue-400" />
+            )
+          }
+          title="Memory Resources"
+        />
+        {variant === "chart" ? (
+          <div className="space-y-3">
+            <ChartContainer
+              config={{
+                memory: { label: "Memory", color: "hsl(var(--chart-2))" },
+              }}
+              className="h-40 w-full"
+            >
+              <RechartsAreaChart data={history}>
+                <XAxis dataKey="timestamp" hide />
+                <YAxis domain={[0, 100]} hide />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Area
+                  type="monotone"
+                  dataKey="memory"
+                  stroke="var(--color-memory)"
+                  fill="var(--color-memory)"
+                  fillOpacity={0.2}
+                  strokeWidth={2}
+                />
+              </RechartsAreaChart>
+            </ChartContainer>
+            <div className="bg-background/50 border border-border/30 p-2 text-xs">
+              <div className="text-muted-foreground mb-1">Memory Usage</div>
+              <div className="font-mono font-bold">
                 {formatPercent(resources?.memory_percent ?? null)}
-              </span>
+              </div>
             </div>
-            <Progress value={resources?.memory_percent ?? 0} />
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="space-y-3 text-xs">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Memory Usage</span>
+                <span className="font-mono font-bold">
+                  {formatPercent(resources?.memory_percent ?? null)}
+                </span>
+              </div>
+              <Progress value={resources?.memory_percent ?? 0} />
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

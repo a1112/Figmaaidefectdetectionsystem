@@ -9,13 +9,13 @@ export const StatusBar: React.FC = () => {
     const isActive = location.pathname === path;
     return `flex items-center gap-1 px-2 py-0.5 border rounded-sm text-[9px] transition-colors ${
       isActive 
-        ? 'bg-primary-foreground text-primary border-primary-foreground font-bold' 
-        : 'border-primary-foreground/40 hover:bg-primary-foreground hover:text-primary'
+        ? 'bg-white text-black border-white font-bold' 
+        : 'border-white/40 hover:bg-white hover:text-black text-white'
     }`;
   };
 
   return (
-    <div className="h-6 bg-primary text-primary-foreground flex items-center justify-between px-3 text-[10px] uppercase tracking-wider shrink-0">
+    <div className="h-6 bg-black text-white flex items-center justify-between px-3 text-[10px] uppercase tracking-wider shrink-0">
       <div className="flex items-center gap-4">
         <span className="flex items-center gap-1"><Server className="w-3 h-3" /> SERVER: ONLINE (42ms)</span>
         <span className="flex items-center gap-1"><Wifi className="w-3 h-3" /> SIGNAL: STRONG</span>
@@ -24,7 +24,7 @@ export const StatusBar: React.FC = () => {
         <span>
           USER: OPERATOR_01 | SESSION: #882910
         </span>
-        <div className="flex items-center gap-2 mr-2 border-r border-primary-foreground/20 pr-4">
+        <div className="flex items-center gap-2 mr-2 border-r border-white/20 pr-4">
           <button
             type="button"
             onClick={() => navigate('/')}

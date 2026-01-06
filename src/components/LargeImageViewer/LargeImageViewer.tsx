@@ -296,17 +296,21 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
     );
 
     tiles.forEach(tile => {
+      // Always fill background with dark theme color
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillRect(tile.x, tile.y, tile.width, tile.height);
+
       if (renderTile) {
         renderTile(ctx, tile, tileSize, scale);
       } else {
-        ctx.fillStyle = 'white';
-        ctx.fillRect(tile.x, tile.y, tile.width, tile.height);
 
-        ctx.strokeStyle = '#ccc';
+
+
+        ctx.strokeStyle = '#333';
         ctx.lineWidth = 1 / scale;
         ctx.strokeRect(tile.x, tile.y, tile.width, tile.height);
 
-        ctx.fillStyle = '#000';
+        ctx.fillStyle = '#666';
 
         ctx.save();
         ctx.translate(tile.x, tile.y);
@@ -602,7 +606,7 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
   return (
     <div
       ref={containerRef}
-      className={`relative overflow-hidden w-full h-full ${className ?? ''}`}
+      className={`relative overflow-hidden w-full h-full bg-muted transition-colors duration-300 ${className ?? ''}`}
     >
       <canvas
         ref={backCanvasRef}

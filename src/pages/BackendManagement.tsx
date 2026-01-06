@@ -177,7 +177,7 @@ export const BackendManagement: React.FC = () => {
           <div className="flex flex-col justify-center">
             <span className="text-[13px] font-black tracking-tighter leading-none flex items-center gap-2">
               <Database className="w-4 h-4 text-primary" />
-              CONFIG MANAGEMENT SYSTEM
+              配置管理系统
             </span>
             <span className="text-[9px] text-muted-foreground uppercase tracking-[0.2em] mt-1 opacity-70">
               Admin Control Panel / v2.1.0-RC
