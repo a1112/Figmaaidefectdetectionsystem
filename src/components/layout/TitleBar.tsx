@@ -14,6 +14,7 @@ import {
   Settings,
   Database,
   Shield,
+  Monitor,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -31,12 +32,16 @@ import type {
 
 import { useState } from "react";
 import { LoginModal } from "../auth/LoginModal";
-import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "../ui/avatar";
 import { User as UserIcon, LogOut, LogIn } from "lucide-react";
 import { DataSourceModal } from "../modals/DataSourceModal";
-import type { ApiNode } from "../../src/api/types";
+import type { ApiNode } from "../../api/types";
 import { useNavigate } from "react-router-dom";
-import type { AuthUser } from "../../src/api/admin";
+import type { AuthUser } from "../../api/admin";
 
 interface TitleBarProps {
   activeTab: ActiveTab;
@@ -56,6 +61,7 @@ interface TitleBarProps {
   apiNodes: ApiNode[];
   onLineChange: (name: string) => void;
   onRefreshApiNodes: () => void;
+  onOpenSettings: () => void;
 }
 
 export const TitleBar: React.FC<TitleBarProps> = ({
@@ -76,25 +82,31 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   apiNodes,
   onLineChange,
   onRefreshApiNodes,
+  onOpenSettings,
 }) => {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
-  const [isDataSourceOpen, setIsDataSourceOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
-    const raw = window.localStorage.getItem("auth_user");
-    if (!raw) return null;
-    try {
-      return JSON.parse(raw) as AuthUser;
-    } catch {
-      return null;
-    }
-  });
+  const [isDataSourceOpen, setIsDataSourceOpen] =
+    useState(false);
+  const [currentUser, setCurrentUser] =
+    useState<AuthUser | null>(() => {
+      const raw = window.localStorage.getItem("auth_user");
+      if (!raw) return null;
+      try {
+        return JSON.parse(raw) as AuthUser;
+      } catch {
+        return null;
+      }
+    });
   const navigate = useNavigate();
   const saveUser = (user: AuthUser | null) => {
     if (!user) {
       window.localStorage.removeItem("auth_user");
       return;
     }
-    window.localStorage.setItem("auth_user", JSON.stringify(user));
+    window.localStorage.setItem(
+      "auth_user",
+      JSON.stringify(user),
+    );
   };
 
   const handlePrevPlate = () => {
@@ -167,6 +179,13 @@ export const TitleBar: React.FC<TitleBarProps> = ({
               网页刷新
             </DropdownMenuItem>
             <DropdownMenuItem
+              onClick={() => navigate("/TraditionalMode")}
+              className="cursor-pointer focus:bg-accent focus:text-accent-foreground text-xs flex items-center gap-2"
+            >
+              <Monitor className="w-3.5 h-3.5" />
+              传统仪表盘
+            </DropdownMenuItem>
+            <DropdownMenuItem
               onClick={() => navigate("/BackendManagement")}
               className="cursor-pointer focus:bg-accent focus:text-accent-foreground text-xs flex items-center gap-2"
             >
@@ -174,14 +193,10 @@ export const TitleBar: React.FC<TitleBarProps> = ({
               后台管理
             </DropdownMenuItem>
             <DropdownMenuSeparator className="bg-border" />
-            <DropdownMenuItem
-              className="cursor-pointer focus:bg-accent focus:text-accent-foreground text-xs"
-            >
+            <DropdownMenuItem className="cursor-pointer focus:bg-accent focus:text-accent-foreground text-xs">
               窗口
             </DropdownMenuItem>
-            <DropdownMenuItem
-              className="cursor-pointer focus:bg-accent focus:text-accent-foreground text-xs"
-            >
+            <DropdownMenuItem className="cursor-pointer focus:bg-accent focus:text-accent-foreground text-xs">
               帮助
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -318,10 +333,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
             <Activity className="w-4 h-4" />
           </button>
           <button
-            onClick={() => {
-              setActiveTab("settings");
-              setShowPlatesPanel(false);
-            }}
+            onClick={onOpenSettings}
             className="p-1.5 hover:bg-white/10 rounded transition-colors"
             title="系统设置"
           >
@@ -334,19 +346,32 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                 <Avatar className="h-8 w-8 shrink-0 rounded-9999 avatar-hover-ring transition-all cursor-pointer">
                   <AvatarImage src="" alt="@user" />
                   <AvatarFallback className="bg-primary/10 text-primary leading-none text-center rounded-9999">
-                    {currentUser ? currentUser.username[0].toUpperCase() : <UserIcon className="w-4 h-4" />}
+                    {currentUser ? (
+                      currentUser.username[0].toUpperCase()
+                    ) : (
+                      <UserIcon className="w-4 h-4" />
+                    )}
                   </AvatarFallback>
                 </Avatar>
                 {/* Online Status Indicator */}
-                <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-9999 border-2 border-primary/50 ${currentUser ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+                <span
+                  className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-9999 border-2 border-primary/50 ${currentUser ? "bg-green-500" : "bg-gray-400"}`}
+                ></span>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 bg-card border-border text-foreground">
+            <DropdownMenuContent
+              align="end"
+              className="w-56 bg-card border-border text-foreground"
+            >
               <DropdownMenuLabel>
                 {currentUser ? (
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{currentUser.username}</p>
-                    <p className="text-xs leading-none text-muted-foreground">{currentUser.role}</p>
+                    <p className="text-sm font-medium leading-none">
+                      {currentUser.username}
+                    </p>
+                    <p className="text-xs leading-none text-muted-foreground">
+                      {currentUser.role}
+                    </p>
                   </div>
                 ) : (
                   "未登录"
@@ -354,7 +379,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-border" />
               <DropdownMenuItem
-                onClick={() => { setActiveTab("settings"); setShowPlatesPanel(false); }}
+                onClick={onOpenSettings}
                 className="cursor-pointer focus:bg-accent focus:text-accent-foreground"
               >
                 <Settings className="mr-2 h-4 w-4" />

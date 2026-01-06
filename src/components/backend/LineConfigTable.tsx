@@ -22,10 +22,9 @@ import { toast } from "sonner@2.0.3";
 import {
   getLineConfig,
   saveLineConfig,
-  getConfigApiList,
-  restartLine,
+  type LineConfigPayload,
   type ConfigApiNode,
-} from "../../src/api/admin";
+} from "../../api/admin";
 
 type LineItem = {
   name?: string;
@@ -53,6 +52,7 @@ export const LineConfigTable: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [apiStatus, setApiStatus] = useState<Record<string, ConfigApiNode>>({});
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showAddRow, setShowAddRow] = useState(false);
 
   const loadAll = async () => {
     setIsRefreshing(true);
@@ -103,6 +103,7 @@ export const LineConfigTable: React.FC = () => {
 
   const handleAddLine = () => {
     setLines((prev) => [{ ...defaultLine }, ...prev]);
+    setShowAddRow(false); // 重用现有的逻辑，或者可以切换到 showAddRow 模式
   };
 
   const handleDeleteLine = (index: number) => {
@@ -223,54 +224,65 @@ export const LineConfigTable: React.FC = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-4 space-y-4 h-full flex flex-col overflow-hidden">
+      <div className="flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <Factory className="w-6 h-6 text-primary" />
+          <div className="w-10 h-10 rounded-sm bg-primary/10 border border-primary/20 flex items-center justify-center">
+            <Factory className="w-5 h-5 text-primary" />
+          </div>
           <div>
-            <h2 className="text-xl">产线编辑</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              数据来源：net_tabel/map.json
+            <h2 className="text-lg font-bold tracking-tighter uppercase">Production Line Edit</h2>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-mono">
+              Source: net_tabel/map.json
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={handleAddLine}>
-            <Plus className="w-4 h-4 mr-2" />
-            新增产线
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-8 text-[11px] font-bold border-dashed"
+            onClick={handleAddLine}
+          >
+            <Plus className="w-3.5 h-3.5 mr-2" />
+            NEW LINE
           </Button>
+          <div className="w-[1px] h-4 bg-border mx-1" />
           <Button
-            size="sm"
             variant="outline"
+            size="sm"
+            className="h-8 text-[11px] font-bold"
             onClick={loadAll}
             disabled={isRefreshing}
           >
-            <RefreshCcw className="w-4 h-4 mr-2" />
-            {isRefreshing ? "刷新中..." : "刷新状态"}
+            <RefreshCcw className={`w-3.5 h-3.5 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
+            REFRESH
           </Button>
-          <Button size="sm" onClick={handleSave} disabled={isSaving}>
-            <Save className="w-4 h-4 mr-2" />
-            {isSaving ? "保存中..." : "保存配置"}
+          <Button 
+            size="sm" 
+            className="h-8 text-[11px] font-bold px-4"
+            onClick={handleSave} 
+            disabled={isSaving}
+          >
+            <Save className="w-3.5 h-3.5 mr-2" />
+            {isSaving ? "SAVING..." : "SAVE ALL"}
           </Button>
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">产线列表</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <div className="flex-1 overflow-auto border border-border bg-card/50">
+        <div className="min-w-[1000px]">
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>名称</TableHead>
-                <TableHead>Key</TableHead>
-                <TableHead>模式</TableHead>
-                <TableHead>IP</TableHead>
-                <TableHead>端口</TableHead>
-                <TableHead>Profile</TableHead>
-                <TableHead>状态</TableHead>
-                <TableHead>操作</TableHead>
+            <TableHeader className="bg-muted/50 sticky top-0 z-10">
+              <TableRow className="border-b border-border hover:bg-transparent">
+                <TableHead className="text-[10px] font-bold uppercase py-2">产线名称</TableHead>
+                <TableHead className="text-[10px] font-bold uppercase py-2">Key</TableHead>
+                <TableHead className="text-[10px] font-bold uppercase py-2">连接模式</TableHead>
+                <TableHead className="text-[10px] font-bold uppercase py-2">IP 地址</TableHead>
+                <TableHead className="text-[10px] font-bold uppercase py-2 w-24">端口</TableHead>
+                <TableHead className="text-[10px] font-bold uppercase py-2">Profile</TableHead>
+                <TableHead className="text-[10px] font-bold uppercase py-2">实时状态</TableHead>
+                <TableHead className="text-[10px] font-bold uppercase py-2 text-right w-28">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -286,106 +298,108 @@ export const LineConfigTable: React.FC = () => {
                       ? "--"
                       : `${status.latency_ms}ms`;
                 return (
-                  <TableRow key={`${line.key || line.name || "line"}-${index}`}>
-                  <TableCell>
-                    <Input
-                      value={line.name ?? ""}
-                      onChange={(e) => handleLineChange(index, "name", e.target.value)}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      value={line.key ?? ""}
-                      onChange={(e) => handleLineChange(index, "key", e.target.value)}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Select
-                      value={line.mode || "direct"}
-                      onValueChange={(value) => handleLineChange(index, "mode", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
+                  <TableRow key={`${line.key || line.name || "line"}-${index}`} className="border-b border-border/50 hover:bg-muted/30 group">
+                    <TableCell className="py-1.5">
+                      <input
+                        className="bg-transparent border-none focus:ring-1 focus:ring-primary w-full text-[12px] font-bold px-1 py-0.5 rounded-sm"
+                        value={line.name ?? ""}
+                        onChange={(e) => handleLineChange(index, "name", e.target.value)}
+                      />
+                    </TableCell>
+                    <TableCell className="py-1.5">
+                      <input
+                        className="bg-transparent border-none focus:ring-1 focus:ring-primary w-full text-[12px] font-mono px-1 py-0.5 rounded-sm text-muted-foreground"
+                        value={line.key ?? ""}
+                        onChange={(e) => handleLineChange(index, "key", e.target.value)}
+                      />
+                    </TableCell>
+                    <TableCell className="py-1.5">
+                      <select
+                        className="bg-background border border-border text-[11px] rounded-sm px-1 py-1 w-full focus:ring-1 focus:ring-primary focus:outline-none"
+                        value={line.mode || "direct"}
+                        onChange={(e) => handleLineChange(index, "mode", e.target.value)}
+                      >
                         {modeOptions.map((mode) => (
-                          <SelectItem key={mode} value={mode}>
-                            {mode}
-                          </SelectItem>
+                          <option key={mode} value={mode}>{mode.toUpperCase()}</option>
                         ))}
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      value={line.ip ?? ""}
-                      onChange={(e) => handleLineChange(index, "ip", e.target.value)}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      value={line.port ?? ""}
-                      onChange={(e) =>
-                        handleLineChange(index, "port", e.target.value)
-                      }
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      value={line.profile ?? ""}
-                      onChange={(e) =>
-                        handleLineChange(index, "profile", e.target.value)
-                      }
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-xs">
-                      <div className={online ? "text-emerald-500" : "text-muted-foreground"}>
-                        {online ? "在线" : "离线"}
+                      </select>
+                    </TableCell>
+                    <TableCell className="py-1.5">
+                      <input
+                        className="bg-transparent border-none focus:ring-1 focus:ring-primary w-full text-[12px] font-mono px-1 py-0.5 rounded-sm"
+                        value={line.ip ?? ""}
+                        onChange={(e) => handleLineChange(index, "ip", e.target.value)}
+                      />
+                    </TableCell>
+                    <TableCell className="py-1.5">
+                      <input
+                        className="bg-transparent border-none focus:ring-1 focus:ring-primary w-full text-[12px] font-mono px-1 py-0.5 rounded-sm"
+                        value={line.port ?? ""}
+                        onChange={(e) => handleLineChange(index, "port", e.target.value)}
+                      />
+                    </TableCell>
+                    <TableCell className="py-1.5">
+                      <input
+                        className="bg-transparent border-none focus:ring-1 focus:ring-primary w-full text-[12px] font-mono px-1 py-0.5 rounded-sm"
+                        value={line.profile ?? ""}
+                        onChange={(e) => handleLineChange(index, "profile", e.target.value)}
+                      />
+                    </TableCell>
+                    <TableCell className="py-1.5">
+                      <div className="flex flex-col gap-0.5 text-[10px] font-mono">
+                        <div className={`flex items-center gap-1.5 font-bold ${online ? "text-emerald-500" : "text-muted-foreground"}`}>
+                          <div className={`w-1.5 h-1.5 rounded-full ${online ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground"}`} />
+                          {online ? "ONLINE" : "OFFLINE"}
+                        </div>
+                        <div className="flex gap-2 opacity-60 italic">
+                          <span>AGE:{ageText}</span>
+                          <span>LAT:{latency}</span>
+                        </div>
                       </div>
-                      <div className="text-muted-foreground">最新: {ageText}</div>
-                      <div className="text-muted-foreground">延迟: {latency}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleTestLine(line)}
-                      title="测试接口"
-                    >
-                      <Play className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleRestartLine(line)}
-                      title="重启产线"
-                    >
-                      <RefreshCcw className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => handleDeleteLine(index)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
+                    </TableCell>
+                    <TableCell className="py-1.5 text-right flex justify-end items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 hover:bg-primary/20 hover:text-primary"
+                        onClick={() => handleTestLine(line)}
+                        title="测试连接"
+                      >
+                        <Play className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 hover:bg-primary/20 hover:text-primary"
+                        onClick={() => handleRestartLine(line)}
+                        title="重启服务"
+                      >
+                        <RefreshCcw className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 hover:bg-destructive/20 hover:text-destructive"
+                        onClick={() => handleDeleteLine(index)}
+                        title="移除产线"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
                 );
               })}
               {lines.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-sm text-muted-foreground">
-                    暂无产线数据
+                  <TableCell colSpan={8} className="py-8 text-center text-[11px] text-muted-foreground font-mono">
+                    NO PRODUCTION LINE DATA DETECTED
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 };

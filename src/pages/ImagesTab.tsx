@@ -1,7 +1,7 @@
 import type { Defect, SteelPlate, ImageOrientation } from "../types/app.types";
-import type { SurfaceImageInfo } from "../src/api/types";
+import type { SurfaceImageInfo } from "../api/types";
 import { LargeImageViewer } from "../components/LargeImageViewer/LargeImageViewer";
-import type { Tile } from "../components/LargeImageViewer/utils";
+import { useState, useMemo } from "react";
 import {
   buildOrientationLayout,
   pickSurfaceForTile,
@@ -9,8 +9,9 @@ import {
   convertDefectToWorldRect,
   type SurfaceLayout,
 } from "../utils/imageOrientation";
-import { getTileImageUrl } from "../src/api/client";
+import { getTileImageUrl } from "../api/client";
 import { drawTileImage, tryDrawFallbackTile } from "../utils/tileFallback";
+import type { Tile } from "../components/LargeImageViewer/utils";
 
 const tileImageCache = new Map<string, HTMLImageElement>();
 const tileImageLoading = new Set<string>();

@@ -1,4 +1,4 @@
-import type { SurfaceImageInfo, Surface } from "../src/api/types";
+import type { SurfaceImageInfo, Surface } from "../api/types";
 import type { SurfaceFilter, ImageOrientation } from "../types/app.types";
 import type { Tile } from "../components/LargeImageViewer/utils";
 import type { Defect } from "../types/app.types";

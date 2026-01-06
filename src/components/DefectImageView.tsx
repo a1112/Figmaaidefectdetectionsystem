@@ -1,13 +1,13 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { AlertCircle } from "lucide-react";
-import { env } from "../src/config/env";
+import { env } from "../config/env";
 import type {
-  SteelPlate,
   Defect,
+  SteelPlate,
   ImageOrientation,
 } from "../types/app.types";
-import type { SurfaceImageInfo } from "../src/api/types";
-import { getTileImageUrl } from "../src/api/client";
+import type { SurfaceImageInfo } from "../api/types";
+import { getTileImageUrl } from "../api/client";
 import { LargeImageViewer } from "./LargeImageViewer/LargeImageViewer";
 import type { Tile } from "./LargeImageViewer/utils";
 import {

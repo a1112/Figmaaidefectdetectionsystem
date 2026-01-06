@@ -16,33 +16,33 @@ import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Separator } from "../ui/separator";
 import { toast } from "sonner@2.0.3";
 import { useTheme, themePresets } from "../ThemeContext";
-import { getUiSettings, saveUiSettings } from "../../src/api/admin";
+import { getUiSettings, saveUiSettings } from "../../api/admin";
 
-interface UIConfig {
+export interface UIConfig {
+  theme: "light" | "dark" | "auto";
   themePreset: string;
   customTheme: boolean;
-  theme: "light" | "dark" | "auto";
-  language: string;
-  fontSize: number;
-  compactMode: boolean;
-  showGridLines: boolean;
-  animationSpeed: number;
   primaryColor: string;
   accentColor: string;
+  language: string;
+  fontSize: number;
+  animationSpeed: number;
+  compactMode: boolean;
+  showGridLines: boolean;
   autoRefreshInterval: number;
 }
 
 const defaultConfig: UIConfig = {
-  themePreset: "industrial-blue",
-  customTheme: false,
   theme: "dark",
+  themePreset: "industrial-dark",
+  customTheme: false,
+  primaryColor: "#3b82f6",
+  accentColor: "#6366f1",
   language: "zh-CN",
   fontSize: 14,
+  animationSpeed: 300,
   compactMode: true,
   showGridLines: true,
-  animationSpeed: 300,
-  primaryColor: "#3b82f6",
-  accentColor: "#8b5cf6",
   autoRefreshInterval: 30,
 };
 
@@ -64,6 +64,13 @@ export const UISettings: React.FC = () => {
       try {
         const payload = await getUiSettings(defaultConfig);
         if (cancelled) return;
+
+        // 确保加载的配置在预设范围内
+        const presetExists = themePresets.some((p) => p.id === payload.themePreset);
+        if (!presetExists) {
+          payload.themePreset = themePresets[0].id;
+        }
+
         setConfig(payload);
         setHasChanges(false);
       } catch (error) {
@@ -81,10 +88,7 @@ export const UISettings: React.FC = () => {
     };
   }, []);
 
-  const handleChange = <K extends keyof UIConfig>(
-    key: K,
-    value: UIConfig[K]
-  ) => {
+  const handleChange = <K extends keyof UIConfig>(key: K, value: UIConfig[K]) => {
     setConfig((prev) => ({ ...prev, [key]: value }));
     setHasChanges(true);
   };
@@ -100,6 +104,8 @@ export const UISettings: React.FC = () => {
         accentColor: preset.colors.accent,
       }));
       setHasChanges(true);
+      // 立即应用主题以增强交互反馈
+      applyTheme(preset);
     }
   };
 
@@ -109,6 +115,9 @@ export const UISettings: React.FC = () => {
       await saveUiSettings(config);
       toast.success("UI设置已保存");
       setHasChanges(false);
+
+      // 保存时确保应用当前选中的预设
+      applyThemeById(config.themePreset);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "保存 UI 设置失败";
@@ -247,9 +256,7 @@ export const UISettings: React.FC = () => {
                 <Switch
                   id="customTheme"
                   checked={config.customTheme}
-                  onCheckedChange={(checked) =>
-                    handleChange("customTheme", checked)
-                  }
+                  onCheckedChange={(checked) => handleChange("customTheme", checked)}
                 />
                 <Label htmlFor="customTheme">启用自定义主题</Label>
               </div>
@@ -411,9 +418,7 @@ export const UISettings: React.FC = () => {
               <Switch
                 id="compactMode"
                 checked={config.compactMode}
-                onCheckedChange={(checked) =>
-                  handleChange("compactMode", checked)
-                }
+                onCheckedChange={(checked) => handleChange("compactMode", checked)}
               />
             </div>
 

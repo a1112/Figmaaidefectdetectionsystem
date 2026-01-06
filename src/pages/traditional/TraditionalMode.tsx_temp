@@ -1,0 +1,56 @@
+// ... existing code ...
+                <div className="flex gap-1">
+                <ZoomIn className="w-3 h-3" />
+                <ZoomOut className="w-3 h-3" />
+              </div>
+            </div>
+            <div className="flex-1 relative flex justify-center bg-[#161b22]/30">
+               <div className="w-px h-full bg-[#30363d] absolute" />
+               <div className="absolute right-0 top-1/2 -rotate-90 origin-right text-[10px] text-[#8b949e] tracking-widest whitespace-nowrap translate-x-12">
+                 传动侧分布
+               </div>
+            </div>
+            <div className="h-4 bg-[#161b22] text-[8px] flex items-center px-1 text-[#8b949e]">446.0</div>
+          </div>
+         )}
+       </div>
+
+      {/* Footer / Status Bar */}
+      <footer className="h-5 bg-[#010409] border-t border-[#30363d] flex items-center justify-between px-2 text-[9px] text-[#8b949e] shrink-0">
+        <div className="flex gap-4">
+          <span className="flex items-center gap-1"><Monitor className="w-3 h-3" /> WORKSTATION-01</span>
+          <span className="flex items-center gap-1"><Database className="w-3 h-3" /> DB-CONNECTED</span>
+        </div>
+        <div className="flex gap-4">
+          <span>MEM: 24.5GB / 32GB</span>
+          <span>CPU: 12%</span>
+          <span className="text-[#58a6ff]">© 2026 北科工研 BKVISION</span>
+        </div>
+      </footer>
+      <DataSourceModal
+        isOpen={isDataSourceOpen}
+        onClose={() => setIsDataSourceOpen(false)}
+        nodes={apiNodes}
+        onRefresh={refreshDataSources}
+        currentLineKey={apiNodes.find(n => n?.line_name?.includes("1780"))?.line_key || ""}
+        onConfirm={(lineKey) => {
+          const node = apiNodes.find(n => n.line_key === lineKey);
+          if (node) {
+            setCurrentLine(node.line_name);
+            toast.success(`已切换至: ${node.line_name}`);
+          }
+          setIsDataSourceOpen(false);
+        }}
+      />
+      <LoginModal
+        isOpen={isLoginOpen}
+        onClose={() => setIsLoginOpen(false)}
+        onLogin={(user) => {
+          setCurrentUser(user);
+          saveUser(user);
+          toast.success(`欢迎回来, ${user.username}`);
+        }}
+      />
+    </div>
+  );
+}

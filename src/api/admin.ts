@@ -170,10 +170,11 @@ const MOCK_DATA_KEY = "admin_mock_data";
 
 const getAdminBaseUrl = (): string => {
   if (env.getMode() === "cors") {
-    return `${env.getCorsBaseUrl().replace(/\/+$/, "")}/config`;
+    const base = env.getCorsBaseUrl().replace(/\/+$/, "");
+    return `${base}/api/config`;
   }
   if (env.getMode() === "production") {
-    return "/config";
+    return "/api/config";
   }
   return "";
 };
@@ -303,12 +304,20 @@ export async function getUsers(): Promise<AdminUser[]> {
     ];
   }
   const url = `${getAdminBaseUrl()}/admin/users`;
-  const response = await fetch(url, { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error("加载用户列表失败");
+  try {
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`加载用户列表失败: ${response.status} ${response.statusText}`);
+    }
+    const data = await response.json();
+    return (data.items ?? []) as AdminUser[];
+  } catch (error) {
+    console.error("❌ getUsers failed:", error);
+    if (error instanceof TypeError && error.message === "Failed to fetch") {
+      throw new Error(`无法连接到远程服务器管理接口。\n请检查地址是否正确：${url}\n并确保已信任自签名证书。`);
+    }
+    throw error;
   }
-  const data = await response.json();
-  return (data.items ?? []) as AdminUser[];
 }
 
 export async function getRoles(): Promise<AdminRole[]> {
@@ -323,12 +332,17 @@ export async function getRoles(): Promise<AdminRole[]> {
     ];
   }
   const url = `${getAdminBaseUrl()}/admin/roles`;
-  const response = await fetch(url, { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error("加载角色列表失败");
+  try {
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`加载角色列表失败: ${response.status} ${response.statusText}`);
+    }
+    const data = await response.json();
+    return (data.items ?? []) as AdminRole[];
+  } catch (error) {
+    console.error("❌ getRoles failed:", error);
+    throw error;
   }
-  const data = await response.json();
-  return (data.items ?? []) as AdminRole[];
 }
 
 export async function getPolicies(): Promise<AdminPolicy[]> {
@@ -357,12 +371,17 @@ export async function getPolicies(): Promise<AdminPolicy[]> {
     ];
   }
   const url = `${getAdminBaseUrl()}/admin/policies`;
-  const response = await fetch(url, { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error("加载权限策略失败");
+  try {
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`加载权限策略失败: ${response.status} ${response.statusText}`);
+    }
+    const data = await response.json();
+    return (data.items ?? []) as AdminPolicy[];
+  } catch (error) {
+    console.error("❌ getPolicies failed:", error);
+    throw error;
   }
-  const data = await response.json();
-  return (data.items ?? []) as AdminPolicy[];
 }
 
 export async function createUser(payload: AdminUserPayload): Promise<AdminUser> {
@@ -550,12 +569,25 @@ export async function deletePolicy(id: number): Promise<void> {
 
 export async function getLineConfig(): Promise<LineConfigPayload> {
   const url = `${getAdminBaseUrl()}/lines`;
-  const response = await fetch(url, { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error("加载产线配置失败");
+  try {
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`加载产线配置失败: ${response.status} ${response.statusText}`);
+    }
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      console.warn("⚠️ getLineConfig: Received non-JSON response. Using defaults.");
+      return { lines: [] };
+    }
+    const data = await response.json();
+    return { lines: data.lines ?? [], defaults: data.defaults ?? {} };
+  } catch (error) {
+    console.warn("⚠️ getLineConfig failed:", error);
+    if (error instanceof TypeError && error.message === "Failed to fetch") {
+      console.error(`Fetch error at ${url}. Possible CORS or Network issue.`);
+    }
+    return { lines: [] };
   }
-  const data = await response.json();
-  return { lines: data.lines ?? [], defaults: data.defaults ?? {} };
 }
 
 export async function saveLineConfig(payload: LineConfigPayload): Promise<void> {
@@ -573,12 +605,22 @@ export async function saveLineConfig(payload: LineConfigPayload): Promise<void> 
 
 export async function getConfigApiList(): Promise<ConfigApiNode[]> {
   const url = `${getAdminBaseUrl()}/api_list`;
-  const response = await fetch(url, { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error("加载产线状态失败");
+  try {
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`加载产线状态失败: ${response.status} ${response.statusText}`);
+    }
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      console.warn("⚠️ getConfigApiList: Received non-JSON response.");
+      return [];
+    }
+    const data = await response.json();
+    return (data.items ?? []) as ConfigApiNode[];
+  } catch (error) {
+    console.warn("⚠️ getConfigApiList failed:", error);
+    return [];
   }
-  const data = await response.json();
-  return (data.items ?? []) as ConfigApiNode[];
 }
 
 export const getConfigSpeedTestUrl = (options?: {
@@ -596,17 +638,67 @@ export const getConfigSpeedTestUrl = (options?: {
 export async function getNginxConfig(): Promise<NginxConfigPayload> {
   if (env.isDevelopment()) {
     return {
-      path: "../plugins/platforms/windows/nginx/conf/nginx.conf",
-      content: "# Start backend to load nginx.conf\n",
+      path: "/etc/nginx/conf.d/bkvision.conf",
+      content: `map $http_upgrade $connection_upgrade {
+  default upgrade;
+  '' close;
+}
+
+server {
+  listen 443 ssl;
+  server_name bkvision.online;
+
+  ssl_certificate /etc/nginx/ssl/bkvision.online.crt;
+  ssl_certificate_key /etc/nginx/ssl/bkvision.online.key;
+
+  # [IMPORTANT] CORS Configuration for Cross-Origin UI Access
+  location /api/ {
+    # Allow cross-origin requests from any domain (or specify your UI domain)
+    add_header 'Access-Control-Allow-Origin' '*' always;
+    add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE' always;
+    add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization' always;
+    add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range' always;
+
+    # Handle OPTIONS preflight requests
+    if ($request_method = 'OPTIONS') {
+      add_header 'Access-Control-Allow-Origin' '*';
+      add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE';
+      add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization';
+      add_header 'Access-Control-Max-Age' 1728000;
+      add_header 'Content-Type' 'text/plain; charset=utf-8';
+      add_header 'Content-Length' 0;
+      return 204;
+    }
+
+    # Proxy to Backend Service
+    # Note: the trailing slash in proxy_pass strips the '/api/' prefix
+    proxy_pass http://127.0.0.1:8120/; 
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+
+  location / {
+    root /var/www/bkvision/dist;
+    index index.html;
+    try_files $uri $uri/ /index.html;
+  }
+}`,
     };
   }
   const url = `${getAdminBaseUrl()}/config/nginx`;
-  const response = await fetch(url, { cache: "no-store" });
-  if (!response.ok) {
-    const data = await response.json().catch(() => null);
-    throw new Error(data?.detail || "Failed to load nginx config");
+  try {
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.detail || `Failed to load nginx config: ${response.status}`);
+    }
+    return (await response.json()) as NginxConfigPayload;
+  } catch (error) {
+    console.error("❌ getNginxConfig failed:", error);
+    throw error;
   }
-  return (await response.json()) as NginxConfigPayload;
 }
 
 export async function getSystemInfo(): Promise<SystemInfoPayload> {
@@ -670,12 +762,24 @@ export async function getSystemInfo(): Promise<SystemInfoPayload> {
     };
   }
   const url = `${getAdminBaseUrl()}/system-info`;
-  const response = await fetch(url, { cache: "no-store" });
-  if (!response.ok) {
-    const data = await response.json().catch(() => null);
-    throw new Error(data?.detail || "Failed to load system info");
+  try {
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.detail || `Failed to load system info: ${response.status}`);
+    }
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      throw new Error("Received non-JSON response for system info");
+    }
+    return (await response.json()) as SystemInfoPayload;
+  } catch (error) {
+    console.error("❌ getSystemInfo failed:", error);
+    if (error instanceof TypeError && error.message === "Failed to fetch") {
+       throw new Error(`无法连接到系统信息接口。\nURL: ${url}\n这通常是由于跨域(CORS)请求被拦截或证书不信任导致。`);
+    }
+    throw error;
   }
-  return (await response.json()) as SystemInfoPayload;
 }
 
 export const getSystemMetricsWsUrl = (): string => {
@@ -695,16 +799,25 @@ export async function getConfigMate(): Promise<ConfigMatePayload> {
     };
   }
   const url = `${getAdminBaseUrl()}/mate`;
-  const response = await fetch(url, { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error("Failed to load config mate");
+  try {
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`Failed to load config mate: ${response.status}`);
+    }
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      return { lines: [], defaults: {} };
+    }
+    const data = (await response.json()) as ConfigMateResponse;
+    const payload = data.payload;
+    if (Array.isArray(payload)) {
+      return { lines: payload };
+    }
+    return payload as ConfigMatePayload;
+  } catch (error) {
+    console.warn("⚠️ getConfigMate failed:", error);
+    return { lines: [], defaults: {} };
   }
-  const data = (await response.json()) as ConfigMateResponse;
-  const payload = data.payload;
-  if (Array.isArray(payload)) {
-    return { lines: payload };
-  }
-  return payload as ConfigMatePayload;
 }
 
 export async function restartLine(lineKey: string): Promise<void> {

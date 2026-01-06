@@ -16,6 +16,13 @@ import {
   ServerResourcesPanel,
 } from "./system/SystemMetricsBlocks";
 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
+
 interface SystemDiagnosticDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -27,7 +34,6 @@ export function SystemDiagnosticDialog({
   onClose,
   triggerRef,
 }: SystemDiagnosticDialogProps) {
-  const [position, setPosition] = useState({ top: 0, left: 0 });
   const [cameraStatus, setCameraStatus] = useState({
     online: true,
     fps: 30,
@@ -52,16 +58,6 @@ export function SystemDiagnosticDialog({
     return () => clearInterval(interval);
   }, [isOpen]);
 
-  useEffect(() => {
-    if (isOpen && triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect();
-      setPosition({
-        top: rect.bottom + 8,
-        left: rect.left - 500 + rect.width,
-      });
-    }
-  }, [isOpen, triggerRef]);
-
   if (!isOpen) return null;
 
   const handleResetSystem = () => {
@@ -85,42 +81,22 @@ export function SystemDiagnosticDialog({
   };
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
-        onClick={onClose}
-      />
-
-      {/* Dialog */}
-      <div
-        className="fixed z-50 bg-card border-2 border-primary shadow-2xl shadow-primary/20"
-        style={{
-          top: `${position.top}px`,
-          left: `${position.left}px`,
-          width: "550px",
-        }}
-      >
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[580px] bg-card/80 backdrop-blur-xl border-border shadow-2xl p-0 overflow-hidden">
         {/* Header */}
-        <div className="bg-primary/20 border-b-2 border-primary px-4 py-2.5 flex items-center justify-between">
+        <DialogHeader className="p-4 border-b border-border bg-primary/5">
           <div className="flex items-center gap-2">
-            <Activity className="w-4 h-4 text-primary" />
-            <h3 className="font-bold text-sm uppercase tracking-wider">
+            <Activity className="w-5 h-5 text-primary" />
+            <DialogTitle className="text-sm font-bold uppercase tracking-wider">
               系统诊断 / SYSTEM DIAGNOSTIC
-            </h3>
+            </DialogTitle>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-primary/30 rounded transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+        </DialogHeader>
 
         {/* Content */}
-        <div className="p-4 space-y-4 max-h-[600px] overflow-y-auto">
+        <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
           {/* 相机状态 */}
-          <div className="bg-muted/30 border border-border/50 p-3">
+          <div className="bg-muted/30 border border-border/50 rounded-lg p-3">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Camera className="w-4 h-4 text-blue-400" />
@@ -184,7 +160,7 @@ export function SystemDiagnosticDialog({
 
             <button
               onClick={handleRestartCamera}
-              className="w-full mt-3 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold border border-blue-500/50 transition-colors flex items-center justify-center gap-2"
+              className="w-full mt-3 px-3 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 text-xs font-bold border border-blue-500/30 rounded-md transition-colors flex items-center justify-center gap-2"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               重启相机
@@ -202,28 +178,27 @@ export function SystemDiagnosticDialog({
         </div>
 
         {/* Footer Actions */}
-        <div className="border-t-2 border-primary bg-muted/20 p-3">
+        <div className="border-t border-border bg-muted/20 p-4">
           <div className="flex items-center gap-2">
             <button
               onClick={handleResetSystem}
-              className="flex-1 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-bold border border-yellow-500/50 transition-colors flex items-center justify-center gap-2"
+              className="flex-1 px-4 py-2 bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-500 text-xs font-bold border border-yellow-500/30 rounded-md transition-colors flex items-center justify-center gap-2"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               一键恢复
             </button>
             <button
               onClick={onClose}
-              className="px-6 py-2 bg-muted hover:bg-accent text-foreground text-xs font-bold border border-border transition-colors"
+              className="px-6 py-2 bg-muted hover:bg-accent text-foreground text-xs font-bold border border-border rounded-md transition-colors"
             >
               关闭
             </button>
           </div>
-          <div className="mt-2 text-[9px] text-muted-foreground text-center">
-            最后更新: {new Date().toLocaleTimeString("zh-CN")} |
-            系统版本: v2.0.1
+          <div className="mt-3 text-[10px] text-muted-foreground text-center font-mono">
+            最后更新: {new Date().toLocaleTimeString("zh-CN")} | 系统版本: v2.0.1
           </div>
         </div>
-      </div>
-    </>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -18,7 +18,7 @@ import type {
   SurfaceImageInfo,
   ApiNode,
 } from "./types";
-import { DEFECT_TYPES, mapDefectItem } from "./types";
+import { mapDefectItem } from "./types";
 
 // 钢种列表（基于真实数据）
 const steelGrades = [
@@ -139,7 +139,6 @@ const defectTypeDescriptions = defectClassItems
  * 格式：H + 9位数字
  */
 function generateSteelNo(seqNo: number): string {
-  // 基于 seq_no 生成伪随机但稳定的钢板号
   const randomPart = String(seqNo * 123456 + 411000000).slice(
     0,
     9,
@@ -152,7 +151,7 @@ function generateSteelNo(seqNo: number): string {
  */
 function generateMockSteel(seqNo: number): SteelItemRaw {
   const now = new Date();
-  const timestamp = new Date(now.getTime() - seqNo * 60000); // 每个钢板间隔1分钟
+  const timestamp = new Date(now.getTime() - seqNo * 60000);
 
   return {
     seq_no: seqNo,
@@ -161,20 +160,19 @@ function generateMockSteel(seqNo: number): SteelItemRaw {
       steelGrades[
         Math.floor(Math.random() * steelGrades.length)
       ],
-    length: Math.floor(Math.random() * 2000) + 6000, // 6000-8000mm（基于真实数据）
-    width: Math.floor(Math.random() * 1000) + 3000, // 3000-4000mm
-    thickness: Math.floor(Math.random() * 200) + 100, // 100-300mm
+    length: Math.floor(Math.random() * 2000) + 6000,
+    width: Math.floor(Math.random() * 1000) + 3000,
+    thickness: Math.floor(Math.random() * 200) + 100,
     timestamp: timestamp.toISOString(),
     level: ["A", "B", "C", "D"][
       Math.floor(Math.random() * 4)
     ] as "A" | "B" | "C" | "D",
-    defect_count: Math.floor(Math.random() * 50) + 50, // 50-100个缺陷（基于真实数据）
+    defect_count: Math.floor(Math.random() * 50) + 50,
   };
 }
 
 /**
  * 生成随机缺陷数据（基于真实数据格式）
- * 使用绝对像素坐标，而非百分比
  */
 export function generateMockDefect(
   seqNo: number,
@@ -185,27 +183,23 @@ export function generateMockDefect(
   const surface =
     surfaces[Math.floor(Math.random() * surfaces.length)];
 
-  // 图像尺寸（基于 TestData/meta.json）
   const frameWidth = 16384;
   const frameHeight = 1024;
 
-  // 随机缺陷类型（使用真实的中文描述）
   const defectType =
     defectTypeDescriptions[
       Math.floor(Math.random() * defectTypeDescriptions.length)
     ];
 
-  // 生成绝对像素坐标（基于真实数据范围）
-  const defectWidth = Math.floor(Math.random() * 600) + 200; // 200-800px
-  const defectHeight = Math.floor(Math.random() * 200) + 50; // 50-250px
+  const defectWidth = Math.floor(Math.random() * 600) + 200;
+  const defectHeight = Math.floor(Math.random() * 200) + 50;
   const x = Math.floor(
     Math.random() * (frameWidth - defectWidth - 1000) + 500,
-  ); // 留出边距
+  );
   const y = Math.floor(
     Math.random() * (frameHeight - defectHeight - 100) + 50,
-  ); // 留出边距
+  );
 
-  // image_index 范围（基于 TestData/steel_meta_seq12.json）
   const maxFrameIndex = surface === "top" ? 19 : 21;
 
   return {
@@ -217,7 +211,7 @@ export function generateMockDefect(
     y: y,
     width: defectWidth,
     height: defectHeight,
-    confidence: 1.0, // 固定为 1.0（基于真实数据）
+    confidence: 1.0,
     surface: surface,
     image_index: Math.floor(Math.random() * maxFrameIndex),
   };
@@ -227,7 +221,6 @@ function generateMockDefectList(
   seqNo: number,
   defectCount?: number,
 ): DefectItemRaw[] {
-  // 🔧 开发模式：生成 50-100 条缺陷数据用于测试滚动（基于真实数据量）
   const count =
     defectCount ?? Math.floor(Math.random() * 50) + 50;
   const defects: DefectItemRaw[] = [];
@@ -257,20 +250,18 @@ export function generateMockDefects(
 export async function mockListSteels(
   limit: number = 20,
 ): Promise<SteelListResponse> {
-  // 模拟网络延迟
   await new Promise((resolve) =>
     setTimeout(resolve, 300 + Math.random() * 200),
   );
 
   const steels: SteelItemRaw[] = [];
-  // 从较大的 seq_no 开始生成，确保数据多样性
   const startSeqNo = 1000;
   for (let i = 0; i < limit; i++) {
     steels.push(generateMockSteel(startSeqNo + i));
   }
 
   return {
-    steels: steels.reverse(), // 最新的在前面
+    steels: steels.reverse(),
     total: limit,
   };
 }
@@ -281,7 +272,6 @@ export async function mockListSteels(
 export async function mockGetDefects(
   seqNo: number,
 ): Promise<DefectResponse> {
-  // 模拟网络延迟
   await new Promise((resolve) =>
     setTimeout(resolve, 200 + Math.random() * 150),
   );
@@ -289,7 +279,6 @@ export async function mockGetDefects(
   const defects: DefectItemRaw[] =
     generateMockDefectList(seqNo);
 
-  // 基于真实数据的图像元信息
   const surfaceImages: SurfaceImageInfo[] = [
     {
       surface: "top",
@@ -321,23 +310,19 @@ export async function mockGetFrameImage(
   seqNo: number,
   imageIndex: number,
 ): Promise<string> {
-  // 模拟网络延迟
   await new Promise((resolve) => setTimeout(resolve, 100));
 
-  // 返回 placeholder 图像
   const width = 800;
   const height = 600;
   const seed = `${seqNo}-${surface}-${imageIndex}`;
 
-  // 使用 picsum.photos 作为占位图
   return `https://picsum.photos/seed/${seed}/${width}/${height}`;
 }
 
 /**
- * Mock: 健康检查（基于真实数据格式）
+ * Mock: 健康检查
  */
 export async function mockHealthCheck(): Promise<HealthResponse> {
-  // 模拟网络延迟
   await new Promise((resolve) =>
     setTimeout(resolve, 50 + Math.random() * 50),
   );
@@ -354,7 +339,7 @@ export async function mockHealthCheck(): Promise<HealthResponse> {
 }
 
 /**
- * Mock: 缺陷字典（基于真实数据）
+ * Mock: 缺陷字典
  */
 export async function mockGetDefectClasses(): Promise<DefectClassesResponse> {
   await new Promise((resolve) => setTimeout(resolve, 120));

@@ -14,6 +14,7 @@ import type {
   SteelMetaResponse,
   ApiListResponse,
   ApiNode,
+  DefectClassesResponse,
 } from "./types";
 import * as mock from "./mock";
 
@@ -492,14 +493,27 @@ export async function getApiList(): Promise<ApiNode[]> {
   }
   const url =
     env.getMode() === "cors"
-      ? `${env.getCorsBaseUrl().replace(/\/+$/, "")}/config/api_list`
-      : "/config/api_list";
-  const response = await fetch(url, { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error(`加载 API 列表失败: ${response.status} ${response.statusText}`);
+      ? `${env.getCorsBaseUrl().replace(/\/+$/, "")}/api/config/api_list`
+      : "/api/config/api_list";
+  
+  try {
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`加载 API 列表失败: ${response.status} ${response.statusText}`);
+    }
+    
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      console.warn("⚠️ getApiList: Received non-JSON response (likely HTML index). Falling back to empty list.");
+      return [];
+    }
+    
+    const data: ApiListResponse = await response.json();
+    return data.items ?? [];
+  } catch (error) {
+    console.warn("⚠️ getApiList failed:", error);
+    return []; // Return empty list instead of crashing
   }
-  const data: ApiListResponse = await response.json();
-  return data.items ?? [];
 }
 
 /**

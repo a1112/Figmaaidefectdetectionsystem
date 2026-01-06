@@ -10,17 +10,15 @@ import {
 } from "lucide-react";
 import { ModeSwitch } from "../ModeSwitch";
 import type {
-  Theme,
+  ActiveTab,
   ImageOrientation,
 } from "../../types/app.types";
-import { env, type ApiProfile } from "../../src/config/env";
-import type { ApiNode } from "../../src/api/types";
+import { env, type ApiProfile } from "../../config/env";
+import type { ApiNode } from "../../api/types";
 import { useTheme, themePresets } from "../ThemeContext";
 import { Button } from "../ui/button";
 
 interface SettingsPageProps {
-  theme: Theme;
-  setTheme: (theme: Theme) => void;
   imageOrientation: ImageOrientation;
   setImageOrientation: (value: ImageOrientation) => void;
   apiNodes: ApiNode[];
@@ -29,8 +27,6 @@ interface SettingsPageProps {
 }
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({
-  theme,
-  setTheme,
   imageOrientation,
   setImageOrientation,
   apiNodes,
@@ -42,12 +38,15 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   );
   const [mode, setMode] = useState(env.getMode());
   const [corsBaseUrl, setCorsBaseUrl] = useState(env.getCorsBaseUrl());
-  const { currentTheme, applyTheme } = useTheme();
+  const { currentTheme, applyTheme, applyThemeById } = useTheme();
+  
+  const theme = currentTheme.colors.background === "#ffffff" ? "light" : "dark";
+
   const activeNode =
     apiNodes.find((node) => node.key === lineName) ?? apiNodes[0];
   const isFullAvailable = Boolean(activeNode?.port);
   const isSmallAvailable = Boolean(activeNode?.small_port);
-
+  
   useEffect(() => {
     const handleModeChange = (e: CustomEvent) => {
       setMode(e.detail);
@@ -92,10 +91,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     <div className="max-w-2xl mx-auto space-y-6 p-8 border border-border bg-card mt-8">
       <div className="pb-4 border-b border-border">
         <h3 className="text-lg font-medium">
-          SYSTEM CONFIGURATION
+          系统配置
         </h3>
         <p className="text-sm text-muted-foreground">
-          Manage detection parameters and device settings
+          管理检测参数与设备设置
         </p>
       </div>
 
@@ -166,7 +165,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm font-medium">
-                  IMAGE SERVER / 图像模式
+                  图像服务器 / 图像模式
                 </div>
                 <div className="text-xs text-muted-foreground mt-0.5">
                   在标准 16K 2D 与 8K SMALL 图像服务实例之间切换
@@ -190,7 +189,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   <HardDrive className="w-4 h-4" />
                   <div className="text-left">
                     <div className="text-xs font-semibold">
-                      FULL
+                      完整模式
                     </div>
                     <div className="text-[10px] opacity-70">
                       16K 数据 / 原始 2D
@@ -211,7 +210,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   <Minimize2 className="w-4 h-4" />
                   <div className="text-left">
                     <div className="text-xs font-semibold">
-                      SMALL
+                      精简模式
                     </div>
                     <div className="text-[10px] opacity-70">
                       8K 数据 / 精简图像
@@ -245,7 +244,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             </div>
           </div>
           <div className="grid grid-cols-3 gap-2 mt-3">
-            {themePresets.slice(0, 6).map((preset) => (
+            {themePresets.map((preset) => (
               <button
                 key={preset.id}
                 onClick={() => applyTheme(preset)}
@@ -279,17 +278,17 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             ))}
           </div>
           <div className="text-xs text-muted-foreground/80 mt-2">
-            在后台管理中可查看全部 {themePresets.length} 个主题预设
+            当前支持 {themePresets.length} 种精选工业风格
           </div>
         </div>
 
         <div className="grid grid-cols-2 items-center gap-4">
           <label className="text-sm font-medium">
-            THEME MODE / 明暗模式
+            配色方案 / 明暗模式
           </label>
           <div className="flex items-center gap-2 bg-background border border-border rounded-sm p-1">
             <button
-              onClick={() => setTheme("light")}
+              onClick={() => applyThemeById("business-light")}
               className={`flex-1 px-3 py-1.5 text-xs rounded-sm transition-colors flex items-center justify-center gap-1.5 ${
                 theme === "light"
                   ? "bg-primary text-primary-foreground"
@@ -297,10 +296,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               }`}
             >
               <Sun className="w-3.5 h-3.5" />
-              LIGHT
+              浅色
             </button>
             <button
-              onClick={() => setTheme("dark")}
+              onClick={() => applyThemeById("industrial-blue")}
               className={`flex-1 px-3 py-1.5 text-xs rounded-sm transition-colors flex items-center justify-center gap-1.5 ${
                 theme === "dark"
                   ? "bg-primary text-primary-foreground"
@@ -308,7 +307,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               }`}
             >
               <Moon className="w-3.5 h-3.5" />
-              DARK
+              深色
             </button>
           </div>
         </div>
@@ -345,7 +344,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
         <div className="grid grid-cols-2 items-center gap-4">
           <label className="text-sm font-medium">
-            DETECTION THRESHOLD
+            检测阈值
           </label>
           <input
             type="range"
@@ -354,7 +353,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </div>
         <div className="grid grid-cols-2 items-center gap-4">
           <label className="text-sm font-medium">
-            CAMERA EXPOSURE
+            相机曝光
           </label>
           <input
             type="range"
@@ -363,7 +362,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </div>
         <div className="grid grid-cols-2 items-center gap-4">
           <label className="text-sm font-medium">
-            AUTO-ARCHIVE LOGS
+            自动存档日志
           </label>
           <div className="flex items-center gap-2">
             <input
@@ -373,7 +372,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               className="accent-primary w-4 h-4"
             />
             <span className="text-sm text-muted-foreground">
-              ENABLED
+              已开启
             </span>
           </div>
         </div>
@@ -381,10 +380,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
       <div className="pt-4 border-t border-border flex justify-end gap-2">
         <button className="px-4 py-2 border border-border hover:bg-accent text-sm transition-colors">
-          RESET
+          重置
         </button>
         <button className="px-4 py-2 bg-primary text-primary-foreground text-sm hover:bg-primary/90 transition-colors">
-          SAVE CHANGES
+          保存更改
         </button>
       </div>
     </div>

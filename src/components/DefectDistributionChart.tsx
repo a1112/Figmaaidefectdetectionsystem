@@ -1,11 +1,13 @@
 import React, { useMemo, useRef, useEffect, useState } from "react";
-import type { Defect } from "../types/app.types";
-import type { ImageOrientation } from "../types/app.types";
+import type {
+  Defect,
+  ImageOrientation,
+} from "../types/app.types";
 import type {
   SurfaceImageInfo,
   Surface,
-} from "../src/api/types";
-import { getTileImageUrl } from "../src/api/client";
+} from "../api/types";
+import { getTileImageUrl } from "../api/client";
 import type { ViewportInfo } from "./DefectImageView";
 import type { Tile } from "./LargeImageViewer/utils";
 import {
@@ -28,6 +30,8 @@ interface DefectDistributionChartProps {
   viewportInfo?: ViewportInfo | null;
   viewportSurface?: Surface | null;
   imageOrientation?: ImageOrientation;
+  showDistributionImages?: boolean;
+  showTileBorders?: boolean;
   onViewportCenterChange?: (center: { x: number; y: number } | null) => void;
 }
 
@@ -106,6 +110,8 @@ export function DefectDistributionChart({
   viewportSurface,
   imageOrientation: _imageOrientation,
   onViewportCenterChange,
+  showDistributionImages = true,
+  showTileBorders = false,
 }: DefectDistributionChartProps) {
   const getSeverityColor = (severity: string) => {
     switch (severity) {
@@ -121,7 +127,7 @@ export function DefectDistributionChart({
   };
 
   const getDefectBorderColor = (type: string) => {
-    if (defectColors && defectColors[type]) {
+    if (defectColors && defectColors[type] && typeof defectColors[type].border === "string") {
       // 从Tailwind类名中提取颜色
       const colorMatch = defectColors[type].border.match(
         /border-(\w+)-(\d+)/,
@@ -134,7 +140,7 @@ export function DefectDistributionChart({
   };
 
   const getDefectTextColor = (type: string) => {
-    if (defectColors && defectColors[type]) {
+    if (defectColors && defectColors[type] && typeof defectColors[type].text === "string") {
       return defectColors[type].text;
     }
     return "text-primary";
@@ -145,7 +151,7 @@ export function DefectDistributionChart({
   const plateHeight = 120; // 固定高度
 
   const getDistributionTileLevel = (): number => {
-    const preferred = 4; // L4
+    const preferred = 6; // L6 - Optimize for single-row layout
     const normalizedPreferred = Math.max(0, Math.floor(preferred));
     const cap =
       typeof maxTileLevel === "number" && Number.isFinite(maxTileLevel)
@@ -397,15 +403,11 @@ export function DefectDistributionChart({
     const orientation: ImageOrientation = "horizontal";
 
     if (
+      showDistributionImages &&
       meta &&
       typeof (seqNo as number | undefined) === "number"
     ) {
       const level = getDistributionTileLevel();
-      const tileSize = Math.max(
-        defaultTileSize ?? 0,
-        meta.image_height ?? 0,
-        512,
-      );
       const layout = buildOrientationLayout({
         orientation,
         surfaceFilter: surf,
@@ -416,6 +418,23 @@ export function DefectDistributionChart({
       const surfaceLayout = layout.surfaces.find(
         (s) => s.surface === surf,
       );
+
+      // Calculate tileSize based on layout to ensure single row if possible
+      let tileSize = Math.max(
+        defaultTileSize ?? 0,
+        meta.image_height ?? 0,
+        512,
+      );
+
+      if (surfaceLayout) {
+        const factor = Math.pow(2, level);
+        // Ensure virtualTileSize >= worldHeight to use 1 tile height
+        const minRequired = Math.ceil(surfaceLayout.worldHeight / factor);
+        if (minRequired > tileSize) {
+          tileSize = minRequired;
+        }
+      }
+
       if (!surfaceLayout) {
         // no layout available; skip tile rendering
       } else {
@@ -499,8 +518,10 @@ export function DefectDistributionChart({
                 key={`tile-${surf}-L${level}-${tileSize}-${col}-${row}`}
                 src={url}
                 alt="mosaic-tile"
-                className="absolute"
+                className="absolute select-none"
                 draggable={false}
+                loading="lazy"
+                decoding="async"
                 onDragStart={(e) => e.preventDefault()}
                 style={{
                   left,
@@ -508,6 +529,7 @@ export function DefectDistributionChart({
                   width: displayWidth,
                   height: displayHeight,
                   objectFit: "fill",
+                  border: showTileBorders ? "1px solid rgba(255,255,255,0.3)" : "none",
                 }}
               />,
             );
@@ -685,6 +707,9 @@ export function DefectDistributionChart({
 
           {/* 瓦片背景 */}
           {tileImages}
+          {showTileBorders && (
+            <div className="absolute inset-0 border-2 border-dashed border-yellow-500/50 pointer-events-none z-10" />
+          )}
 
           {/* 鸟瞰图视口框 */}
           {viewportBox}

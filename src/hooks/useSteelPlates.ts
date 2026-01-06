@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
-import { env } from "../src/config/env";
-import { listSteels } from "../src/api/client";
-import type { SteelItem } from "../src/api/types";
+import { env } from "../config/env";
+import { listSteels } from "../api/client";
+import type { SteelItem } from "../api/types";
 import type {
-  SteelPlate,
   DetectionRecord,
+  SteelPlate,
 } from "../types/app.types";
 import { generateRandomDefects } from "../utils/defects";
 

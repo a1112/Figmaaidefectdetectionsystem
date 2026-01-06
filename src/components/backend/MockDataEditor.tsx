@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
-import { getMockDataConfig, saveMockDataConfig } from "../../src/api/admin";
+import { getMockDataConfig, saveMockDataConfig } from "../../api/admin";
 
 interface MockDataConfig {
   steelPlateCount: number;
@@ -152,10 +152,7 @@ export const MockDataEditor: React.FC = () => {
       toast.error("该缺陷类型已存在");
       return;
     }
-    handleConfigChange("defectTypes", [
-      ...config.defectTypes,
-      newDefectType.trim(),
-    ]);
+    handleConfigChange("defectTypes", [...config.defectTypes, newDefectType.trim()]);
     setNewDefectType("");
     toast.success("已添加缺陷类型");
   };

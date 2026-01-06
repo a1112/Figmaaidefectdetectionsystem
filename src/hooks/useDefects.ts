@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { env } from '../src/config/env';
-import { getDefects } from '../src/api/client';
-import type { DefectItem } from '../src/api/types';
+import { env } from '../config/env';
+import { getDefects } from '../api/client';
+import type { DefectItem } from '../api/types';
 import type { Defect, SteelPlate } from '../types/app.types';
 
 /**

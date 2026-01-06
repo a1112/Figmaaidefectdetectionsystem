@@ -97,7 +97,7 @@ export type Surface = "top" | "bottom";
 export type Severity = "low" | "medium" | "high";
 
 /**
- * 按表面统计的图像元信息（来自后端 /api/ui/defects）
+ * 按表面统计的图像元信息
  */
 export interface SurfaceImageInfo {
   surface: Surface;
@@ -145,10 +145,11 @@ export interface DefectResponse {
   seq_no: number;
   defects: DefectItemRaw[];
   total_count: number;
+  surface_images?: SurfaceImageInfo[];
 }
 
 /**
- * 钢板图像元信息响应（来自后端 /api/ui/steel-meta）
+ * 钢板图像元信息响应
  */
 export interface SteelMetaResponse {
   seq_no: number;
@@ -196,7 +197,7 @@ export interface FrameImageParams {
  * 健康检查响应
  */
 export interface HealthResponse {
-  status: "healthy" | "unhealthy";
+  status: "healthy" | "unhealthy" | "ok";
   timestamp: string;
   version?: string;
   database?: {

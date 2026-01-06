@@ -12,7 +12,7 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Lock, User, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner@2.0.3";
-import { login, type AuthUser } from "../../src/api/admin";
+import { login, type AuthUser } from "../../api/admin";
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -47,16 +47,16 @@ export function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[420px] bg-card border-border">
+        <DialogContent className="sm:max-w-[420px] bg-zinc-950/80 backdrop-blur-xl border-zinc-800/50 shadow-2xl text-zinc-100">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-2xl text-blue-600">
-              <Lock className="w-5 h-5 text-primary" />
+            <DialogTitle className="flex items-center gap-2 text-2xl text-blue-400 font-semibold tracking-wide">
+              <Lock className="w-5 h-5 text-blue-400" />
               系统登录
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-zinc-400">
               请输入您的凭据以访问钢板缺陷检测系统
             </DialogDescription>
-        </DialogHeader>
+          </DialogHeader>
 
         <form onSubmit={handleLogin} className="space-y-4 py-4">
           {errorMessage && (

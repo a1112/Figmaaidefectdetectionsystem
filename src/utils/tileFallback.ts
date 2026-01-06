@@ -1,13 +1,15 @@
 import type { ImageOrientation } from "../types/app.types";
-import type { Surface } from "../src/api/types";
+import type { Surface } from "../api/types";
 
-export function drawTileImage(params: {
+export interface DrawTileParams {
   ctx: CanvasRenderingContext2D;
   img: HTMLImageElement;
   tile: { x: number; y: number; width: number; height: number };
   orientation: ImageOrientation;
   source?: { x: number; y: number; width: number; height: number };
-}): void {
+}
+
+export function drawTileImage(params: DrawTileParams): void {
   const { ctx, img, tile, orientation, source } = params;
 
   ctx.save();
@@ -116,4 +118,3 @@ export function tryDrawFallbackTile(params: {
 
   return false;
 }
-

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { env } from "../src/config/env";
+import { env } from "../config/env";
 import {
   getSystemMetricsWsUrl,
+  getSystemInfo,
   type SystemMetricsPayload,
-} from "../src/api/admin";
+} from "../api/admin";
 
 export type ResourceSample = {
   timestamp: string;

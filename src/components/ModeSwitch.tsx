@@ -3,8 +3,8 @@
  */
 
 import { useState, useEffect } from "react";
-import { env } from "../src/config/env";
-import { getApiStatus } from "../src/api/client";
+import { env } from "../config/env";
+import { getApiStatus } from "../api/client";
 import { Code, Globe, AlertCircle, Server } from "lucide-react";
 
 export function ModeSwitch() {

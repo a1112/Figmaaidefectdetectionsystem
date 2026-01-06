@@ -19,7 +19,7 @@ export interface ThemePreset {
 export const themePresets: ThemePreset[] = [
   {
     id: "industrial-blue",
-    name: "深蓝工业风",
+    name: "工业深蓝",
     description: "经典工业界面，专业稳重",
     colors: {
       primary: "#3b82f6",
@@ -32,8 +32,8 @@ export const themePresets: ThemePreset[] = [
   },
   {
     id: "midnight-dark",
-    name: "暗夜黑色",
-    description: "纯黑背景，减少眼部疲劳",
+    name: "科技暗夜",
+    description: "高对比度纯黑，极简高效",
     colors: {
       primary: "#60a5fa",
       accent: "#a78bfa",
@@ -44,74 +44,9 @@ export const themePresets: ThemePreset[] = [
     },
   },
   {
-    id: "cyber-purple",
-    name: "赛博紫色",
-    description: "未来科技感，赛博朋克风格",
-    colors: {
-      primary: "#a855f7",
-      accent: "#ec4899",
-      background: "#0d0a1f",
-      foreground: "#f0e7ff",
-      muted: "#1a1229",
-      border: "#2d1f4a",
-    },
-  },
-  {
-    id: "military-green",
-    name: "军事绿色",
-    description: "军工级配色，坚固可靠",
-    colors: {
-      primary: "#22c55e",
-      accent: "#84cc16",
-      background: "#0a0f0a",
-      foreground: "#e8ffe8",
-      muted: "#121812",
-      border: "#1f2e1f",
-    },
-  },
-  {
-    id: "alert-orange",
-    name: "橙色警戒",
-    description: "高对比度，适合监控场景",
-    colors: {
-      primary: "#f97316",
-      accent: "#eab308",
-      background: "#0f0a05",
-      foreground: "#fff5e5",
-      muted: "#1a1208",
-      border: "#2e1f0f",
-    },
-  },
-  {
-    id: "arctic-blue",
-    name: "极光蓝",
-    description: "冷色调，清爽专注",
-    colors: {
-      primary: "#06b6d4",
-      accent: "#0ea5e9",
-      background: "#05111a",
-      foreground: "#e0f7ff",
-      muted: "#0a1929",
-      border: "#1a2e3d",
-    },
-  },
-  {
-    id: "sunset-red",
-    name: "日落橙红",
-    description: "温暖色调，醒目提醒",
-    colors: {
-      primary: "#ef4444",
-      accent: "#f59e0b",
-      background: "#1a0a05",
-      foreground: "#ffe5e5",
-      muted: "#2a1208",
-      border: "#3d1f0f",
-    },
-  },
-  {
     id: "business-light",
-    name: "浅色商务",
-    description: "明亮简洁，适合办公环境",
+    name: "简约浅色",
+    description: "明亮清晰，适合办公环境",
     colors: {
       primary: "#2563eb",
       accent: "#7c3aed",
@@ -119,58 +54,6 @@ export const themePresets: ThemePreset[] = [
       foreground: "#0a0a0a",
       muted: "#f5f5f5",
       border: "#e5e5e5",
-    },
-  },
-  {
-    id: "slate-gray",
-    name: "石板灰",
-    description: "中性灰调，平衡视觉",
-    colors: {
-      primary: "#64748b",
-      accent: "#94a3b8",
-      background: "#0f172a",
-      foreground: "#f1f5f9",
-      muted: "#1e293b",
-      border: "#334155",
-    },
-  },
-  {
-    id: "ruby-red",
-    name: "宝石红",
-    description: "高贵典雅，适合展示场景",
-    colors: {
-      primary: "#dc2626",
-      accent: "#f43f5e",
-      background: "#1a0505",
-      foreground: "#ffe5e5",
-      muted: "#2a0a0a",
-      border: "#3d1515",
-    },
-  },
-  {
-    id: "emerald-green",
-    name: "翡翠绿",
-    description: "自然清新，护眼舒适",
-    colors: {
-      primary: "#10b981",
-      accent: "#34d399",
-      background: "#051a0f",
-      foreground: "#e5fff0",
-      muted: "#0a2a1a",
-      border: "#153d25",
-    },
-  },
-  {
-    id: "gold-luxury",
-    name: "奢华金",
-    description: "金色点缀，高端大气",
-    colors: {
-      primary: "#eab308",
-      accent: "#fbbf24",
-      background: "#1a1505",
-      foreground: "#fffbe5",
-      muted: "#2a2208",
-      border: "#3d3310",
     },
   },
 ];
@@ -191,11 +74,32 @@ export const useTheme = () => {
   return context;
 };
 
-// 将颜色转换为RGB值
-const hexToRgb = (hex: string): string => {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (!result) return "0 0 0";
-  return `${parseInt(result[1], 16)} ${parseInt(result[2], 16)} ${parseInt(result[3], 16)}`;
+// 将颜色转换为 HSL 空间组件字符串 (h s% l%)
+const hexToHslComponents = (hex: string): string => {
+  let r = 0, g = 0, b = 0;
+  if (hex.length === 4) {
+    r = parseInt(hex[1] + hex[1], 16);
+    g = parseInt(hex[2] + hex[2], 16);
+    b = parseInt(hex[3] + hex[3], 16);
+  } else if (hex.length === 7) {
+    r = parseInt(hex.slice(1, 3), 16);
+    g = parseInt(hex.slice(3, 5), 16);
+    b = parseInt(hex.slice(5, 7), 16);
+  }
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0, l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+  return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
 };
 
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
@@ -217,13 +121,19 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     const root = document.documentElement;
     const colors = preset.colors;
 
-    // 设置HSL颜色变量（Tailwind使用HSL格式）
-    root.style.setProperty("--primary", hexToRgb(colors.primary));
-    root.style.setProperty("--accent", hexToRgb(colors.accent));
-    root.style.setProperty("--background", hexToRgb(colors.background));
-    root.style.setProperty("--foreground", hexToRgb(colors.foreground));
-    root.style.setProperty("--muted", hexToRgb(colors.muted));
-    root.style.setProperty("--border", hexToRgb(colors.border));
+    // 设置 HSL 颜色变量（适配 globals.css 的格式）
+    root.style.setProperty("--primary", hexToHslComponents(colors.primary));
+    root.style.setProperty("--accent", hexToHslComponents(colors.accent));
+    root.style.setProperty("--background", hexToHslComponents(colors.background));
+    root.style.setProperty("--foreground", hexToHslComponents(colors.foreground));
+    root.style.setProperty("--muted", hexToHslComponents(colors.muted));
+    root.style.setProperty("--border", hexToHslComponents(colors.border));
+    
+    // 同步更新 card/popover 等衍生变量
+    root.style.setProperty("--card", hexToHslComponents(colors.background));
+    root.style.setProperty("--card-foreground", hexToHslComponents(colors.foreground));
+    root.style.setProperty("--popover", hexToHslComponents(colors.background));
+    root.style.setProperty("--popover-foreground", hexToHslComponents(colors.foreground));
 
     // 设置额外的变量供直接使用
     root.style.setProperty("--color-primary", colors.primary);

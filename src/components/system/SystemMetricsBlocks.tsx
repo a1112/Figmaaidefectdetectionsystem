@@ -8,7 +8,7 @@ import {
   ChartTooltipContent,
 } from "../ui/chart";
 import { cn } from "../ui/utils";
-import type { NetworkInterfaceMetrics, SystemDiskUsage, SystemMetricsPayload } from "../../src/api/admin";
+import type { NetworkInterfaceMetrics, SystemDiskUsage, SystemMetricsPayload } from "../../api/admin";
 import type { ResourceSample } from "../../hooks/useSystemMetrics";
 
 export const formatBytes = (value: number | null) => {

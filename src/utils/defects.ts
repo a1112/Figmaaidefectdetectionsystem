@@ -1,8 +1,8 @@
 // 缺陷相关工具函数
 
 import type { Defect } from "../types/app.types";
-import { DEFECT_TYPES } from "../src/api/types";
-import { generateMockDefects } from "../src/api/mock";
+import { DEFECT_TYPES } from "../api/types";
+import { generateMockDefects } from "../api/mock";
 
 // 缺陷类型列表（统一从 API 类型导出）
 export const defectTypes = [...DEFECT_TYPES];

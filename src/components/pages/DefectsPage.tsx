@@ -3,14 +3,15 @@ import { DefectDistributionChart } from "../DefectDistributionChart";
 import { DefectImageView, type ViewportInfo } from "../DefectImageView";
 import { DefectNavigationBar } from "../DefectNavigationBar";
 import type {
-  Defect,
-  SteelPlate,
+  ActiveTab,
   SurfaceFilter,
   ImageViewMode,
-  ImageOrientation,
   ManualConfirmStatus,
+  Defect,
+  SteelPlate,
+  ImageOrientation,
 } from "../../types/app.types";
-import type { SurfaceImageInfo } from "../../src/api/types";
+import type { SurfaceImageInfo } from "../../api/types";
 import type {
   SearchCriteria,
   FilterCriteria,
@@ -51,6 +52,8 @@ interface DefectsPageProps {
   imageOrientation: ImageOrientation;
   defaultTileSize: number;
   maxTileLevel: number;
+  showDistributionImages: boolean;
+  showTileBorders: boolean;
 }
 
 export const DefectsPage: React.FC<DefectsPageProps> = ({
@@ -78,6 +81,8 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
   imageOrientation,
   defaultTileSize,
   maxTileLevel,
+  showDistributionImages,
+  showTileBorders,
 }) => {
   const activeDefects: Defect[] = plateDefects;
 
@@ -230,6 +235,8 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
               onViewportCenterChange={setCenterTarget}
               defaultTileSize={defaultTileSize}
               maxTileLevel={maxTileLevel}
+              showDistributionImages={showDistributionImages}
+              showTileBorders={showTileBorders}
               seqNo={
                 selectedPlate
                   ? parseInt(selectedPlate.serialNumber, 10)

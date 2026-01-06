@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Shield, RefreshCcw, User, Lock, Plus, Save, Trash2, ChevronDown } from "lucide-react";
+import { Shield, RefreshCcw, User, Lock, Plus, Save, Trash2, ChevronDown, X } from "lucide-react";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Input } from "../ui/input";
@@ -32,10 +32,8 @@ import {
   createPolicy,
   updatePolicy,
   deletePolicy,
-  type AdminPolicy,
-  type AdminRole,
   type AdminUser,
-} from "../../src/api/admin";
+} from "../../api/admin";
 
 export const PermissionsPanel: React.FC = () => {
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -46,6 +44,10 @@ export const PermissionsPanel: React.FC = () => {
   );
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // 用于内联新增的临时状态
+  const [showAddRow, setShowAddRow] = useState(false);
+
   const [userPasswords, setUserPasswords] = useState<Record<number, string>>({});
   const [newUser, setNewUser] = useState({
     username: "",
@@ -175,6 +177,7 @@ export const PermissionsPanel: React.FC = () => {
         is_active: true,
         is_superuser: false,
       });
+      setShowAddRow(false);
       toast.success("用户已创建");
     } catch (error) {
       const message = error instanceof Error ? error.message : "创建用户失败";
@@ -220,6 +223,7 @@ export const PermissionsPanel: React.FC = () => {
       });
       setRoles((prev) => [item, ...prev]);
       setNewRole({ name: "", description: "" });
+      setShowAddRow(false);
       toast.success("角色已创建");
     } catch (error) {
       const message = error instanceof Error ? error.message : "创建角色失败";
@@ -283,6 +287,7 @@ export const PermissionsPanel: React.FC = () => {
         v4: "",
         v5: "",
       });
+      setShowAddRow(false);
       toast.success("策略已创建");
     } catch (error) {
       const message = error instanceof Error ? error.message : "创建策略失败";
@@ -311,127 +316,147 @@ export const PermissionsPanel: React.FC = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-4 space-y-4 h-full flex flex-col overflow-hidden">
+      <div className="flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <Shield className="w-6 h-6 text-primary" />
+          <div className="w-10 h-10 rounded-sm bg-primary/10 border border-primary/20 flex items-center justify-center">
+            <Shield className="w-5 h-5 text-primary" />
+          </div>
           <div>
-            <h2 className="text-xl">任务权限</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              基于 Casbin 的 RBAC 配置与账户信息
+            <h2 className="text-lg font-bold tracking-tighter">TASK & PERMISSIONS</h2>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-mono">
+              RBAC Configuration / Casbin Policies
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex rounded-md border border-border bg-muted/30 p-1 text-xs">
-            {[
-              { key: "users", label: "用户" },
-              { key: "roles", label: "角色" },
-              { key: "policies", label: "权限" },
-            ].map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key as typeof activeTab)}
-                className={`px-3 py-1 rounded-sm transition-colors ${
-                  activeTab === tab.key
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+        <div className="flex items-center gap-2 bg-muted/30 p-1 border border-border">
+          {[
+            { key: "users", label: "用户账户" },
+            { key: "roles", label: "角色定义" },
+            { key: "policies", label: "权限策略" },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => {
+                setActiveTab(tab.key as typeof activeTab);
+                setShowAddRow(false);
+              }}
+              className={`px-4 py-1.5 text-[11px] font-bold uppercase transition-all ${
+                activeTab === tab.key
+                  ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+          <div className="w-[1px] h-4 bg-border mx-1" />
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={loadAll}
             disabled={isRefreshing}
-            className="flex items-center gap-2"
+            className="h-7 w-7 p-0"
           >
-            <RefreshCcw className="w-4 h-4" />
-            {isRefreshing ? "刷新中..." : "刷新"}
+            <RefreshCcw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
           </Button>
         </div>
       </div>
 
-      {activeTab === "users" && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <User className="w-4 h-4" />
-              用户管理
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-6 gap-3 rounded-lg border border-border bg-muted/20 p-3 text-xs">
-              <Input
-                placeholder="用户名"
-                value={newUser.username}
-                onChange={(e) =>
-                  setNewUser((prev) => ({ ...prev, username: e.target.value }))
-                }
-              />
-              <Input
-                placeholder="密码"
-                type="password"
-                value={newUser.password}
-                onChange={(e) =>
-                  setNewUser((prev) => ({ ...prev, password: e.target.value }))
-                }
-              />
-              <RoleDropdown
-                value={newUser.roles}
-                onChange={(next) =>
-                  setNewUser((prev) => ({ ...prev, roles: next }))
-                }
-              />
-              <div className="flex items-center gap-2 text-xs">
-                <Switch
-                  checked={newUser.is_active}
-                  onCheckedChange={(checked) =>
-                    setNewUser((prev) => ({ ...prev, is_active: checked }))
-                  }
-                />
-                启用
-              </div>
-              <div className="flex items-center gap-2 text-xs">
-                <Switch
-                  checked={newUser.is_superuser}
-                  onCheckedChange={(checked) =>
-                    setNewUser((prev) => ({ ...prev, is_superuser: checked }))
-                  }
-                />
-                超管
-              </div>
-              <Button size="sm" onClick={handleCreateUser} className="flex gap-2">
-                <Plus className="w-4 h-4" />
-                新增
-              </Button>
-            </div>
+      <div className="flex-1 overflow-auto border border-border bg-card/50">
+        {activeTab === "users" && (
+          <div className="min-w-[800px]">
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>用户名</TableHead>
-                  <TableHead>角色</TableHead>
-                  <TableHead>新密码</TableHead>
-                  <TableHead>启用</TableHead>
-                  <TableHead>超管</TableHead>
-                  <TableHead>操作</TableHead>
+              <TableHeader className="bg-muted/50 sticky top-0 z-10">
+                <TableRow className="border-b border-border hover:bg-transparent">
+                  <TableHead className="text-[10px] font-bold uppercase py-2">用户名</TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase py-2">所属角色</TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase py-2">重置密码</TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase py-2 text-center w-16">启用</TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase py-2 text-center w-16">超管</TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase py-2 text-right w-24">
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="h-6 px-2 text-[10px] text-primary hover:bg-primary/10"
+                      onClick={() => setShowAddRow(!showAddRow)}
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      NEW
+                    </Button>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>
+                {showAddRow && (
+                  <TableRow className="bg-primary/5 border-b border-primary/20 animate-in fade-in slide-in-from-top-1 duration-200">
+                    <TableCell className="py-1">
                       <Input
+                        placeholder="USERNAME"
+                        className="h-7 text-[11px] bg-background border-primary/30"
+                        value={newUser.username}
+                        onChange={(e) =>
+                          setNewUser((prev) => ({ ...prev, username: e.target.value }))
+                        }
+                      />
+                    </TableCell>
+                    <TableCell className="py-1">
+                      <RoleDropdown
+                        value={newUser.roles}
+                        onChange={(next) =>
+                          setNewUser((prev) => ({ ...prev, roles: next }))
+                        }
+                      />
+                    </TableCell>
+                    <TableCell className="py-1">
+                      <Input
+                        placeholder="PASSWORD"
+                        type="password"
+                        className="h-7 text-[11px] bg-background border-primary/30"
+                        value={newUser.password}
+                        onChange={(e) =>
+                          setNewUser((prev) => ({ ...prev, password: e.target.value }))
+                        }
+                      />
+                    </TableCell>
+                    <TableCell className="py-1 text-center">
+                      <Switch
+                        checked={newUser.is_active}
+                        onCheckedChange={(checked) =>
+                          setNewUser((prev) => ({ ...prev, is_active: checked }))
+                        }
+                      />
+                    </TableCell>
+                    <TableCell className="py-1 text-center">
+                      <Switch
+                        checked={newUser.is_superuser}
+                        onCheckedChange={(checked) =>
+                          setNewUser((prev) => ({ ...prev, is_superuser: checked }))
+                        }
+                      />
+                    </TableCell>
+                    <TableCell className="py-1 text-right gap-1 flex justify-end">
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setShowAddRow(false)}>
+                        <X className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button size="sm" className="h-7 px-3 text-[10px] font-bold" onClick={handleCreateUser}>
+                        ADD
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )}
+                {users.map((user) => (
+                  <TableRow key={user.id} className="border-b border-border/50 hover:bg-muted/30 group">
+                    <TableCell className="py-1.5">
+                      <input
+                        className="bg-transparent border-none focus:ring-1 focus:ring-primary w-full text-[12px] font-mono px-1 py-0.5 rounded-sm"
                         value={user.username}
                         onChange={(e) =>
                           handleUserChange(user.id, { username: e.target.value })
                         }
                       />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-1.5">
                       <RoleDropdown
                         value={user.roles}
                         onChange={(next) =>
@@ -439,10 +464,11 @@ export const PermissionsPanel: React.FC = () => {
                         }
                       />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-1.5">
                       <Input
                         type="password"
-                        placeholder="留空不修改"
+                        placeholder="******"
+                        className="h-7 text-[11px] bg-transparent border-border/50 focus:border-primary"
                         value={userPasswords[user.id] || ""}
                         onChange={(e) =>
                           setUserPasswords((prev) => ({
@@ -452,7 +478,7 @@ export const PermissionsPanel: React.FC = () => {
                         }
                       />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-1.5 text-center">
                       <Switch
                         checked={user.is_active}
                         onCheckedChange={(checked) =>
@@ -460,7 +486,7 @@ export const PermissionsPanel: React.FC = () => {
                         }
                       />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-1.5 text-center">
                       <Switch
                         checked={user.is_superuser}
                         onCheckedChange={(checked) =>
@@ -468,81 +494,91 @@ export const PermissionsPanel: React.FC = () => {
                         }
                       />
                     </TableCell>
-                    <TableCell className="flex items-center gap-2">
+                    <TableCell className="py-1.5 text-right flex justify-end items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Button
                         size="sm"
-                        variant="outline"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 hover:bg-primary/20 hover:text-primary"
                         onClick={() => handleSaveUser(user)}
+                        title="保存更改"
                       >
-                        <Save className="w-4 h-4" />
+                        <Save className="w-3.5 h-3.5" />
                       </Button>
                       <Button
                         size="sm"
-                        variant="destructive"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 hover:bg-destructive/20 hover:text-destructive"
                         onClick={() => handleDeleteUser(user.id)}
+                        title="删除用户"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </TableCell>
                   </TableRow>
                 ))}
-                {users.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-sm text-muted-foreground">
-                      暂无用户数据
-                    </TableCell>
-                  </TableRow>
-                )}
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        )}
 
-      {activeTab === "roles" && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Lock className="w-4 h-4" />
-              角色管理
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 rounded-lg border border-border bg-muted/20 p-3 text-xs">
-              <Input
-                placeholder="角色名称"
-                value={newRole.name}
-                onChange={(e) =>
-                  setNewRole((prev) => ({ ...prev, name: e.target.value }))
-                }
-              />
-              <Input
-                placeholder="角色描述"
-                value={newRole.description}
-                onChange={(e) =>
-                  setNewRole((prev) => ({ ...prev, description: e.target.value }))
-                }
-              />
-              <div className="md:col-span-2 flex items-center">
-                <Button size="sm" onClick={handleCreateRole} className="flex gap-2">
-                  <Plus className="w-4 h-4" />
-                  新增
-                </Button>
-              </div>
-            </div>
+        {activeTab === "roles" && (
+          <div className="min-w-[600px]">
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>角色名称</TableHead>
-                  <TableHead>描述</TableHead>
-                  <TableHead>操作</TableHead>
+              <TableHeader className="bg-muted/50 sticky top-0 z-10">
+                <TableRow className="border-b border-border hover:bg-transparent">
+                  <TableHead className="text-[10px] font-bold uppercase py-2">角色名称</TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase py-2">职责描述</TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase py-2 text-right w-24">
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="h-6 px-2 text-[10px] text-primary hover:bg-primary/10"
+                      onClick={() => setShowAddRow(!showAddRow)}
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      NEW
+                    </Button>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {roles.map((role) => (
-                  <TableRow key={role.id}>
-                    <TableCell>
+                {showAddRow && (
+                  <TableRow className="bg-primary/5 border-b border-primary/20 animate-in fade-in slide-in-from-top-1 duration-200">
+                    <TableCell className="py-1">
                       <Input
+                        placeholder="ROLE_NAME"
+                        className="h-7 text-[11px] bg-background border-primary/30 font-mono"
+                        value={newRole.name}
+                        onChange={(e) =>
+                          setNewRole((prev) => ({ ...prev, name: e.target.value }))
+                        }
+                      />
+                    </TableCell>
+                    <TableCell className="py-1">
+                      <Input
+                        placeholder="DESCRIPTION"
+                        className="h-7 text-[11px] bg-background border-primary/30"
+                        value={newRole.description}
+                        onChange={(e) =>
+                          setNewRole((prev) => ({ ...prev, description: e.target.value }))
+                        }
+                      />
+                    </TableCell>
+                    <TableCell className="py-1 text-right gap-1 flex justify-end">
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setShowAddRow(false)}>
+                        <X className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button size="sm" className="h-7 px-3 text-[10px] font-bold" onClick={handleCreateRole}>
+                        ADD
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )}
+                {roles.map((role) => (
+                  <TableRow key={role.id} className="border-b border-border/50 hover:bg-muted/30 group">
+                    <TableCell className="py-1.5">
+                      <input
+                        className="bg-transparent border-none focus:ring-1 focus:ring-primary w-full text-[12px] font-mono font-bold px-1 py-0.5 rounded-sm"
                         value={role.name}
                         onChange={(e) =>
                           setRoles((prev) =>
@@ -555,8 +591,9 @@ export const PermissionsPanel: React.FC = () => {
                         }
                       />
                     </TableCell>
-                    <TableCell>
-                      <Input
+                    <TableCell className="py-1.5">
+                      <input
+                        className="bg-transparent border-none focus:ring-1 focus:ring-primary w-full text-[12px] px-1 py-0.5 rounded-sm text-muted-foreground"
                         value={role.description || ""}
                         onChange={(e) =>
                           setRoles((prev) =>
@@ -569,242 +606,98 @@ export const PermissionsPanel: React.FC = () => {
                         }
                       />
                     </TableCell>
-                    <TableCell className="flex items-center gap-2">
+                    <TableCell className="py-1.5 text-right flex justify-end items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Button
                         size="sm"
-                        variant="outline"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 hover:bg-primary/20 hover:text-primary"
                         onClick={() => handleSaveRole(role)}
                       >
-                        <Save className="w-4 h-4" />
+                        <Save className="w-3.5 h-3.5" />
                       </Button>
                       <Button
                         size="sm"
-                        variant="destructive"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 hover:bg-destructive/20 hover:text-destructive"
                         onClick={() => handleDeleteRole(role.id)}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </TableCell>
                   </TableRow>
                 ))}
-                {roles.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={3} className="text-sm text-muted-foreground">
-                      暂无角色数据
-                    </TableCell>
-                  </TableRow>
-                )}
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        )}
 
-      {activeTab === "policies" && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">权限策略</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-8 gap-2 rounded-lg border border-border bg-muted/20 p-3 text-xs">
-              <Input
-                placeholder="ptype"
-                value={newPolicy.ptype}
-                onChange={(e) =>
-                  setNewPolicy((prev) => ({ ...prev, ptype: e.target.value }))
-                }
-              />
-              <Input
-                placeholder="v0"
-                value={newPolicy.v0}
-                onChange={(e) =>
-                  setNewPolicy((prev) => ({ ...prev, v0: e.target.value }))
-                }
-              />
-              <Input
-                placeholder="v1"
-                value={newPolicy.v1}
-                onChange={(e) =>
-                  setNewPolicy((prev) => ({ ...prev, v1: e.target.value }))
-                }
-              />
-              <Input
-                placeholder="v2"
-                value={newPolicy.v2}
-                onChange={(e) =>
-                  setNewPolicy((prev) => ({ ...prev, v2: e.target.value }))
-                }
-              />
-              <Input
-                placeholder="v3"
-                value={newPolicy.v3}
-                onChange={(e) =>
-                  setNewPolicy((prev) => ({ ...prev, v3: e.target.value }))
-                }
-              />
-              <Input
-                placeholder="v4"
-                value={newPolicy.v4}
-                onChange={(e) =>
-                  setNewPolicy((prev) => ({ ...prev, v4: e.target.value }))
-                }
-              />
-              <Input
-                placeholder="v5"
-                value={newPolicy.v5}
-                onChange={(e) =>
-                  setNewPolicy((prev) => ({ ...prev, v5: e.target.value }))
-                }
-              />
-              <Button size="sm" onClick={handleCreatePolicy} className="flex gap-2">
-                <Plus className="w-4 h-4" />
-                新增
-              </Button>
-            </div>
+        {activeTab === "policies" && (
+          <div className="min-w-[1000px]">
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ptype</TableHead>
-                  <TableHead>v0</TableHead>
-                  <TableHead>v1</TableHead>
-                  <TableHead>v2</TableHead>
-                  <TableHead>v3</TableHead>
-                  <TableHead>v4</TableHead>
-                  <TableHead>v5</TableHead>
-                  <TableHead>操作</TableHead>
+              <TableHeader className="bg-muted/50 sticky top-0 z-10">
+                <TableRow className="border-b border-border hover:bg-transparent font-mono text-[9px]">
+                  <TableHead className="py-2 w-16">TYPE</TableHead>
+                  <TableHead className="py-2">V0 (SUB/OBJ)</TableHead>
+                  <TableHead className="py-2">V1 (OBJ/DOM)</TableHead>
+                  <TableHead className="py-2">V2 (ACT)</TableHead>
+                  <TableHead className="py-2">V3</TableHead>
+                  <TableHead className="py-2">V4</TableHead>
+                  <TableHead className="py-2">V5</TableHead>
+                  <TableHead className="py-2 text-right w-24">
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="h-6 px-2 text-[10px] text-primary hover:bg-primary/10"
+                      onClick={() => setShowAddRow(!showAddRow)}
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      NEW
+                    </Button>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {policies.map((policy) => (
-                  <TableRow key={policy.id}>
-                    <TableCell>
-                      <Input
-                        value={policy.ptype}
-                        onChange={(e) =>
-                          setPolicies((prev) =>
-                            prev.map((item) =>
-                              item.id === policy.id
-                                ? { ...item, ptype: e.target.value }
-                                : item,
-                            ),
-                          )
-                        }
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        value={policy.v0 || ""}
-                        onChange={(e) =>
-                          setPolicies((prev) =>
-                            prev.map((item) =>
-                              item.id === policy.id
-                                ? { ...item, v0: e.target.value }
-                                : item,
-                            ),
-                          )
-                        }
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        value={policy.v1 || ""}
-                        onChange={(e) =>
-                          setPolicies((prev) =>
-                            prev.map((item) =>
-                              item.id === policy.id
-                                ? { ...item, v1: e.target.value }
-                                : item,
-                            ),
-                          )
-                        }
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        value={policy.v2 || ""}
-                        onChange={(e) =>
-                          setPolicies((prev) =>
-                            prev.map((item) =>
-                              item.id === policy.id
-                                ? { ...item, v2: e.target.value }
-                                : item,
-                            ),
-                          )
-                        }
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        value={policy.v3 || ""}
-                        onChange={(e) =>
-                          setPolicies((prev) =>
-                            prev.map((item) =>
-                              item.id === policy.id
-                                ? { ...item, v3: e.target.value }
-                                : item,
-                            ),
-                          )
-                        }
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        value={policy.v4 || ""}
-                        onChange={(e) =>
-                          setPolicies((prev) =>
-                            prev.map((item) =>
-                              item.id === policy.id
-                                ? { ...item, v4: e.target.value }
-                                : item,
-                            ),
-                          )
-                        }
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        value={policy.v5 || ""}
-                        onChange={(e) =>
-                          setPolicies((prev) =>
-                            prev.map((item) =>
-                              item.id === policy.id
-                                ? { ...item, v5: e.target.value }
-                                : item,
-                            ),
-                          )
-                        }
-                      />
-                    </TableCell>
-                    <TableCell className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleSavePolicy(policy)}
-                      >
-                        <Save className="w-4 h-4" />
+                {showAddRow && (
+                  <TableRow className="bg-primary/5 border-b border-primary/20 animate-in fade-in slide-in-from-top-1 duration-200">
+                    <TableCell className="py-1"><Input className="h-7 text-[10px] bg-background font-mono" value={newPolicy.ptype} onChange={(e) => setNewPolicy(p => ({...p, ptype: e.target.value}))} /></TableCell>
+                    <TableCell className="py-1"><Input className="h-7 text-[10px] bg-background font-mono" value={newPolicy.v0} onChange={(e) => setNewPolicy(p => ({...p, v0: e.target.value}))} /></TableCell>
+                    <TableCell className="py-1"><Input className="h-7 text-[10px] bg-background font-mono" value={newPolicy.v1} onChange={(e) => setNewPolicy(p => ({...p, v1: e.target.value}))} /></TableCell>
+                    <TableCell className="py-1"><Input className="h-7 text-[10px] bg-background font-mono" value={newPolicy.v2} onChange={(e) => setNewPolicy(p => ({...p, v2: e.target.value}))} /></TableCell>
+                    <TableCell className="py-1"><Input className="h-7 text-[10px] bg-background font-mono" value={newPolicy.v3} onChange={(e) => setNewPolicy(p => ({...p, v3: e.target.value}))} /></TableCell>
+                    <TableCell className="py-1"><Input className="h-7 text-[10px] bg-background font-mono" value={newPolicy.v4} onChange={(e) => setNewPolicy(p => ({...p, v4: e.target.value}))} /></TableCell>
+                    <TableCell className="py-1"><Input className="h-7 text-[10px] bg-background font-mono" value={newPolicy.v5} onChange={(e) => setNewPolicy(p => ({...p, v5: e.target.value}))} /></TableCell>
+                    <TableCell className="py-1 text-right gap-1 flex justify-end">
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setShowAddRow(false)}>
+                        <X className="w-3.5 h-3.5" />
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => handleDeletePolicy(policy.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
+                      <Button size="sm" className="h-7 px-3 text-[10px] font-bold" onClick={handleCreatePolicy}>
+                        ADD
                       </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {policies.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-sm text-muted-foreground">
-                      暂无策略数据
                     </TableCell>
                   </TableRow>
                 )}
+                {policies.map((policy) => (
+                  <TableRow key={policy.id} className="border-b border-border/50 hover:bg-muted/30 group font-mono text-[11px]">
+                    <TableCell className="py-1.5">
+                      <input className="bg-transparent border-none focus:ring-1 focus:ring-primary w-full px-1" value={policy.ptype} onChange={(e) => setPolicies(p => p.map(i => i.id === policy.id ? {...i, ptype: e.target.value} : i))} />
+                    </TableCell>
+                    <TableCell className="py-1.5"><input className="bg-transparent border-none focus:ring-1 focus:ring-primary w-full px-1" value={policy.v0 || ""} onChange={(e) => setPolicies(p => p.map(i => i.id === policy.id ? {...i, v0: e.target.value} : i))} /></TableCell>
+                    <TableCell className="py-1.5"><input className="bg-transparent border-none focus:ring-1 focus:ring-primary w-full px-1 font-bold text-primary" value={policy.v1 || ""} onChange={(e) => setPolicies(p => p.map(i => i.id === policy.id ? {...i, v1: e.target.value} : i))} /></TableCell>
+                    <TableCell className="py-1.5"><input className="bg-transparent border-none focus:ring-1 focus:ring-primary w-full px-1 text-accent" value={policy.v2 || ""} onChange={(e) => setPolicies(p => p.map(i => i.id === policy.id ? {...i, v2: e.target.value} : i))} /></TableCell>
+                    <TableCell className="py-1.5"><input className="bg-transparent border-none focus:ring-1 focus:ring-primary w-full px-1" value={policy.v3 || ""} onChange={(e) => setPolicies(p => p.map(i => i.id === policy.id ? {...i, v3: e.target.value} : i))} /></TableCell>
+                    <TableCell className="py-1.5"><input className="bg-transparent border-none focus:ring-1 focus:ring-primary w-full px-1" value={policy.v4 || ""} onChange={(e) => setPolicies(p => p.map(i => i.id === policy.id ? {...i, v4: e.target.value} : i))} /></TableCell>
+                    <TableCell className="py-1.5"><input className="bg-transparent border-none focus:ring-1 focus:ring-primary w-full px-1" value={policy.v5 || ""} onChange={(e) => setPolicies(p => p.map(i => i.id === policy.id ? {...i, v5: e.target.value} : i))} /></TableCell>
+                    <TableCell className="py-1.5 text-right flex justify-end items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 hover:bg-primary/20 hover:text-primary" onClick={() => handleSavePolicy(policy)}><Save className="w-3.5 h-3.5" /></Button>
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 hover:bg-destructive/20 hover:text-destructive" onClick={() => handleDeletePolicy(policy.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
