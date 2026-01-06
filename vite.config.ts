@@ -2,9 +2,9 @@
   import { defineConfig } from 'vite';
   import react from '@vitejs/plugin-react-swc';
   import path from 'path';
-
+  import tailwindcss from '@tailwindcss/vite';
   export default defineConfig({
-    plugins: [react()],
+    plugins: [react(), tailwindcss()],
     resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
       alias: {
@@ -56,5 +56,25 @@
     server: {
       port: 3000,
       open: true,
+      host: '0.0.0.0',
+      allowedHosts: ['n9yhdrvz.zjz-service.cn', '9qwygl8e.zjz-service.cn','www.bkvision.online','bkvision.online'],
+      proxy: {
+        '/config': {
+          target: 'http://localhost:80',
+          changeOrigin: true,
+          secure: false,
+          ws: true,
+        },
+        '/api': {
+          target: 'http://localhost:80',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/small--api': {
+          target: 'http://localhost:80',
+          changeOrigin: true,
+          secure: false,
+        },
+      },
     },
   });

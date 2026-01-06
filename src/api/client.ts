@@ -346,6 +346,17 @@ export function getTileImageUrl(params: {
     fmt = "JPEG",
     view,
   } = params;
+
+  // 在生产/跨域模式下，如果还未选择产线（line_name 为空），
+  // 避免访问不可用的 /api/images 路径，直接返回空字符串。
+  // 这样调用方会拿到空 src，不会发起错误请求。
+  const lineName = (env as any).getLineName
+    ? (env as any).getLineName()
+    : "";
+  if (env.isProduction() && !lineName) {
+    return "";
+  }
+
   const baseUrl = env.getApiBaseUrl();
   const viewParam = view ? `&view=${encodeURIComponent(view)}` : "";
   return (
@@ -493,8 +504,8 @@ export async function getApiList(): Promise<ApiNode[]> {
   }
   const url =
     env.getMode() === "cors"
-      ? `${env.getCorsBaseUrl().replace(/\/+$/, "")}/api/config/api_list`
-      : "/api/config/api_list";
+      ? `${env.getCorsBaseUrl().replace(/\/+$/, "")}/config/api_list`
+      : "/config/api_list";
   
   try {
     const response = await fetch(url, { cache: "no-store" });

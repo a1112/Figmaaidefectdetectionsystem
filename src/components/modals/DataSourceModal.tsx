@@ -13,6 +13,7 @@ import { Database, Gauge, Zap, LayoutGrid, Monitor } from "lucide-react";
 import { getConfigSpeedTestUrl } from "../../api/admin";
 import { env } from "../../config/env";
 import { RotateCw } from "lucide-react";
+import { Checkbox } from "../ui/checkbox";
 
 const SPEED_TEST_DURATION_MS = 60_000;
 const SPEED_SAMPLE_INTERVAL_MS = 1_000;
@@ -44,6 +45,7 @@ export function DataSourceModal({
   const [isLatencyError, setIsLatencyError] = useState(false);
   const [isSpeedTestOpen, setIsSpeedTestOpen] = useState(false);
   const [isSpeedTesting, setIsSpeedTesting] = useState(false);
+  const [testConfigCenter, setTestConfigCenter] = useState(false);
   const [speedSamples, setSpeedSamples] = useState<number[]>([]);
   const [speedElapsed, setSpeedElapsed] = useState(0);
   const [speedError, setSpeedError] = useState<string | null>(null);
@@ -165,6 +167,13 @@ export function DataSourceModal({
 
   const startSpeedTest = async () => {
     if (isSpeedTesting) return;
+
+    const selectedNode = nodes.find((n) => n.key === selected);
+    if (!selectedNode && !testConfigCenter) {
+      setSpeedError("请先选择要测试的产线");
+      return;
+    }
+
     setSpeedError(null);
     setSpeedSamples([]);
     setSpeedElapsed(0);
@@ -194,8 +203,55 @@ export function DataSourceModal({
     }, SPEED_TEST_DURATION_MS);
 
     try {
+      const params = new URLSearchParams();
+      params.set("chunk_kb", "1024");
+      // total_mb=0 表示后端持续输出，由前端控制测试时长（60秒）
+      params.set("total_mb", "0");
+
+      const buildLineSpeedTestUrl = (node: ApiNode): string => {
+        // 计算最终模式：是否走 CORS 代理
+        const finalMode = corsProxy ? "cors" : appMode;
+        const lineKey = node.key || currentLineKey || selected;
+
+        if (!lineKey) {
+          return "";
+        }
+
+        // CORS 模式：基于远程地址追加 /api/{line_key}
+        if (finalMode === "cors") {
+          const raw = (corsUrl || env.getCorsBaseUrl()).trim();
+          const root = raw || env.getCorsBaseUrl().trim();
+          const baseApi = root.endsWith("/api")
+            ? root
+            : root.endsWith("/api/")
+              ? root.slice(0, -1)
+              : `${root.replace(/\/+$/, "")}/api`;
+          return `${baseApi}/${encodeURIComponent(
+            lineKey,
+          )}/speed_test?${params.toString()}`;
+        }
+
+        // 本地 / 生产：根据 API Profile 选择 /api 或 /small--api
+        const basePath = apiProfile === "small" ? "/small--api" : "/api";
+        return `${basePath}/${encodeURIComponent(
+          lineKey,
+        )}/speed_test?${params.toString()}`;
+      };
+
+      const url = testConfigCenter
+        ? getConfigSpeedTestUrl({
+            chunkKb: 1024,
+            totalMb: 0,
+          })
+        : buildLineSpeedTestUrl(selectedNode as ApiNode);
+
+      if (!url) {
+        setSpeedError("无法构造测速地址，请检查配置");
+        return;
+      }
+
       const response = await fetch(
-        getConfigSpeedTestUrl({ chunkKb: 1024, totalMb: 1024 }),
+        url,
         {
           cache: "no-store",
           signal: controller.signal,
@@ -558,8 +614,16 @@ export function DataSourceModal({
               <Gauge className="h-5 w-5 text-primary" />
               下载带宽测试
             </DialogTitle>
-            <DialogDescription>
-              1分钟下行带宽测试，结果仅作参考。
+            <DialogDescription className="space-y-1">
+              <div>1分钟下行带宽测试，结果仅作参考。</div>
+              <div className="text-xs text-muted-foreground">
+                测试产线：
+                <span className="font-medium text-foreground">
+                  {nodes.find((n) => n.key === selected)?.name ||
+                    nodes.find((n) => n.key === selected)?.key ||
+                    "未选择"}
+                </span>
+              </div>
             </DialogDescription>
           </DialogHeader>
 
@@ -611,27 +675,44 @@ export function DataSourceModal({
             {speedError && <div className="text-sm text-red-500">{speedError}</div>}
           </div>
 
-          <DialogFooter className="pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsSpeedTestOpen(false)}
-            >
-              关闭
-            </Button>
-            {isSpeedTesting ? (
+          <DialogFooter className="pt-2 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="test-config-center"
+                checked={testConfigCenter}
+                onCheckedChange={(value) =>
+                  setTestConfigCenter(value === true)
+                }
+              />
+              <label
+                htmlFor="test-config-center"
+                className="text-xs text-muted-foreground select-none cursor-pointer"
+              >
+                测试配置中心
+              </label>
+            </div>
+            <div className="flex items-center gap-2">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => stopSpeedTest()}
+                onClick={() => setIsSpeedTestOpen(false)}
               >
-                停止
+                关闭
               </Button>
-            ) : (
-              <Button type="button" onClick={startSpeedTest}>
-                开始测速
-              </Button>
-            )}
+              {isSpeedTesting ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => stopSpeedTest()}
+                >
+                  停止
+                </Button>
+              ) : (
+                <Button type="button" onClick={startSpeedTest}>
+                  开始测速
+                </Button>
+              )}
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

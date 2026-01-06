@@ -627,10 +627,26 @@ export const getConfigSpeedTestUrl = (options?: {
   chunkKb?: number;
   totalMb?: number;
 }): string => {
-  const base = getAdminBaseUrl() || "/config";
+  let base: string;
+
+  // 配置中心测速统一走 /config/speed_test
+  // - 生产 / 开发：通过反向代理访问当前站点 /config
+  // - CORS 模式：基于远程地址追加 /config
+  if (env.getMode() === "cors") {
+    const raw = env.getCorsBaseUrl().trim();
+    const root = raw || env.getCorsBaseUrl().trim();
+    base = `${root.replace(/\/+$/, "")}/config`;
+  } else {
+    base = "/config";
+  }
+
   const params = new URLSearchParams();
-  if (options?.chunkKb) params.set("chunk_kb", String(options.chunkKb));
-  if (options?.totalMb) params.set("total_mb", String(options.totalMb));
+  if (options && typeof options.chunkKb === "number") {
+    params.set("chunk_kb", String(options.chunkKb));
+  }
+  if (options && typeof options.totalMb === "number") {
+    params.set("total_mb", String(options.totalMb));
+  }
   const query = params.toString();
   return query ? `${base}/speed_test?${query}` : `${base}/speed_test`;
 };

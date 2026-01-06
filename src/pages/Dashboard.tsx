@@ -332,14 +332,23 @@ export function Dashboard() {
     }
   }, [activeLineLabel]);
 
-  // 加载全局 Meta
-  useEffect(() => {
-    if (!startupReady) return;
-    if (env.isProduction() && apiNodes.length === 0) return;
-    let cancelled = false;
-    const loadGlobalMeta = async () => {
-      try {
-        const res = await getGlobalMeta();
+    // 加载全局 Meta
+    useEffect(() => {
+      if (!startupReady) return;
+      if (env.isProduction() && apiNodes.length === 0) return;
+      let cancelled = false;
+      const loadGlobalMeta = async () => {
+        // 生产模式下，尚未选择产线时不发起 /api/meta 请求，避免访问无效的 /api/meta。
+        if (env.isProduction()) {
+          const lineName =
+            (env as any).getLineName?.() ?? "";
+          if (!lineName) {
+            return;
+          }
+        }
+
+        try {
+          const res = await getGlobalMeta();
         if (cancelled) return;
 
         const defectPayload = res.defect_classes;
@@ -448,23 +457,34 @@ export function Dashboard() {
     );
   };
 
-  const [steelPlates, setSteelPlates] = useState<SteelPlate[]>(
-    [],
-  );
-  const [isLoadingSteels, setIsLoadingSteels] = useState(false);
-  const [surfaceImageInfo, setSurfaceImageInfo] = useState<
-    SurfaceImageInfo[] | null
-  >(null);
+    const [steelPlates, setSteelPlates] = useState<SteelPlate[]>(
+      [],
+    );
+    const [isLoadingSteels, setIsLoadingSteels] = useState(false);
+    const [surfaceImageInfo, setSurfaceImageInfo] = useState<
+      SurfaceImageInfo[] | null
+    >(null);
 
-  const loadSteelPlates = async (
-    criteria: SearchCriteria = searchCriteria,
-    forceLimit?: number,
-    forceSearch?: boolean,
-  ) => {
-    setIsLoadingSteels(true);
+    const loadSteelPlates = async (
+      criteria: SearchCriteria = searchCriteria,
+      forceLimit?: number,
+      forceSearch?: boolean,
+    ) => {
+      setIsLoadingSteels(true);
 
     try {
-      const hasCriteria = Object.keys(criteria).length > 0;
+        const hasCriteria = Object.keys(criteria).length > 0;
+
+        // 生产模式下尚未选择产线时，不触发真实 API 请求，避免访问无效的 /api/steels。
+        if (env.isProduction()) {
+          const lineName =
+            (env as any).getLineName?.() ?? "";
+          if (!lineName) {
+            setSteelPlates([]);
+            setIsLoadingSteels(false);
+            return;
+          }
+        }
       const limitToUse = Math.max(
         1,
         Math.min(
