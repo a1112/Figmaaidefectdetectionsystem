@@ -144,7 +144,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   })();
 
   return (
-    <div className="h-10 bg-muted border-b border-border flex items-center justify-between px-4 select-none shrink-0">
+    <div className="h-10 bg-muted/40 backdrop-blur-md border-b border-white/10 flex items-center justify-between px-4 select-none shrink-0 z-20">
       {/* Left: Menu and Tab Buttons */}
       <div className="flex items-center gap-3">
         <button

@@ -810,8 +810,12 @@ export function Dashboard() {
 
   return (
     <div
-      className={`h-screen w-full bg-background text-foreground flex flex-col overflow-hidden selection:bg-primary selection:text-primary-foreground font-mono ${theme === "dark" ? "dark" : ""}`}
+      className={`h-screen w-full bg-background text-foreground flex flex-col overflow-hidden selection:bg-primary selection:text-primary-foreground font-mono bg-grid-pattern relative ${theme === "dark" ? "dark" : ""}`}
     >
+      <div className="absolute inset-0 pointer-events-none industrial-gradient z-0"></div>
+      <div className="absolute inset-0 pointer-events-none scanline z-50 opacity-20"></div>
+
+      <div className="relative z-10 flex flex-col h-full w-full overflow-hidden">
       {!isMobileDevice && (
         <TitleBar
           activeTab={activeTab}
@@ -851,7 +855,7 @@ export function Dashboard() {
 
       <div className="flex-1 flex overflow-hidden">
         <div
-          className={`${isMobileDevice ? "hidden" : isSidebarCollapsed ? "w-0" : "w-64"} bg-muted/30 border-r border-border flex flex-col shrink-0 transition-all duration-300 overflow-hidden`}
+          className={`${isMobileDevice ? "hidden" : isSidebarCollapsed ? "w-0" : "w-64"} glass-panel border-r border-border flex flex-col shrink-0 transition-all duration-300 overflow-hidden`}
         >
           <Sidebar
             isCollapsed={isSidebarCollapsed}
@@ -871,7 +875,7 @@ export function Dashboard() {
           />
         </div>
 
-        <div className="flex-1 bg-background/50 flex flex-col min-w-0 overflow-hidden">
+        <div className="flex-1 bg-transparent flex flex-col min-w-0 overflow-hidden">
           <DefectToolbar
             activeTab={activeTab}
             availableDefectTypes={availableDefectTypes}
@@ -1075,6 +1079,7 @@ export function Dashboard() {
         </div>
       )}
 
+      </div>
       <SearchDialog
         isOpen={isSearchDialogOpen}
         onClose={() => setIsSearchDialogOpen(false)}
