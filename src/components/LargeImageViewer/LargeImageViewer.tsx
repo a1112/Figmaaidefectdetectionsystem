@@ -66,6 +66,18 @@ interface LargeImageViewerProps {
    * 纵向布局时优先按照高度填充视口（避免将宽度过度压缩）
    */
   fitToHeight?: boolean;
+  /**
+   * 按容器宽度填充视口（锁定宽度比例）
+   */
+  fitToWidth?: boolean;
+  /**
+   * 是否锁定缩放（禁用缩放，仅允许平移）
+   */
+  lockScale?: boolean;
+  /**
+   * 鼠标滚轮行为：缩放或滚动
+   */
+  wheelMode?: "zoom" | "scroll";
 }
 
 export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
@@ -85,6 +97,9 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
   onViewportChange,
   panMargin,
   fitToHeight,
+  fitToWidth,
+  lockScale = false,
+  wheelMode = "zoom",
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   // 双 canvas：底层保留上一轮内容，顶层用于当前绘制（便于后续扩展双 LOD 图层）
@@ -170,13 +185,19 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
   const getConstraints = useCallback(() => {
     const cw = containerSize.width;
     const ch = containerSize.height;
-    const fitScale = fitToHeight
-      ? ch / imageHeight
-      : Math.min(cw / imageWidth, ch / imageHeight);
+    const fitScale = fitToWidth
+      ? cw / imageWidth
+      : fitToHeight
+        ? ch / imageHeight
+        : Math.min(cw / imageWidth, ch / imageHeight);
     const maxScale = 1.0;
+    if (lockScale) {
+      const locked = Math.min(fitScale, maxScale);
+      return { minScale: locked, maxScale: locked };
+    }
     const minScale = Math.min(fitScale, maxScale);
     return { minScale, maxScale };
-  }, [containerSize, imageWidth, imageHeight, fitToHeight]);
+  }, [containerSize, imageWidth, imageHeight, fitToHeight, fitToWidth, lockScale]);
 
   const ensureInitialized = useCallback(() => {
     if (
@@ -437,6 +458,21 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
     const { minScale, maxScale } = getConstraints();
     const current = transform.current;
 
+    if (wheelMode === "scroll") {
+      const next = clampTransform({
+        scale: current.scale,
+        x: current.x,
+        y: current.y - e.deltaY,
+      });
+      transform.current = next;
+      setTick(t => t + 1);
+      return;
+    }
+
+    if (lockScale) {
+      return;
+    }
+
     const zoomSensitivity = 0.001;
     const delta = -e.deltaY * zoomSensitivity;
     const factor = Math.exp(delta);
@@ -457,7 +493,7 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
 
     transform.current = clampTransform({ x: newX, y: newY, scale: newScale });
     setTick(t => t + 1);
-  }, [getConstraints, clampTransform]);
+  }, [getConstraints, clampTransform, wheelMode, lockScale]);
 
   useEffect(() => {
     const canvas = frontCanvasRef.current;

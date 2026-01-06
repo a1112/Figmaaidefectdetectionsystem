@@ -5,7 +5,7 @@ import {
   ChevronLeft, ChevronRight, Search, Play, Pause, Square,
   Maximize2, Minimize2, ZoomIn, ZoomOut, RefreshCcw, Clock, RotateCw, Gavel,
   Layout, BarChart3, AlertCircle, FileText, ChevronDown, Activity,
-  LogOut, Box, Terminal, Home, Calendar, LayoutGrid, Filter, ArrowUpToLine, X,
+  LogOut, Box, Terminal, Home, Calendar, LayoutGrid, Filter, ArrowUpToLine, X, Link2, ArrowLeftRight,
   PanelRightOpen, PanelRightClose, Target, Locate
 } from "lucide-react";
 import { StatusBar } from "../../components/layout/StatusBar";
@@ -20,6 +20,7 @@ import {
   getDefectImageUrl,
   getApiList,
   searchSteels,
+  getGlobalMeta,
 } from "../../api/client";
 import type { SteelItem, DefectItem, SurfaceImageInfo, ApiNode } from "../../api/types";
 import { toast } from "sonner@2.0.3";
@@ -45,6 +46,17 @@ import type { AuthUser } from "../../api/admin";
 import type { SearchCriteria } from "../../components/SearchDialog";
 import type { FilterCriteria } from "../../components/FilterDialog";
 import { FilterDialog } from "../../components/FilterDialog";
+import { LargeImageViewer } from "../../components/LargeImageViewer/LargeImageViewer";
+import type { Tile } from "../../components/LargeImageViewer/utils";
+import { drawTileImage, tryDrawFallbackTile } from "../../utils/tileFallback";
+import {
+  buildOrientationLayout,
+  pickSurfaceForTile,
+  computeTileRequestInfo,
+  convertDefectToWorldRect,
+  type SurfaceLayout,
+} from "../../utils/imageOrientation";
+import type { ImageOrientation } from "../../types/app.types";
 
 // Separate Clock component to prevent full page re-renders every second
 const DEFECT_TYPES = [
@@ -57,6 +69,12 @@ const DEFECT_TYPES = [
 ];
 
 const NAV_ITEMS = ["缺陷分析", "图像分析"];
+const DEFAULT_DEFECT_CROP_EXPAND = 100;
+
+const mapTileImageCache = new Map<string, HTMLImageElement>();
+const mapTileImageLoading = new Set<string>();
+const analysisTileImageCache = new Map<string, HTMLImageElement>();
+const analysisTileImageLoading = new Set<string>();
 
 function LiveClock({ formatTime }: { formatTime: (date: Date) => string }) {
   const [time, setTime] = useState(new Date());
@@ -145,39 +163,14 @@ export default function TraditionalMode() {
   
   // Image Analysis State
   const [analysisScrollState, setAnalysisScrollState] = useState({ top: 0, height: 1, clientHeight: 1 });
-  const topScrollRef = useRef<HTMLDivElement>(null);
-  const bottomScrollRef = useRef<HTMLDivElement>(null);
-  const isSyncing = useRef(false);
-  const scrollUpdatePending = useRef(false);
   const [selectedDefectId, setSelectedDefectId] = useState<string | null>(null);
-
-  const handleScrollSync = useCallback((e: React.UIEvent<HTMLDivElement>, source: 'top' | 'bottom') => {
-    if (isSyncing.current) return;
-    const target = e.currentTarget;
-    
-    // Throttle state updates to animation frames to prevent "Maximum update depth exceeded"
-    if (!scrollUpdatePending.current) {
-      scrollUpdatePending.current = true;
-      requestAnimationFrame(() => {
-        setAnalysisScrollState({
-          top: target.scrollTop,
-          height: target.scrollHeight,
-          clientHeight: target.clientHeight
-        });
-        scrollUpdatePending.current = false;
-      });
-    }
-
-    if (surfaceFilter === 'all') {
-      isSyncing.current = true;
-      const otherRef = source === 'top' ? bottomScrollRef : topScrollRef;
-      if (otherRef.current) {
-        const ratio = target.scrollTop / (target.scrollHeight - target.clientHeight || 1);
-        otherRef.current.scrollTop = ratio * (otherRef.current.scrollHeight - otherRef.current.clientHeight);
-      }
-      setTimeout(() => { isSyncing.current = false; }, 50);
-    }
-  }, [surfaceFilter]);
+  const [topCenterTarget, setTopCenterTarget] = useState<{ x: number; y: number } | null>(null);
+  const [bottomCenterTarget, setBottomCenterTarget] = useState<{ x: number; y: number } | null>(null);
+  const topViewportRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
+  const bottomViewportRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
+  const syncLockRef = useRef(false);
+  const [isAnalysisSyncEnabled, setIsAnalysisSyncEnabled] = useState(true);
+  const [isWidthLockEnabled, setIsWidthLockEnabled] = useState(true);
 
   // Data Source State
   const [isDataSourceOpen, setIsDataSourceOpen] = useState(false);
@@ -291,6 +284,17 @@ export default function TraditionalMode() {
   const [listFilter, setListFilter] = useState("all"); // all, normal, alert
   const [isDefectListOpen, setIsDefectListOpen] = useState(true);
   const [isImmersiveMode, setIsImmersiveMode] = useState(false);
+  const [isMapMode, setIsMapMode] = useState(false);
+  const [mapViewport, setMapViewport] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [showMapCrop, setShowMapCrop] = useState(false);
+  const [defectCropExpand, setDefectCropExpand] = useState(DEFAULT_DEFECT_CROP_EXPAND);
+  const defectImageRef = useRef<HTMLImageElement>(null);
+  const [defectImageMetrics, setDefectImageMetrics] = useState<{
+    width: number;
+    height: number;
+    naturalWidth: number;
+    naturalHeight: number;
+  } | null>(null);
 
   const filteredPlates = useMemo(
     () =>
@@ -320,6 +324,295 @@ export default function TraditionalMode() {
       }),
     [plates, filterCriteria, listFilter]
   );
+
+  const analysisOrientation: ImageOrientation = "vertical";
+  const analysisTopMeta = useMemo(
+    () => surfaceImages.find((info) => info.surface === "top"),
+    [surfaceImages],
+  );
+  const analysisBottomMeta = useMemo(
+    () => surfaceImages.find((info) => info.surface === "bottom"),
+    [surfaceImages],
+  );
+  const analysisTileSize = useMemo(() => {
+    return Math.max(
+      analysisTopMeta?.image_height ?? 0,
+      analysisBottomMeta?.image_height ?? 0,
+      512,
+    );
+  }, [analysisTopMeta, analysisBottomMeta]);
+  const topLayout = useMemo(() => {
+    return buildOrientationLayout({
+      orientation: analysisOrientation,
+      surfaceFilter: "top",
+      topMeta: analysisTopMeta,
+      bottomMeta: analysisBottomMeta,
+      surfaceGap: 0,
+    });
+  }, [analysisOrientation, analysisTopMeta, analysisBottomMeta]);
+  const bottomLayout = useMemo(() => {
+    return buildOrientationLayout({
+      orientation: analysisOrientation,
+      surfaceFilter: "bottom",
+      topMeta: analysisTopMeta,
+      bottomMeta: analysisBottomMeta,
+      surfaceGap: 0,
+    });
+  }, [analysisOrientation, analysisTopMeta, analysisBottomMeta]);
+  const computeLayoutMaxLevel = useCallback(
+    (layout: { surfaces: SurfaceLayout[] }) => {
+      const widths = layout.surfaces.map((s) => s.mosaicWidth);
+      const maxWidth = widths.length ? Math.max(...widths) : 0;
+      if (!maxWidth || !analysisTileSize) return 0;
+      return Math.max(
+        0,
+        Math.ceil(Math.log2(Math.max(1, maxWidth / analysisTileSize))),
+      );
+    },
+    [analysisTileSize],
+  );
+  const topMaxTileLevel = useMemo(
+    () => computeLayoutMaxLevel(topLayout),
+    [computeLayoutMaxLevel, topLayout],
+  );
+  const bottomMaxTileLevel = useMemo(
+    () => computeLayoutMaxLevel(bottomLayout),
+    [computeLayoutMaxLevel, bottomLayout],
+  );
+  const topDefectRects = useMemo(() => {
+    if (topLayout.surfaces.length === 0) return [];
+    return plateDefects
+      .map((defect) => {
+        const surfaceLayout = topLayout.surfaces.find(
+          (surface) => surface.surface === defect.surface,
+        );
+        if (!surfaceLayout) return null;
+        const rect = convertDefectToWorldRect({
+          surface: surfaceLayout,
+          defect,
+          orientation: analysisOrientation,
+        });
+        if (!rect) return null;
+        return { defect, surface: surfaceLayout, rect };
+      })
+      .filter(
+        (
+          item,
+        ): item is {
+          defect: DefectItem;
+          surface: SurfaceLayout;
+          rect: { x: number; y: number; width: number; height: number };
+        } => item !== null,
+      );
+  }, [topLayout, plateDefects, analysisOrientation]);
+  const bottomDefectRects = useMemo(() => {
+    if (bottomLayout.surfaces.length === 0) return [];
+    return plateDefects
+      .map((defect) => {
+        const surfaceLayout = bottomLayout.surfaces.find(
+          (surface) => surface.surface === defect.surface,
+        );
+        if (!surfaceLayout) return null;
+        const rect = convertDefectToWorldRect({
+          surface: surfaceLayout,
+          defect,
+          orientation: analysisOrientation,
+        });
+        if (!rect) return null;
+        return { defect, surface: surfaceLayout, rect };
+      })
+      .filter(
+        (
+          item,
+        ): item is {
+          defect: DefectItem;
+          surface: SurfaceLayout;
+          rect: { x: number; y: number; width: number; height: number };
+        } => item !== null,
+      );
+  }, [bottomLayout, plateDefects, analysisOrientation]);
+  const analysisSeverityColor = useCallback((severity: DefectItem["severity"]) => {
+    switch (severity) {
+      case "high":
+        return "#ef4444";
+      case "medium":
+        return "#f59e0b";
+      default:
+        return "#22c55e";
+    }
+  }, []);
+  const analysisSeqNo = useMemo(() => {
+    if (!selectedPlate) return null;
+    const parsed = parseInt(selectedPlate.serialNumber, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+  }, [selectedPlate]);
+
+  const createAnalysisTileRenderer = useCallback(
+    (layout: { surfaces: SurfaceLayout[] }, defectRects: typeof topDefectRects, maxLevel: number) =>
+      (ctx: CanvasRenderingContext2D, tile: Tile, tileSizeArg: number, scale: number) => {
+        if (!analysisSeqNo || layout.surfaces.length === 0) {
+          ctx.fillStyle = "#0b1220";
+          ctx.fillRect(tile.x, tile.y, tile.width, tile.height);
+          return;
+        }
+        const surfaceLayout = pickSurfaceForTile(layout, tile);
+        if (!surfaceLayout) {
+          ctx.fillStyle = "#0b1220";
+          ctx.fillRect(tile.x, tile.y, tile.width, tile.height);
+          return;
+        }
+        const virtualTileSize = tileSizeArg * Math.pow(2, tile.level);
+        const requestInfo = computeTileRequestInfo({
+          surface: surfaceLayout,
+          tile,
+          orientation: analysisOrientation,
+          virtualTileSize,
+          tileSize: tileSizeArg,
+        });
+        if (!requestInfo) {
+          ctx.fillStyle = "#0b1220";
+          ctx.fillRect(tile.x, tile.y, tile.width, tile.height);
+          return;
+        }
+        const cacheKey = `${analysisOrientation}-${surfaceLayout.surface}-${analysisSeqNo}-${tile.level}-${requestInfo.tileX}-${requestInfo.tileY}-${tileSizeArg}`;
+        const cached = analysisTileImageCache.get(cacheKey);
+        const url = getTileImageUrl({
+          surface: surfaceLayout.surface,
+          seqNo: analysisSeqNo,
+          level: tile.level,
+          tileX: requestInfo.tileX,
+          tileY: requestInfo.tileY,
+          tileSize: tileSizeArg,
+          fmt: "JPEG",
+        });
+        if (cached && cached.complete) {
+          drawTileImage({
+            ctx,
+            img: cached,
+            tile,
+            orientation: analysisOrientation,
+          });
+        } else {
+          const drewFallback = tryDrawFallbackTile({
+            ctx,
+            tile,
+            orientation: analysisOrientation,
+            cache: analysisTileImageCache,
+            cacheKeyPrefix: analysisOrientation,
+            surface: surfaceLayout.surface,
+            seqNo: analysisSeqNo,
+            tileX: requestInfo.tileX,
+            tileY: requestInfo.tileY,
+            tileSize: tileSizeArg,
+            maxLevel,
+          });
+          if (!analysisTileImageLoading.has(cacheKey)) {
+            analysisTileImageLoading.add(cacheKey);
+            const img = new Image();
+            img.src = url;
+            img.onload = () => {
+              analysisTileImageCache.set(cacheKey, img);
+              analysisTileImageLoading.delete(cacheKey);
+            };
+            img.onerror = () => {
+              analysisTileImageLoading.delete(cacheKey);
+            };
+          }
+          if (!drewFallback) {
+            ctx.fillStyle = "#0b1220";
+            ctx.fillRect(tile.x, tile.y, tile.width, tile.height);
+            ctx.strokeStyle = "#1f2937";
+            ctx.lineWidth = 1 / scale;
+            ctx.strokeRect(tile.x, tile.y, tile.width, tile.height);
+          }
+        }
+
+        const defectsInTile = defectRects.filter((item) => {
+          if (item.surface.surface !== surfaceLayout.surface) {
+            return false;
+          }
+          const { rect } = item;
+          return !(
+            rect.x + rect.width < tile.x ||
+            rect.x > tile.x + tile.width ||
+            rect.y + rect.height < tile.y ||
+            rect.y > tile.y + tile.height
+          );
+        });
+        defectsInTile.forEach(({ defect, rect }) => {
+          ctx.strokeStyle = analysisSeverityColor(defect.severity);
+          ctx.lineWidth =
+            defect.id === selectedDefectId ? 3 / scale : 1.5 / scale;
+          ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
+        });
+      },
+    [analysisSeqNo, analysisOrientation, analysisSeverityColor, selectedDefectId],
+  );
+  const renderTopTile = useMemo(
+    () => createAnalysisTileRenderer(topLayout, topDefectRects, topMaxTileLevel),
+    [createAnalysisTileRenderer, topLayout, topDefectRects, topMaxTileLevel],
+  );
+  const renderBottomTile = useMemo(
+    () =>
+      createAnalysisTileRenderer(
+        bottomLayout,
+        bottomDefectRects,
+        bottomMaxTileLevel,
+      ),
+    [
+      createAnalysisTileRenderer,
+      bottomLayout,
+      bottomDefectRects,
+      bottomMaxTileLevel,
+    ],
+  );
+
+  const createAnalysisOverlayRenderer = useCallback(
+    (layout: { surfaces: SurfaceLayout[] }) =>
+      (ctx: CanvasRenderingContext2D, scale: number) => {
+        layout.surfaces.forEach((surfaceLayout) => {
+          const stroke =
+            surfaceLayout.surface === "top" ? "#0ea5e9" : "#f97316";
+          ctx.save();
+          ctx.lineWidth = 3 / scale;
+          ctx.strokeStyle = stroke;
+          ctx.setLineDash([10 / scale, 6 / scale]);
+          ctx.strokeRect(
+            surfaceLayout.offsetX,
+            surfaceLayout.offsetY,
+            surfaceLayout.worldWidth,
+            surfaceLayout.worldHeight,
+          );
+          ctx.setLineDash([]);
+          ctx.translate(
+            surfaceLayout.offsetX + 12 / scale,
+            surfaceLayout.offsetY + 18 / scale,
+          );
+          const labelScale = 1 / scale;
+          ctx.scale(labelScale, labelScale);
+          ctx.font = "bold 12px 'Consolas', sans-serif";
+          ctx.fillStyle = stroke;
+          ctx.fillText(
+            surfaceLayout.surface === "top"
+              ? "TOP SURFACE"
+              : "BOTTOM SURFACE",
+            0,
+            0,
+          );
+          ctx.restore();
+        });
+      },
+    [],
+  );
+  const renderTopOverlay = useMemo(
+    () => createAnalysisOverlayRenderer(topLayout),
+    [createAnalysisOverlayRenderer, topLayout],
+  );
+  const renderBottomOverlay = useMemo(
+    () => createAnalysisOverlayRenderer(bottomLayout),
+    [createAnalysisOverlayRenderer, bottomLayout],
+  );
+
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -389,6 +682,10 @@ export default function TraditionalMode() {
         case "F":
           setIsImmersiveMode(prev => !prev);
           break;
+        case "Shift":
+          // 切换地图模式
+          setIsMapMode(prev => !prev);
+          break;
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -400,15 +697,34 @@ export default function TraditionalMode() {
     if (isPlaying) {
       if (activeNav === "图像分析") {
         timer = setInterval(() => {
-          const targetRef = topScrollRef.current ? topScrollRef : bottomScrollRef;
-          if (targetRef.current) {
-            const container = targetRef.current;
-            const maxScroll = container.scrollHeight - container.clientHeight;
-            if (container.scrollTop >= maxScroll - 2) {
-              container.scrollTop = 0; // Loop back to start
-            } else {
-              container.scrollTop += 2; // Smooth auto-scroll increment
-            }
+          const sourceLayout =
+            surfaceFilter === "bottom" ? bottomLayout : topLayout;
+          if (sourceLayout.worldHeight <= 0) return;
+          const sourceViewport =
+            surfaceFilter === "bottom"
+              ? bottomViewportRef.current
+              : topViewportRef.current;
+          const currentY = sourceViewport?.y ?? 0;
+          const currentH = sourceViewport?.height ?? 1;
+          const maxScroll = Math.max(0, sourceLayout.worldHeight - currentH);
+          const nextY = currentY >= maxScroll - 2 ? 0 : currentY + 2;
+          const centerY = nextY + currentH / 2;
+          if (surfaceFilter === "top" || surfaceFilter === "all") {
+            const centerX =
+              topViewportRef.current
+                ? topViewportRef.current.x + topViewportRef.current.width / 2
+                : topLayout.worldWidth / 2;
+            setTopCenterTarget({ x: centerX, y: centerY });
+          }
+          if (
+            surfaceFilter === "bottom" ||
+            (surfaceFilter === "all" && isAnalysisSyncEnabled)
+          ) {
+            const centerX =
+              bottomViewportRef.current
+                ? bottomViewportRef.current.x + bottomViewportRef.current.width / 2
+                : bottomLayout.worldWidth / 2;
+            setBottomCenterTarget({ x: centerX, y: centerY });
           }
         }, 16); // ~60fps for smooth motion
       } else {
@@ -422,7 +738,7 @@ export default function TraditionalMode() {
       }
     }
     return () => clearInterval(timer);
-  }, [isPlaying, plates, activeNav]);
+  }, [isPlaying, plates, activeNav, surfaceFilter, topLayout, bottomLayout, isAnalysisSyncEnabled]);
 
   // 3D Model Control State
   const [rotX, setRotX] = useState(-12);
@@ -439,6 +755,10 @@ export default function TraditionalMode() {
           const nodesData = await getApiList().catch(() => []);
           if (!mounted) return;
           setApiNodes(nodesData);
+          const meta = await getGlobalMeta().catch(() => null);
+          if (meta && typeof meta.defect_cache_expand === "number") {
+            setDefectCropExpand(meta.defect_cache_expand);
+          }
           await loadPlatesWithCriteria({}, 50, false);
         } catch (error) {
           if (mounted) toast.error("数据加载失败");
@@ -495,38 +815,58 @@ export default function TraditionalMode() {
   }, [selectedPlate]);
 
   useEffect(() => {
-    if (activeNav === "图像分析" && selectedDefectId && (topScrollRef.current || bottomScrollRef.current)) {
-      const defect = plateDefects.find(d => d.id === selectedDefectId);
-      if (defect && selectedPlate) {
-        const plateLength = selectedPlate.dimensions.length || 10000;
-        const targetRef = defect.surface === 'top' ? topScrollRef : bottomScrollRef;
-        const container = targetRef.current;
-        
-        if (container) {
-          const scrollHeight = container.scrollHeight;
-          const targetY = (defect.y / plateLength) * scrollHeight;
-
-          container.scrollTo({
-            top: targetY - container.clientHeight / 2,
-            behavior: 'smooth'
-          });
-        }
+    if (activeNav !== "图像分析" || !selectedDefectId) return;
+    const defect = plateDefects.find((d) => d.id === selectedDefectId);
+    if (!defect) return;
+    if (defect.surface === "top" && topLayout.surfaces.length > 0) {
+      const rect = topDefectRects.find((item) => item.defect.id === defect.id)?.rect;
+      if (rect) {
+        setTopCenterTarget({
+          x: rect.x + rect.width / 2,
+          y: rect.y + rect.height / 2,
+        });
       }
     }
-  }, [selectedDefectId, activeNav, plateDefects, selectedPlate]);
+    if (defect.surface === "bottom" && bottomLayout.surfaces.length > 0) {
+      const rect = bottomDefectRects.find((item) => item.defect.id === defect.id)?.rect;
+      if (rect) {
+        setBottomCenterTarget({
+          x: rect.x + rect.width / 2,
+          y: rect.y + rect.height / 2,
+        });
+      }
+    }
+  }, [activeNav, selectedDefectId, plateDefects, topLayout, bottomLayout, topDefectRects, bottomDefectRects]);
 
   const handleDistributionInteraction = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (e.buttons !== 1 && e.type !== 'mousedown') return;
     const rect = e.currentTarget.getBoundingClientRect();
     const y = e.clientY - rect.top;
     const ratio = Math.max(0, Math.min(1, y / rect.height));
-    
-    const targetRef = topScrollRef.current ? topScrollRef : bottomScrollRef;
-    if (targetRef.current) {
-      const container = targetRef.current;
-      container.scrollTop = ratio * (container.scrollHeight - container.clientHeight);
+    const targetLayout =
+      surfaceFilter === "bottom" ? bottomLayout : topLayout;
+    if (targetLayout.worldHeight <= 0) return;
+    const targetY = ratio * targetLayout.worldHeight;
+    const getCenterX = (
+      viewport: { x: number; width: number } | null,
+      fallback: number,
+    ) => (viewport ? viewport.x + viewport.width / 2 : fallback / 2);
+    if (surfaceFilter === "top" || surfaceFilter === "all") {
+      setTopCenterTarget({
+        x: getCenterX(topViewportRef.current, topLayout.worldWidth),
+        y: targetY,
+      });
     }
-  }, []);
+    if (
+      surfaceFilter === "bottom" ||
+      (surfaceFilter === "all" && isAnalysisSyncEnabled)
+    ) {
+      setBottomCenterTarget({
+        x: getCenterX(bottomViewportRef.current, bottomLayout.worldWidth),
+        y: targetY,
+      });
+    }
+  }, [surfaceFilter, topLayout, bottomLayout, isAnalysisSyncEnabled]);
 
   const formatTime = useCallback((date: Date) => {
     return date.toLocaleString('zh-CN', { 
@@ -599,6 +939,200 @@ export default function TraditionalMode() {
     return plateDefects[0];
   }, [plateDefects, selectedDefectId]);
 
+  const updateDefectImageMetrics = useCallback(() => {
+    const img = defectImageRef.current;
+    if (!img) return;
+    const naturalWidth = img.naturalWidth || 0;
+    const naturalHeight = img.naturalHeight || 0;
+    const width = img.clientWidth || 0;
+    const height = img.clientHeight || 0;
+    if (!naturalWidth || !naturalHeight || !width || !height) return;
+    setDefectImageMetrics({ width, height, naturalWidth, naturalHeight });
+  }, []);
+
+  useEffect(() => {
+    const img = defectImageRef.current;
+    if (!img) return;
+    updateDefectImageMetrics();
+    const observer = new ResizeObserver(() => updateDefectImageMetrics());
+    observer.observe(img);
+    return () => observer.disconnect();
+  }, [updateDefectImageMetrics, currentDefect?.id]);
+
+  useEffect(() => {
+    if (!isMapMode || !currentDefect) {
+      setShowMapCrop(false);
+      return;
+    }
+    setShowMapCrop(true);
+    const timer = window.setTimeout(() => setShowMapCrop(false), 1200);
+    return () => window.clearTimeout(timer);
+  }, [isMapMode, currentDefect?.id]);
+
+  const mapSurfaceInfo = useMemo(() => {
+    const surface = currentDefect?.surface ?? surfaceImages[0]?.surface;
+    if (!surface) return null;
+    return surfaceImages.find(info => info.surface === surface) ?? null;
+  }, [currentDefect, surfaceImages]);
+
+  const mapSurface = mapSurfaceInfo?.surface ?? currentDefect?.surface ?? surfaceImages[0]?.surface ?? "top";
+  const mapSeqNo = useMemo(() => {
+    if (!selectedPlate) return null;
+    const parsed = parseInt(selectedPlate.serialNumber, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+  }, [selectedPlate]);
+
+  const mapFrameHeight = mapSurfaceInfo?.image_height ?? 0;
+  const mapFrameWidth = mapSurfaceInfo?.image_width ?? 0;
+  const mapFrameCount = mapSurfaceInfo?.frame_count ?? 0;
+  const mapWorldWidth = mapFrameWidth;
+  const mapWorldHeight = mapFrameHeight * mapFrameCount;
+  const mapTileSize = mapFrameHeight > 0 ? mapFrameHeight : 1024;
+  const mapMaxLevel = useMemo(() => {
+    if (!mapFrameWidth || !mapTileSize) return 0;
+    return Math.max(
+      0,
+      Math.ceil(Math.log2(Math.max(1, mapFrameWidth / mapTileSize))),
+    );
+  }, [mapFrameWidth, mapTileSize]);
+
+  const mapDefectWorld = useMemo(() => {
+    if (!currentDefect || !mapFrameHeight) return null;
+    const frameIndex = Math.max(0, currentDefect.imageIndex - 1);
+    return {
+      x: currentDefect.x + currentDefect.width / 2,
+      y: currentDefect.y + currentDefect.height / 2 + frameIndex * mapFrameHeight,
+    };
+  }, [currentDefect, mapFrameHeight]);
+
+  const mapFocusTarget = useMemo(() => {
+    if (!isMapMode || !currentDefect || !mapDefectWorld) return null;
+    const padding = Math.max(currentDefect.width, currentDefect.height, 120) * 2;
+    const focusWidth = currentDefect.width + padding * 2;
+    const focusHeight = currentDefect.height + padding * 2;
+    return {
+      x: Math.max(0, mapDefectWorld.x - focusWidth / 2),
+      y: Math.max(0, mapDefectWorld.y - focusHeight / 2),
+      width: focusWidth,
+      height: focusHeight,
+    };
+  }, [isMapMode, currentDefect, mapDefectWorld]);
+
+  const mapPrefetchHint = useMemo(() => {
+    if (!isMapMode || !currentDefect) return null;
+    const sameSurface = plateDefects.filter(d => d.surface === currentDefect.surface);
+    if (sameSurface.length === 0) return null;
+    const idx = sameSurface.findIndex(d => d.id === currentDefect.id);
+    const nextDefect = idx >= 0 && idx < sameSurface.length - 1 ? sameSurface[idx + 1] : sameSurface[0];
+    if (!nextDefect) return null;
+    return {
+      x: nextDefect.x + nextDefect.width / 2,
+      y: nextDefect.y + nextDefect.height / 2,
+      imageIndex: Math.max(0, nextDefect.imageIndex - 1),
+    };
+  }, [isMapMode, currentDefect, plateDefects]);
+
+  const mapCropStyle = useMemo(() => {
+    if (!showMapCrop || !mapViewport || !currentDefect || !mapDefectWorld) {
+      return null;
+    }
+    const expand = defectCropExpand;
+    const cropWorldWidth = currentDefect.width + expand * 2;
+    const cropWorldHeight = currentDefect.height + expand * 2;
+    const left = ((mapDefectWorld.x - mapViewport.x) / mapViewport.width) * 100;
+    const top = ((mapDefectWorld.y - mapViewport.y) / mapViewport.height) * 100;
+    const width = (cropWorldWidth / mapViewport.width) * 100;
+    const height = (cropWorldHeight / mapViewport.height) * 100;
+    if (!Number.isFinite(left) || !Number.isFinite(top) || width <= 0 || height <= 0) {
+      return null;
+    }
+    return {
+      left: `${left}%`,
+      top: `${top}%`,
+      width: `${width}%`,
+      height: `${height}%`,
+    };
+  }, [showMapCrop, mapViewport, currentDefect, mapDefectWorld]);
+
+  const defectBoxStyle = useMemo(() => {
+    if (!currentDefect || !defectImageMetrics) return null;
+    const scaleX = defectImageMetrics.width / defectImageMetrics.naturalWidth;
+    const scaleY = defectImageMetrics.height / defectImageMetrics.naturalHeight;
+    if (!Number.isFinite(scaleX) || !Number.isFinite(scaleY)) return null;
+    return {
+      left: `${defectCropExpand * scaleX}px`,
+      top: `${defectCropExpand * scaleY}px`,
+      width: `${currentDefect.width * scaleX}px`,
+      height: `${currentDefect.height * scaleY}px`,
+    };
+  }, [currentDefect, defectImageMetrics, defectCropExpand]);
+
+  const getViewportCenterX = useCallback(
+    (viewport: { x: number; width: number } | null, worldWidth: number) => {
+      return viewport ? viewport.x + viewport.width / 2 : worldWidth / 2;
+    },
+    [],
+  );
+
+  const handleTopViewportChange = useCallback(
+    (info: { x: number; y: number; width: number; height: number }) => {
+      topViewportRef.current = info;
+      setAnalysisScrollState({
+        top: info.y,
+        height: topLayout.worldHeight || 1,
+        clientHeight: info.height,
+      });
+      if (
+        surfaceFilter === "all" &&
+        isAnalysisSyncEnabled &&
+        bottomLayout.worldHeight > 0 &&
+        !syncLockRef.current
+      ) {
+        syncLockRef.current = true;
+        setBottomCenterTarget({
+          x: getViewportCenterX(
+            bottomViewportRef.current,
+            bottomLayout.worldWidth,
+          ),
+          y: info.y + info.height / 2,
+        });
+        window.setTimeout(() => {
+          syncLockRef.current = false;
+        }, 60);
+      }
+    },
+    [surfaceFilter, isAnalysisSyncEnabled, topLayout, bottomLayout, getViewportCenterX],
+  );
+
+  const handleBottomViewportChange = useCallback(
+    (info: { x: number; y: number; width: number; height: number }) => {
+      bottomViewportRef.current = info;
+      setAnalysisScrollState({
+        top: info.y,
+        height: bottomLayout.worldHeight || 1,
+        clientHeight: info.height,
+      });
+      if (
+        surfaceFilter === "all" &&
+        isAnalysisSyncEnabled &&
+        topLayout.worldHeight > 0 &&
+        !syncLockRef.current
+      ) {
+        syncLockRef.current = true;
+        setTopCenterTarget({
+          x: getViewportCenterX(
+            topViewportRef.current,
+            topLayout.worldWidth,
+          ),
+          y: info.y + info.height / 2,
+        });
+        window.setTimeout(() => {
+          syncLockRef.current = false;
+        }, 60);
+      }
+    },
+    [surfaceFilter, isAnalysisSyncEnabled, topLayout, bottomLayout, getViewportCenterX],
+  );
   const currentImageUrl = useMemo(() => {
     // 若有选中缺陷，则优先展示该缺陷的小图（缺陷分析视图）
     if (currentDefect) {
@@ -626,6 +1160,114 @@ export default function TraditionalMode() {
       tileSize: surfaceImages[0].image_height || 512
     });
   }, [currentDefect, selectedPlate, surfaceImages]);
+
+  const renderMapTile = useCallback(
+    (ctx: CanvasRenderingContext2D, tile: Tile, tileSizeArg: number, scale: number) => {
+      if (!mapSurface || mapSeqNo == null) {
+        ctx.fillStyle = "#0b1220";
+        ctx.fillRect(tile.x, tile.y, tile.width, tile.height);
+        return;
+      }
+
+      const cacheKey = `vertical-${mapSurface}-${mapSeqNo}-${tile.level}-${tile.col}-${tile.row}-${tileSizeArg}`;
+      const cached = mapTileImageCache.get(cacheKey);
+      const url = getTileImageUrl({
+        surface: mapSurface,
+        seqNo: mapSeqNo,
+        level: tile.level,
+        tileX: tile.col,
+        tileY: tile.row,
+        tileSize: tileSizeArg,
+        fmt: "JPEG",
+        prefetch: mapPrefetchHint
+          ? {
+              mode: "defect",
+              x: mapPrefetchHint.x,
+              y: mapPrefetchHint.y,
+              imageIndex: mapPrefetchHint.imageIndex,
+            }
+          : undefined,
+      });
+
+      if (cached && cached.complete) {
+        drawTileImage({
+          ctx,
+          img: cached,
+          tile,
+          orientation: "vertical",
+        });
+        return;
+      }
+
+      const drewFallback = tryDrawFallbackTile({
+        ctx,
+        tile,
+        orientation: "vertical",
+        cache: mapTileImageCache,
+        cacheKeyPrefix: "vertical",
+        surface: mapSurface,
+        seqNo: mapSeqNo,
+        tileX: tile.col,
+        tileY: tile.row,
+        tileSize: tileSizeArg,
+        maxLevel: mapMaxLevel,
+      });
+
+      if (!mapTileImageLoading.has(cacheKey)) {
+        mapTileImageLoading.add(cacheKey);
+        const img = new Image();
+        img.src = url;
+        img.onload = () => {
+          mapTileImageCache.set(cacheKey, img);
+          mapTileImageLoading.delete(cacheKey);
+        };
+        img.onerror = () => {
+          mapTileImageLoading.delete(cacheKey);
+        };
+      }
+
+      if (!drewFallback) {
+        ctx.fillStyle = "#0b1220";
+        ctx.fillRect(tile.x, tile.y, tile.width, tile.height);
+        ctx.strokeStyle = "#1f2937";
+        ctx.lineWidth = 1 / scale;
+        ctx.strokeRect(tile.x, tile.y, tile.width, tile.height);
+      }
+    },
+    [mapSurface, mapSeqNo, mapPrefetchHint, mapMaxLevel],
+  );
+
+  const renderMapOverlay = useCallback(
+    (ctx: CanvasRenderingContext2D, scale: number) => {
+      if (!mapSurface || !mapFrameHeight) return;
+      const severityColor = (severity: DefectItem["severity"]) => {
+        switch (severity) {
+          case "high":
+            return "#ef4444";
+          case "medium":
+            return "#f59e0b";
+          default:
+            return "#22c55e";
+        }
+      };
+
+      plateDefects.forEach((defect) => {
+        if (defect.surface !== mapSurface) return;
+        const rectX = defect.x;
+        const frameIndex = Math.max(0, defect.imageIndex - 1);
+        const rectY = defect.y + frameIndex * mapFrameHeight;
+        const rectW = defect.width;
+        const rectH = defect.height;
+
+        ctx.save();
+        ctx.strokeStyle = severityColor(defect.severity);
+        ctx.lineWidth = defect.id === selectedDefectId ? 3 / scale : 1.5 / scale;
+        ctx.strokeRect(rectX, rectY, rectW, rectH);
+        ctx.restore();
+      });
+    },
+    [mapSurface, mapFrameHeight, plateDefects, selectedDefectId],
+  );
 
   // Dynamic Scale Calculation based on Actual Dimensions
   const box = useMemo(() => {
@@ -1588,13 +2230,41 @@ export default function TraditionalMode() {
           <div className="h-8 bg-[#161b22] border border-[#30363d] flex items-center justify-between px-2 shrink-0 gap-4 relative">
             <div className="flex items-center gap-2 shrink-0">
               <div className="flex gap-0.5 items-center">
-                <button 
-                  className={`p-1 transition-colors ${isGridView ? 'bg-[#30363d] text-[#58a6ff]' : 'hover:bg-[#30363d] text-[#8b949e]'}`}
-                  onClick={() => setIsGridView(!isGridView)}
-                  title="列表模式"
-                >
-                  <LayoutGrid className="w-4 h-4" />
-                </button>
+                {activeNav === "缺陷分析" && (
+                  <>
+                    <button 
+                      className={`p-1 transition-colors ${isGridView ? 'bg-[#30363d] text-[#58a6ff]' : 'hover:bg-[#30363d] text-[#8b949e]'}`}
+                      onClick={() => setIsGridView(!isGridView)}
+                      title="列表模式"
+                    >
+                      <LayoutGrid className="w-4 h-4" />
+                    </button>
+                    <button
+                      className={`p-1 transition-colors ${
+                        isMapMode
+                          ? 'bg-[#30363d] text-[#58a6ff]'
+                          : 'hover:bg-[#30363d] text-[#8b949e]'
+                      }`}
+                      onClick={() => setIsMapMode(!isMapMode)}
+                      title="地图模式 (Shift)"
+                    >
+                      <Target className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
+                {activeNav === "图像分析" && (
+                  <button
+                    className={`p-1 transition-colors ${
+                      isWidthLockEnabled
+                        ? 'bg-[#30363d] text-[#58a6ff]'
+                        : 'hover:bg-[#30363d] text-[#8b949e]'
+                    }`}
+                    onClick={() => setIsWidthLockEnabled((prev) => !prev)}
+                    title={isWidthLockEnabled ? "关闭宽度锁定" : "开启宽度锁定"}
+                  >
+                    <ArrowLeftRight className="w-4 h-4" />
+                  </button>
+                )}
                 <div className="w-px h-3 bg-[#30363d] mx-1 self-center" />
                 
                 <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 z-10">
@@ -1830,6 +2500,19 @@ export default function TraditionalMode() {
               >
                 {isDefectListOpen ? <PanelRightClose className="w-3.5 h-3.5" /> : <PanelRightOpen className="w-3.5 h-3.5" />}
               </button>
+              {activeNav === "图像分析" && surfaceFilter === "all" && (
+                <button
+                  onClick={() => setIsAnalysisSyncEnabled((prev) => !prev)}
+                  className={`h-6 w-7 flex items-center justify-center rounded border transition-colors ${
+                    isAnalysisSyncEnabled
+                      ? "bg-[#58a6ff]/10 text-[#58a6ff] border-[#58a6ff]/30"
+                      : "text-[#8b949e] border-[#30363d] hover:bg-[#30363d]"
+                  }`}
+                  title={isAnalysisSyncEnabled ? "关闭同步滚动" : "开启同步滚动"}
+                >
+                  <Link2 className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -1837,9 +2520,9 @@ export default function TraditionalMode() {
           <div className="flex-1 flex overflow-hidden">
             <div 
               className="flex-1 bg-black relative flex items-center justify-center overflow-hidden border border-[#30363d] cursor-crosshair"
-              onWheel={activeNav !== "图像分析" && !isGridView ? handleImageWheel : undefined}
-              onMouseDown={activeNav !== "图像分析" && !isGridView ? handleImageMouseDown : undefined}
-              onMouseMove={activeNav !== "图像分析" && !isGridView ? (e => { handleMouseMove(e); handleImageMouseMove(e); }) : handleMouseMove}
+              onWheel={activeNav !== "图像分析" && !isGridView && !isMapMode ? handleImageWheel : undefined}
+              onMouseDown={activeNav !== "图像分析" && !isGridView && !isMapMode ? handleImageMouseDown : undefined}
+              onMouseMove={activeNav !== "图像分析" && !isGridView && !isMapMode ? (e => { handleMouseMove(e); handleImageMouseMove(e); }) : handleMouseMove}
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseUp}
             >
@@ -1852,65 +2535,91 @@ export default function TraditionalMode() {
                     exit={{ opacity: 0 }}
                     className="absolute inset-0 bg-[#0d1117] flex flex-col"
                   >
-                    {/* Top Surface Viewport */}
-                    {(surfaceFilter === 'all' || surfaceFilter === 'top') && (
-                      <div 
-                        ref={topScrollRef}
-                        onScroll={(e) => handleScrollSync(e, 'top')}
-                        className={`relative w-full overflow-y-auto custom-scrollbar overflow-x-hidden ${
-                          surfaceFilter === 'all' ? 'flex-1 border-b-2 border-[#30363d]/50' : 'h-full'
+                    {(surfaceFilter === "all" || surfaceFilter === "top") && (
+                      <div
+                        className={`relative w-full overflow-hidden ${
+                          surfaceFilter === "all"
+                            ? "flex-1 border-b-2 border-[#30363d]/50"
+                            : "h-full"
                         }`}
                       >
-                        <div className="absolute top-2 left-2 px-2 py-0.5 bg-black/60 text-[10px] text-[#58a6ff] font-bold z-10 border border-[#58a6ff]/30 rounded-sm">TOP SURFACE</div>
-                        <div className="flex flex-col w-full">
-                          {Array.from({ length: Math.ceil((selectedPlate?.dimensions.length || 8000) / 1024) }).map((_, i) => (
-                            <img
-                              key={`top-tile-${i}`}
-                              src={getTileImageUrl({
-                                surface: 'top',
-                                seqNo: parseInt(selectedPlate?.serialNumber || "0", 10),
-                                level: 0,
-                                tileX: 0,
-                                tileY: i,
-                                tileSize: 1024
-                              })}
-                              className="w-full h-auto bg-[#1c2128] aspect-square"
-                              loading="lazy"
-                              style={{ minHeight: '200px' }}
-                            />
-                          ))}
+                        <div className="absolute top-2 left-2 px-2 py-0.5 bg-black/60 text-[10px] text-[#58a6ff] font-bold z-10 border border-[#58a6ff]/30 rounded-sm">
+                          TOP SURFACE
                         </div>
+                        {analysisSeqNo && topLayout.worldWidth > 0 ? (
+                          <LargeImageViewer
+                            imageWidth={topLayout.worldWidth}
+                            imageHeight={topLayout.worldHeight}
+                            tileSize={analysisTileSize}
+                            className="bg-[#0d1117]"
+                            maxLevel={topMaxTileLevel}
+                            prefetchMargin={400}
+                            renderTile={renderTopTile}
+                            renderOverlay={renderTopOverlay}
+                            centerTarget={topCenterTarget}
+                            onViewportChange={handleTopViewportChange}
+                            panMargin={200}
+                            fitToHeight={analysisOrientation === "vertical"}
+                            fitToWidth={activeNav === "图像分析" && isWidthLockEnabled}
+                            lockScale={activeNav === "图像分析" && isWidthLockEnabled}
+                            wheelMode={
+                              activeNav === "图像分析" && isWidthLockEnabled
+                                ? "scroll"
+                                : activeNav === "图像分析" &&
+                                    surfaceFilter === "all" &&
+                                    isAnalysisSyncEnabled
+                                  ? "scroll"
+                                  : "zoom"
+                            }
+                          />
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center text-[11px] text-[#8b949e]">
+                            缺少上表图像元信息
+                          </div>
+                        )}
                       </div>
                     )}
 
-                    {/* Bottom Surface Viewport */}
-                    {(surfaceFilter === 'all' || surfaceFilter === 'bottom') && (
-                      <div 
-                        ref={bottomScrollRef}
-                        onScroll={(e) => handleScrollSync(e, 'bottom')}
-                        className={`relative w-full overflow-y-auto custom-scrollbar overflow-x-hidden ${
-                          surfaceFilter === 'all' ? 'flex-1' : 'h-full'
+                    {(surfaceFilter === "all" || surfaceFilter === "bottom") && (
+                      <div
+                        className={`relative w-full overflow-hidden ${
+                          surfaceFilter === "all" ? "flex-1" : "h-full"
                         }`}
                       >
-                        <div className="absolute top-2 left-2 px-2 py-0.5 bg-black/60 text-[10px] text-[#f85149] font-bold z-10 border border-[#f85149]/30 rounded-sm">BOTTOM SURFACE</div>
-                        <div className="flex flex-col w-full">
-                          {Array.from({ length: Math.ceil((selectedPlate?.dimensions.length || 8000) / 1024) }).map((_, i) => (
-                            <img
-                              key={`bottom-tile-${i}`}
-                              src={getTileImageUrl({
-                                surface: 'bottom',
-                                seqNo: parseInt(selectedPlate?.serialNumber || "0", 10),
-                                level: 0,
-                                tileX: 0,
-                                tileY: i,
-                                tileSize: 1024
-                              })}
-                              className="w-full h-auto bg-[#1c2128] aspect-square"
-                              loading="lazy"
-                              style={{ minHeight: '200px' }}
-                            />
-                          ))}
+                        <div className="absolute top-2 left-2 px-2 py-0.5 bg-black/60 text-[10px] text-[#f85149] font-bold z-10 border border-[#f85149]/30 rounded-sm">
+                          BOTTOM SURFACE
                         </div>
+                        {analysisSeqNo && bottomLayout.worldWidth > 0 ? (
+                          <LargeImageViewer
+                            imageWidth={bottomLayout.worldWidth}
+                            imageHeight={bottomLayout.worldHeight}
+                            tileSize={analysisTileSize}
+                            className="bg-[#0d1117]"
+                            maxLevel={bottomMaxTileLevel}
+                            prefetchMargin={400}
+                            renderTile={renderBottomTile}
+                            renderOverlay={renderBottomOverlay}
+                            centerTarget={bottomCenterTarget}
+                            onViewportChange={handleBottomViewportChange}
+                            panMargin={200}
+                            fitToHeight={analysisOrientation === "vertical"}
+                            fitToWidth={activeNav === "图像分析" && isWidthLockEnabled}
+                            lockScale={activeNav === "图像分析" && isWidthLockEnabled}
+                            wheelMode={
+                              activeNav === "图像分析" && isWidthLockEnabled
+                                ? "scroll"
+                                : activeNav === "图像分析" &&
+                                    surfaceFilter === "all" &&
+                                    isAnalysisSyncEnabled
+                                  ? "scroll"
+                                  : "zoom"
+                            }
+                          />
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center text-[11px] text-[#8b949e]">
+                            缺少下表图像元信息
+                          </div>
+                        )}
                       </div>
                     )}
                   </motion.div>
@@ -1958,6 +2667,58 @@ export default function TraditionalMode() {
                       </div>
                     )}
                   </motion.div>
+                ) : isMapMode ? (
+                  <motion.div
+                    key="map"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="w-full h-full relative bg-[#0d1117]"
+                  >
+                    {mapSeqNo != null && mapWorldWidth > 0 && mapWorldHeight > 0 ? (
+                      <>
+                        <LargeImageViewer
+                          imageWidth={mapWorldWidth}
+                          imageHeight={mapWorldHeight}
+                          tileSize={mapTileSize}
+                          className="bg-[#0d1117]"
+                          initialScale="fit"
+                          maxLevel={mapMaxLevel}
+                          prefetchMargin={400}
+                          renderTile={renderMapTile}
+                          renderOverlay={renderMapOverlay}
+                          focusTarget={mapFocusTarget}
+                          onViewportChange={setMapViewport}
+                          panMargin={200}
+                        />
+                        {showMapCrop && currentDefect && (
+                          <img
+                            src={currentImageUrl}
+                            alt="缺陷裁剪图"
+                            className={`absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none select-none transition-opacity duration-700 ${
+                              showMapCrop ? "opacity-100" : "opacity-0"
+                            }`}
+                            style={
+                              mapCropStyle ?? {
+                                left: "50%",
+                                top: "50%",
+                                width: "60%",
+                                maxWidth: "520px",
+                                maxHeight: "70%",
+                              }
+                            }
+                          />
+                        )}
+                      </>
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-[#8b949e]">
+                        <span className="text-xs">缺少瓦片元信息</span>
+                      </div>
+                    )}
+                    <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/60 border border-white/10 text-[9px] text-[#8b949e] font-mono pointer-events-none">
+                      MAP MODE
+                    </div>
+                  </motion.div>
                 ) : (
                   <motion.div 
                     key="single"
@@ -1988,11 +2749,19 @@ export default function TraditionalMode() {
                       <img 
                         src={currentImageUrl} 
                         alt="Surface Defect Detail"
-                        className="max-h-[600px] contrast-110 pointer-events-none select-none"
+                        ref={defectImageRef}
+                        className="max-h-[600px] contrast-110 pointer-events-none select-none block"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=2000&auto=format&fit=crop";
                         }}
+                        onLoad={updateDefectImageMetrics}
                       />
+                      {defectBoxStyle && (
+                        <div
+                          className="absolute border-2 border-[#58a6ff]/80 pointer-events-none"
+                          style={defectBoxStyle}
+                        />
+                      )}
                     </div>
 
                     {/* Scale Indicator Overlay */}

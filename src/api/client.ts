@@ -385,6 +385,12 @@ export function getTileImageUrl(params: {
   tileSize?: number;
   fmt?: string;
   view?: string;
+  prefetch?: {
+    mode: "defect";
+    x: number;
+    y: number;
+    imageIndex?: number;
+  };
 }): string {
   const {
     surface,
@@ -394,6 +400,7 @@ export function getTileImageUrl(params: {
     tileY,
     fmt = "JPEG",
     view,
+    prefetch,
   } = params;
 
   // 在生产/跨域模式下，如果还未选择产线（line_name 为空），
@@ -407,17 +414,29 @@ export function getTileImageUrl(params: {
   }
 
   const baseUrl = env.getApiBaseUrl();
-  const viewParam = view ? `&view=${encodeURIComponent(view)}` : "";
-  return (
-    `${baseUrl}/images/tile` +
-    `?surface=${surface}` +
-    `&seq_no=${seqNo}` +
-    `&level=${level}` +
-    `&tile_x=${tileX}` +
-    `&tile_y=${tileY}` +
-    `&fmt=${fmt}` +
-    viewParam
-  );
+  const search = new URLSearchParams({
+    surface,
+    seq_no: seqNo.toString(),
+    level: level.toString(),
+    tile_x: tileX.toString(),
+    tile_y: tileY.toString(),
+    fmt,
+  });
+  if (view) {
+    search.set("view", view);
+  }
+  if (typeof tileSize === "number") {
+    search.set("tile_size", tileSize.toString());
+  }
+  if (prefetch?.mode === "defect") {
+    search.set("prefetch", "defect");
+    search.set("prefetch_x", Math.round(prefetch.x).toString());
+    search.set("prefetch_y", Math.round(prefetch.y).toString());
+    if (typeof prefetch.imageIndex === "number") {
+      search.set("prefetch_image_index", prefetch.imageIndex.toString());
+    }
+  }
+  return `${baseUrl}/images/tile?${search.toString()}`;
 }
 
 /**
@@ -432,6 +451,7 @@ export async function getGlobalMeta(): Promise<{
     default_tile_size: number;
   };
   image: { frame_width: number; frame_height: number };
+  defect_cache_expand?: number;
 }> {
   if (env.isDevelopment()) {
     // 开发模式：沿用原有 mock 行为，这里简单返回空对象占位
