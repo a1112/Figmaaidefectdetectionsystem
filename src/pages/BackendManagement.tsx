@@ -22,6 +22,7 @@ import { PermissionsPanel } from "../components/backend/PermissionsPanel";
 import { LineConfigTable } from "../components/backend/LineConfigTable";
 import { ProxySettings } from "../components/backend/ProxySettings";
 import { SystemInfoPanel } from "../components/backend/SystemInfoPanel";
+import { ServiceSettings } from "../components/backend/ServiceSettings";
 import { useTheme } from "../components/ThemeContext";
 import {
   getConfigMate,
@@ -35,6 +36,8 @@ type MenuKey =
   | "ui"
   | "production"
   | "proxy"
+  | "proxy"
+  | "cache"
   | "mockdata";
 
 interface MenuItem {
@@ -63,6 +66,11 @@ const menuItems: MenuItem[] = [
     key: "production",
     label: "产线编辑",
     icon: <Factory className="w-5 h-5" />,
+  },
+  {
+    key: "cache",
+    label: "服务设置",
+    icon: <Server className="w-5 h-5" />,
   },
   {
     key: "proxy",
@@ -153,6 +161,8 @@ export const BackendManagement: React.FC = () => {
         return <LineConfigTable />;
       case "proxy":
         return <ProxySettings />;
+      case "cache":
+        return <ServiceSettings />;
       case "mockdata":
         return <MockDataEditor />;
       default:

@@ -165,16 +165,58 @@ export interface ConfigMateResponse {
   payload: ConfigMatePayload | ConfigMatePayload[] | Record<string, any>;
 }
 
+export interface CacheLineConfig {
+  name?: string;
+  key: string;
+  profile?: string;
+  mode?: string;
+  ip?: string;
+  port?: number | null;
+  overrides?: { images?: Record<string, any> };
+  effective?: { images?: Record<string, any> };
+}
+
+export interface CacheConfig {
+  hostname?: string;
+  map_root?: string;
+  map_root_name?: string;
+  templates: {
+    default?: Record<string, any>;
+    small?: Record<string, any>;
+  };
+  defaults: {
+    images?: Record<string, any>;
+    [key: string]: any;
+  };
+  lines?: CacheLineConfig[];
+}
+
+export interface CacheTemplateUpdatePayload {
+  default?: Record<string, any>;
+  small?: Record<string, any>;
+}
+
+export interface CacheLineUpdatePayload {
+  key: string;
+  images?: Record<string, any>;
+}
+
+export interface CacheConfigUpdatePayload {
+  templates?: CacheTemplateUpdatePayload;
+  defaults?: Record<string, any>;
+  lines?: CacheLineUpdatePayload[];
+}
+
 const UI_SETTINGS_KEY = "admin_ui_settings";
 const MOCK_DATA_KEY = "admin_mock_data";
 
 const getAdminBaseUrl = (): string => {
   if (env.getMode() === "cors") {
     const base = env.getCorsBaseUrl().replace(/\/+$/, "");
-    return `${base}/api/config`;
+    return `${base}/config`;
   }
   if (env.getMode() === "production") {
-    return "/api/config";
+    return "/config";
   }
   return "";
 };
@@ -833,6 +875,96 @@ export async function getConfigMate(): Promise<ConfigMatePayload> {
   } catch (error) {
     console.warn("⚠️ getConfigMate failed:", error);
     return { lines: [], defaults: {} };
+  }
+}
+
+export async function getCacheConfig(): Promise<CacheConfig> {
+  if (env.isDevelopment()) {
+    return {
+      hostname: "local-dev",
+      map_root: "configs/net_tabel/DATA/LOCAL-DEV",
+      map_root_name: "LOCAL-DEV",
+      templates: {
+        default: {
+          disk_cache_enabled: true,
+          disk_cache_max_tiles: 2000,
+          disk_cache_max_defects: 1000,
+          defect_cache_enabled: true,
+          defect_cache_expand: 100,
+        },
+        small: {
+          disk_cache_enabled: true,
+          disk_cache_max_tiles: 7000,
+          disk_cache_max_defects: 5000,
+          defect_cache_enabled: true,
+          defect_cache_expand: 100,
+        },
+      },
+      defaults: {
+        images: {},
+      },
+      lines: [
+        {
+          name: "本地测试数据",
+          key: "test",
+          profile: "default",
+          mode: "direct",
+          ip: "127.0.0.1",
+          port: 8120,
+          effective: {
+            images: {
+              disk_cache_enabled: true,
+              defect_cache_enabled: true,
+              defect_cache_expand: 100,
+            },
+          },
+        },
+      ],
+    };
+  }
+  const url = `${getAdminBaseUrl()}/cache`;
+  try {
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.detail || `Failed to load cache config: ${response.status}`);
+    }
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      throw new Error("Received non-JSON response for cache config");
+    }
+    return (await response.json()) as CacheConfig;
+  } catch (error) {
+    console.error("❌ getCacheConfig failed:", error);
+    throw error;
+  }
+}
+
+export async function updateCacheConfig(payload: CacheConfigUpdatePayload): Promise<CacheConfig> {
+  if (env.isDevelopment()) {
+    // 在开发模式下，仅更新本地状态，不真正调用后端
+    console.warn("updateCacheConfig called in development mode; no-op.");
+    return getCacheConfig();
+  }
+  const url = `${getAdminBaseUrl()}/cache`;
+  try {
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.detail || `Failed to update cache config: ${response.status}`);
+    }
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      throw new Error("Received non-JSON response for cache config");
+    }
+    return (await response.json()) as CacheConfig;
+  } catch (error) {
+    console.error("❌ updateCacheConfig failed:", error);
+    throw error;
   }
 }
 

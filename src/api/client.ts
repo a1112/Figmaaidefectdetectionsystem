@@ -256,7 +256,7 @@ export async function getDefectsRaw(
 }
 
 /**
- * 获取缺陷图像 URL
+ * 获取帧图像 URL
  */
 export async function getFrameImage(
   surface: Surface,
@@ -275,6 +275,55 @@ export async function getFrameImage(
   // 生产模式：返回真实 API 图像 URL
   const baseUrl = env.getApiBaseUrl();
   return `${baseUrl}/images/frame?surface=${surface}&seq_no=${seqNo}&image_index=${imageIndex}`;
+}
+
+/**
+ * 获取缺陷小图 URL
+ * 对应后端 /api/images/defect/{defect_id}，内部已实现：
+ *  - 内存缓存 → 磁盘缓存 → 原图裁剪 的优先级。
+ */
+export function getDefectImageUrl(params: {
+  defectId: string | number;
+  surface: Surface;
+  expand?: number;
+  width?: number;
+  height?: number;
+  fmt?: string;
+}): string {
+  const {
+    defectId,
+    surface,
+    expand,
+    width,
+    height,
+    fmt = "JPEG",
+  } = params;
+
+  // 开发模式：直接返回占位图，避免依赖真实后端
+  if (env.isDevelopment()) {
+    const seed = `${defectId}-${surface}`;
+    return `https://picsum.photos/seed/${encodeURIComponent(
+      seed,
+    )}/800/600`;
+  }
+
+  const baseUrl = env.getApiBaseUrl();
+  const search = new URLSearchParams();
+  search.set("surface", surface);
+  if (typeof expand === "number") {
+    search.set("expand", expand.toString());
+  }
+  if (typeof width === "number") {
+    search.set("width", width.toString());
+  }
+  if (typeof height === "number") {
+    search.set("height", height.toString());
+  }
+  if (fmt) {
+    search.set("fmt", fmt);
+  }
+
+  return `${baseUrl}/images/defect/${defectId}?${search.toString()}`;
 }
 
 /**

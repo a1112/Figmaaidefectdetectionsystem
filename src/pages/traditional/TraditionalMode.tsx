@@ -17,7 +17,9 @@ import {
   getDefectsRaw, 
   getSteelMeta, 
   getTileImageUrl,
-  getApiList 
+  getDefectImageUrl,
+  getApiList,
+  searchSteels,
 } from "../../api/client";
 import type { SteelItem, DefectItem, SurfaceImageInfo, ApiNode } from "../../api/types";
 import { toast } from "sonner@2.0.3";
@@ -40,6 +42,9 @@ import {
 import { LoginModal } from "../../components/auth/LoginModal";
 import { User as UserIcon, LogIn } from "lucide-react";
 import type { AuthUser } from "../../api/admin";
+import type { SearchCriteria } from "../../components/SearchDialog";
+import type { FilterCriteria } from "../../components/FilterDialog";
+import { FilterDialog } from "../../components/FilterDialog";
 
 // Separate Clock component to prevent full page re-renders every second
 const DEFECT_TYPES = [
@@ -178,6 +183,12 @@ export default function TraditionalMode() {
   const [isDataSourceOpen, setIsDataSourceOpen] = useState(false);
   const [apiNodes, setApiNodes] = useState<ApiNode[]>([]);
   const [currentLine, setCurrentLine] = useState("1780热轧");
+  // 搜索与过滤状态（复用现代仪表盘逻辑）
+  const [searchCriteria, setSearchCriteria] = useState<SearchCriteria>({});
+  const [filterCriteria, setFilterCriteria] = useState<FilterCriteria>({ levels: [] });
+  const searchButtonRef = useRef<HTMLButtonElement>(null);
+  const filterButtonRef = useRef<HTMLButtonElement>(null);
+  const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
 
   const refreshDataSources = useCallback(async () => {
     try {
@@ -188,35 +199,57 @@ export default function TraditionalMode() {
     }
   }, []);
 
-  const handleRefresh = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const [steelsData, nodesData] = await Promise.all([
-        listSteels(refreshLimit),
-        getApiList().catch(() => [])
-      ]);
-      
-      setPlates(steelsData);
-      setApiNodes(nodesData);
-      
-      if (steelsData.length > 0) {
-        setSelectedPlate(prev => {
-           if (prev) {
-             const found = steelsData.find(s => s.serialNumber === prev.serialNumber);
-             return found || steelsData[0];
-           }
-           return steelsData[0];
-        });
+  const loadPlatesWithCriteria = useCallback(
+    async (criteria: SearchCriteria, limit: number, forceSearch: boolean) => {
+      setIsLoading(true);
+      try {
+        const hasCriteria = Object.keys(criteria).length > 0;
+        const limitToUse = Math.max(1, Math.min(limit, 200));
+
+        let items: SteelItem[];
+        const shouldSearch = env.isProduction() && (hasCriteria || forceSearch);
+
+        if (shouldSearch) {
+          try {
+            items = await searchSteels({
+              limit: limitToUse,
+              serialNumber: criteria.serialNumber,
+              plateId: criteria.plateId,
+              dateFrom: criteria.dateFrom,
+              dateTo: criteria.dateTo,
+            });
+          } catch (err) {
+            console.warn("查询接口不可用，回退到列表接口", err);
+            items = await listSteels(limitToUse);
+          }
+        } else {
+          items = await listSteels(limitToUse);
+        }
+
+        setPlates(items);
+
+        if (items.length > 0) {
+          setSelectedPlate(prev => {
+            if (prev) {
+              const found = items.find(s => s.serialNumber === prev.serialNumber);
+              return found || items[0];
+            }
+            return items[0];
+          });
+        } else {
+          setSelectedPlate(null);
+        }
+      } finally {
+        setIsLoading(false);
       }
-      
-      toast.success(`已刷新数据 (最新 ${refreshLimit} 条)`);
-    } catch (error) {
-      console.error("Refresh failed", error);
-      toast.error("数据刷新失败");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [refreshLimit]);
+    },
+    []
+  );
+
+  const handleRefresh = useCallback(async () => {
+    await loadPlatesWithCriteria(searchCriteria, refreshLimit, false);
+    toast.success(`已刷新数据 (最新 ${refreshLimit} 条)`);
+  }, [loadPlatesWithCriteria, searchCriteria, refreshLimit]);
   
   // Date Picker State
   const [startDate, setStartDate] = useState("");
@@ -258,6 +291,35 @@ export default function TraditionalMode() {
   const [listFilter, setListFilter] = useState("all"); // all, normal, alert
   const [isDefectListOpen, setIsDefectListOpen] = useState(true);
   const [isImmersiveMode, setIsImmersiveMode] = useState(false);
+
+  const filteredPlates = useMemo(
+    () =>
+      plates.filter((plate) => {
+        if (filterCriteria.levels.length > 0 && !filterCriteria.levels.includes(plate.level)) {
+          return false;
+        }
+        if (
+          filterCriteria.defectCountMin !== undefined &&
+          plate.defectCount < filterCriteria.defectCountMin
+        ) {
+          return false;
+        }
+        if (
+          filterCriteria.defectCountMax !== undefined &&
+          plate.defectCount > filterCriteria.defectCountMax
+        ) {
+          return false;
+        }
+        if (listFilter === "normal" && !(plate.level === "A" || plate.level === "B")) {
+          return false;
+        }
+        if (listFilter === "alert" && !(plate.level === "C" || plate.level === "D")) {
+          return false;
+        }
+        return true;
+      }),
+    [plates, filterCriteria, listFilter]
+  );
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -372,25 +434,21 @@ export default function TraditionalMode() {
   // Initial data load
   useEffect(() => {
     let mounted = true;
-    const loadData = async () => {
-      try {
-        const [steelsData, nodesData] = await Promise.all([
-          listSteels(50),
-          getApiList().catch(() => [])
-        ]);
-        if (!mounted) return;
-        setPlates(steelsData);
-        setApiNodes(nodesData);
-        if (steelsData.length > 0) setSelectedPlate(steelsData[0]);
-      } catch (error) {
-        if (mounted) toast.error("数据加载失败");
-      } finally {
-        if (mounted) setIsLoading(false);
-      }
-    };
-    loadData();
-    return () => { mounted = false; };
-  }, []);
+      const loadData = async () => {
+        try {
+          const nodesData = await getApiList().catch(() => []);
+          if (!mounted) return;
+          setApiNodes(nodesData);
+          await loadPlatesWithCriteria({}, 50, false);
+        } catch (error) {
+          if (mounted) toast.error("数据加载失败");
+        } finally {
+          if (mounted) setIsLoading(false);
+        }
+      };
+      loadData();
+      return () => { mounted = false; };
+    }, [loadPlatesWithCriteria]);
 
   // Sync defects and images when selection changes
   useEffect(() => {
@@ -531,7 +589,27 @@ export default function TraditionalMode() {
     });
   };
 
+  // 当前选中的缺陷（优先使用选中 ID，其次回退到列表首个缺陷）
+  const currentDefect = useMemo(() => {
+    if (!plateDefects || plateDefects.length === 0) return null;
+    if (selectedDefectId) {
+      const found = plateDefects.find(d => d.id === selectedDefectId);
+      if (found) return found;
+    }
+    return plateDefects[0];
+  }, [plateDefects, selectedDefectId]);
+
   const currentImageUrl = useMemo(() => {
+    // 若有选中缺陷，则优先展示该缺陷的小图（缺陷分析视图）
+    if (currentDefect) {
+      return getDefectImageUrl({
+        defectId: currentDefect.id,
+        surface: currentDefect.surface,
+        // 不指定宽高，使用后端默认的 defect_cache_expand 和原始大小
+      });
+    }
+
+    // 否则回退到钢板整体瓦片图（图像分析视图基底）
     if (!selectedPlate || surfaceImages.length === 0) {
       return "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=2000&auto=format&fit=crop";
     }
@@ -547,7 +625,7 @@ export default function TraditionalMode() {
       tileY: 0,
       tileSize: surfaceImages[0].image_height || 512
     });
-  }, [selectedPlate, surfaceImages]);
+  }, [currentDefect, selectedPlate, surfaceImages]);
 
   // Dynamic Scale Calculation based on Actual Dimensions
   const box = useMemo(() => {
@@ -1049,9 +1127,16 @@ export default function TraditionalMode() {
                   <label className="text-[9px] text-[#8b949e] pl-1 font-bold flex items-center gap-1">
                     <Terminal className="w-2.5 h-2.5" /> 精确流水号查���
                   </label>
-                  <input 
-                    type="text" 
-                    placeholder="输入完整流水号 (如: SN20260104...)"
+                    <input 
+                      type="text" 
+                      value={searchCriteria.serialNumber ?? ""}
+                      onChange={(e) =>
+                        setSearchCriteria(prev => ({
+                          ...prev,
+                          serialNumber: e.target.value || undefined,
+                        }))
+                      }
+                      placeholder="输入完整流水号 (如: SN20260104...)"
                     className="h-8 bg-[#0d1117] border border-[#30363d] text-[11px] px-2 text-[#c9d1d9] focus:border-[#58a6ff] outline-none transition-colors w-full" 
                   />
                 </div>
@@ -1062,9 +1147,16 @@ export default function TraditionalMode() {
                   <label className="text-[9px] text-[#8b949e] pl-1 font-bold flex items-center gap-1">
                     <FileText className="w-2.5 h-2.5" /> 钢板唯一标识查询
                   </label>
-                  <input 
-                    type="text" 
-                    placeholder="输入钢板 ID (如: H2255043...)"
+                    <input 
+                      type="text" 
+                      value={searchCriteria.plateId ?? ""}
+                      onChange={(e) =>
+                        setSearchCriteria(prev => ({
+                          ...prev,
+                          plateId: e.target.value || undefined,
+                        }))
+                      }
+                      placeholder="输入钢板 ID (如: H2255043...)"
                     className="h-8 bg-[#0d1117] border border-[#30363d] text-[11px] px-2 text-[#c9d1d9] focus:border-[#58a6ff] outline-none transition-colors w-full" 
                   />
                 </div>
@@ -1192,12 +1284,17 @@ export default function TraditionalMode() {
 
               <div className="flex gap-[2px] pt-1">
                 <button 
-                  onClick={() => setIsQueryActive(true)}
+                  onClick={async () => {
+                    setIsQueryActive(true);
+                    await loadPlatesWithCriteria(searchCriteria, refreshLimit, true);
+                  }}
                   className="flex-1 h-8 bg-[#238636]/20 border border-[#238636]/40 text-[#3fb950] text-[11px] font-bold hover:bg-[#238636]/40 transition-all flex items-center justify-center gap-2"
                 >
                   <Search className="w-3.5 h-3.5" /> 检索数据库
                 </button>
-                <button className="w-10 h-8 bg-[#21262d] border border-[#30363d] text-[#8b949e] flex items-center justify-center hover:bg-[#30363d] transition-colors">
+                <button
+                  onClick={() => setIsFilterDialogOpen(true)}
+                  className="w-10 h-8 bg-[#21262d] border border-[#30363d] text-[#8b949e] flex items-center justify-center hover:bg-[#30363d] transition-colors">
                   <RefreshCcw className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -1351,13 +1448,8 @@ export default function TraditionalMode() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#30363d]/50">
-                {plates
-                  .filter(plate => {
-                    if (listFilter === 'normal') return plate.level === 'A' || plate.level === 'B';
-                    if (listFilter === 'alert') return plate.level === 'D' || plate.level === 'C'; // Assuming C/D are non-normal
-                    return true;
-                  })
-                  .map((plate, index) => (
+                  {filteredPlates
+                    .map((plate, index) => (
                   <tr 
                     key={`${plate.plateId}-${plate.serialNumber}`} 
                     onClick={() => setSelectedPlate(plate)}
@@ -1442,7 +1534,7 @@ export default function TraditionalMode() {
                  <div className="w-full h-px bg-[#30363d]/20 absolute top-[75%]" />
                  
                  {/* Real Defect points mapping */}
-                 {plateDefects.map((defect) => {
+                  {plateDefects.map((defect, index) => {
                    const plateLength = selectedPlate?.dimensions.length || 8000;
                    const plateWidth = selectedPlate?.dimensions.width || 2000;
                    
@@ -1450,9 +1542,10 @@ export default function TraditionalMode() {
                    const topPos = (defect.x / plateLength) * 100;
                    const leftPos = (defect.y / plateWidth) * 100;
                    
-                   return (
-                     <div 
-                       key={`dist-dot-${defect.id}`}
+                     const keySuffix = `${defect.id ?? index}-${defect.surface ?? "unknown"}`;
+                     return (
+                       <div 
+                        key={`dist-dot-${keySuffix}`}
                        className={`absolute w-2 h-2 rounded-full border border-white/30 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10 ${
                          defect.surface === 'top' ? 'bg-[#58a6ff]' : 'bg-[#f85149]'
                        }`}
@@ -1781,7 +1874,7 @@ export default function TraditionalMode() {
                                 tileY: i,
                                 tileSize: 1024
                               })}
-                              className="w-full h-auto grayscale brightness-90 contrast-110 bg-[#1c2128] aspect-square"
+                              className="w-full h-auto bg-[#1c2128] aspect-square"
                               loading="lazy"
                               style={{ minHeight: '200px' }}
                             />
@@ -1812,7 +1905,7 @@ export default function TraditionalMode() {
                                 tileY: i,
                                 tileSize: 1024
                               })}
-                              className="w-full h-auto grayscale brightness-90 contrast-110 bg-[#1c2128] aspect-square"
+                              className="w-full h-auto bg-[#1c2128] aspect-square"
                               loading="lazy"
                               style={{ minHeight: '200px' }}
                             />
@@ -1831,27 +1924,33 @@ export default function TraditionalMode() {
                     style={{ 
                       gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))` 
                     }}
-                  >
-                    {plateDefects.map((defect) => (
-                      <motion.div 
-                        key={defect.id}
-                        whileHover={{ scale: 1.05, zIndex: 30 }}
-                        onClick={() => {
-                          setSelectedDefectId(defect.id);
-                          setIsGridView(false);
-                        }}
-                        className="aspect-square bg-[#161b22] border border-[#30363d] relative group cursor-pointer overflow-hidden"
-                      >
-                        <img 
-                          src={currentImageUrl}
-                          className={`w-full h-full grayscale opacity-60 group-hover:opacity-100 transition-opacity ${isImageFit ? 'object-cover' : 'object-contain'}`}
-                        />
-                        <div className="absolute inset-x-0 bottom-0 bg-black/80 p-1 text-[8px] text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                          <div className="truncate font-bold">{defect.type}</div>
-                          <div>{(defect.confidence * 100).toFixed(0)}%</div>
-                        </div>
-                      </motion.div>
-                    ))}
+                    >
+                      {plateDefects.map((defect, index) => {
+                        const defectImageUrl = getDefectImageUrl({
+                          defectId: defect.id,
+                          surface: defect.surface,
+                        });
+                        return (
+                          <motion.div 
+                            key={`${defect.id}-${index}`}
+                            whileHover={{ scale: 1.05, zIndex: 30 }}
+                            onClick={() => {
+                              setSelectedDefectId(defect.id);
+                              setIsGridView(false);
+                            }}
+                            className="aspect-square bg-[#161b22] border border-[#30363d] relative group cursor-pointer overflow-hidden"
+                          >
+                            <img 
+                              src={defectImageUrl}
+                              className={`w-full h-full group-hover:opacity-100 transition-opacity ${isImageFit ? 'object-cover' : 'object-contain'}`}
+                            />
+                            <div className="absolute inset-x-0 bottom-0 bg-black/80 p-1 text-[8px] text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                              <div className="truncate font-bold">{defect.type}</div>
+                              <div>{(defect.confidence * 100).toFixed(0)}%</div>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
                     {plateDefects.length === 0 && (
                       <div className="col-span-full h-full flex flex-col items-center justify-center text-[#8b949e]">
                         <LayoutGrid className="w-12 h-12 mb-2 opacity-20" />
@@ -1889,7 +1988,7 @@ export default function TraditionalMode() {
                       <img 
                         src={currentImageUrl} 
                         alt="Surface Defect Detail"
-                        className="max-h-[600px] grayscale brightness-90 contrast-110 pointer-events-none select-none"
+                        className="max-h-[600px] contrast-110 pointer-events-none select-none"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=2000&auto=format&fit=crop";
                         }}
@@ -1919,39 +2018,82 @@ export default function TraditionalMode() {
                     <Activity className="w-3 h-3 text-[#58a6ff]" />
                   </div>
                   
-                  <div className="flex-1 overflow-y-auto custom-scrollbar p-1.5 space-y-1">
-                    {plateDefects.map((defect, idx) => (
-                      <div 
-                        key={defect.id}
-                        onClick={() => setSelectedDefectId(defect.id)}
-                        className={`p-2 bg-[#0d1117] border rounded-sm transition-colors cursor-pointer group ${
-                          selectedDefectId === defect.id ? 'border-[#58a6ff] bg-[#58a6ff]/5' : 'border-[#30363d] hover:border-[#58a6ff]/50'
-                        }`}
-                      >
-                        <div className="flex justify-between items-start mb-1">
-                          <span className="text-[10px] font-bold text-[#58a6ff]">#{idx + 1} {defect.type}</span>
-                          <span className={`text-[9px] px-1 rounded-sm ${
-                            defect.confidence > 0.9 ? 'bg-[#238636]/20 text-[#3fb950]' : 'bg-[#d29922]/20 text-[#d29922]'
-                          }`}>
-                            {(defect.confidence * 100).toFixed(0)}%
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3 text-[9px] text-[#8b949e] font-mono">
-                          <div className="flex items-center gap-1">
-                            <Locate className="w-2.5 h-2.5" />
-                            <span>X: {defect.x.toFixed(0)}</span>
+                    <div className="flex-1 overflow-y-auto custom-scrollbar p-1.5 space-y-1">
+                      {plateDefects.map((defect, idx) => {
+                        const xMm = defect.xMm ?? defect.x;
+                        const yMm = defect.yMm ?? defect.y;
+                        const wMm = defect.widthMm ?? 0;
+                        const hMm = defect.heightMm ?? 0;
+                        const plateWidth = selectedPlate?.dimensions.width ?? 0;
+                        const plateLength = selectedPlate?.dimensions.length ?? 0;
+                        const distLeft = xMm;
+                        const distRight =
+                          plateWidth > 0 ? Math.max(0, plateWidth - (xMm + wMm)) : undefined;
+                        const distHead = yMm;
+                        const distTail =
+                          plateLength > 0 ? Math.max(0, plateLength - (yMm + hMm)) : undefined;
+
+                        return (
+                          <div 
+                            key={`${defect.id}-${idx}`}
+                            onClick={() => {
+                              setSelectedDefectId(defect.id);
+                              setActiveNav("缺陷分析");
+                              // 点击缺陷时，重置视图以便聚焦当前缺陷
+                              setImgScale(1);
+                              setImgOffset({ x: 0, y: 0 });
+                            }}
+                            className={`p-2 bg-[#0d1117] border rounded-sm transition-colors cursor-pointer group ${
+                              selectedDefectId === defect.id ? 'border-[#58a6ff] bg-[#58a6ff]/5' : 'border-[#30363d] hover:border-[#58a6ff]/50'
+                            }`}
+                          >
+                            <div className="flex justify-between items-start mb-1">
+                              <div className="flex items-center gap-1">
+                                <span className="text-[10px] font-bold text-[#58a6ff]">
+                                  #{idx + 1}
+                                </span>
+                                <span className="text-[9px] px-1 rounded-sm bg-[#30363d] text-[#c9d1d9]">
+                                  {defect.surface === 'top' ? '上' : '下'}
+                                </span>
+                                <span className="text-[9px] font-mono text-[#8b949e]">
+                                  ID:{defect.id}
+                                </span>
+                                <span className="text-[10px] font-bold text-[#58a6ff] truncate max-w-[90px]">
+                                  {defect.type}
+                                </span>
+                              </div>
+                              <span className={`text-[9px] px-1 rounded-sm ${
+                                defect.confidence > 0.9 ? 'bg-[#238636]/20 text-[#3fb950]' : 'bg-[#d29922]/20 text-[#d29922]'
+                              }`}>
+                                {(defect.confidence * 100).toFixed(0)}%
+                              </span>
+                            </div>
+                            <div className="flex flex-col gap-0.5 text-[9px] text-[#8b949e] font-mono">
+                              <div className="flex items-center gap-2">
+                                <Locate className="w-2.5 h-2.5" />
+                                <span>
+                                  距左: {distLeft.toFixed(0)} mm
+                                </span>
+                                {distRight !== undefined && (
+                                  <span>
+                                    距右: {distRight.toFixed(0)} mm
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 ml-4">
+                                <span>
+                                  距头: {distHead.toFixed(0)} mm
+                                </span>
+                                {distTail !== undefined && (
+                                  <span>
+                                    距尾: {distTail.toFixed(0)} mm
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <span>Y: {defect.y.toFixed(0)}</span>
-                          </div>
-                        </div>
-                        <div className="mt-1.5 pt-1.5 border-t border-[#30363d]/50 flex justify-end">
-                          <button className="p-1 hover:bg-[#30363d] rounded text-[#8b949e] group-hover:text-[#58a6ff] transition-colors">
-                            <Target className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                        );
+                      })}
                     {plateDefects.length === 0 && (
                       <div className="h-full flex flex-col items-center justify-center opacity-30 mt-10">
                         <Search className="w-8 h-8 mb-2" />
@@ -2115,6 +2257,12 @@ export default function TraditionalMode() {
           saveUser(user);
           toast.success(`欢迎回来, ${user.username}`);
         }}
+      />
+      <FilterDialog
+        isOpen={isFilterDialogOpen}
+        onClose={() => setIsFilterDialogOpen(false)}
+        onFilter={setFilterCriteria}
+        triggerRef={filterButtonRef}
       />
     </div>
   );

@@ -120,6 +120,11 @@ export interface DefectItemRaw {
   confidence: number;
   surface: Surface;
   image_index: number; // 关联的图像索引
+  // 物理坐标（mm），来自后端 bbox_object / leftInObj 等，可选
+  x_mm?: number;
+  y_mm?: number;
+  width_mm?: number;
+  height_mm?: number;
 }
 
 /**
@@ -136,6 +141,11 @@ export interface DefectItem {
   confidence: number;
   surface: Surface;
   imageIndex: number;
+  // 物理坐标（mm）
+  xMm?: number;
+  yMm?: number;
+  widthMm?: number;
+  heightMm?: number;
 }
 
 /**
@@ -242,5 +252,9 @@ export function mapDefectItem(raw: DefectItemRaw): DefectItem {
     confidence: raw.confidence,
     surface: raw.surface,
     imageIndex: raw.image_index,
+    xMm: raw.x_mm,
+    yMm: raw.y_mm,
+    widthMm: raw.width_mm,
+    heightMm: raw.height_mm,
   };
 }

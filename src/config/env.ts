@@ -180,11 +180,10 @@ class EnvironmentConfig {
     }
 
     // 生产模式：根据产线与 apiProfile 选择标准实例或 small 实例
-    const base = this.apiProfile === "small" ? "/small--api" : "/api";
-    if (this.lineName) {
-      return `${base}/${encodeURIComponent(this.lineName)}`;
-    }
-    return base;
+    // Windows + nginx 测试环境下：
+    // 前端统一走 /api/test 或 /small--api/test，
+    // 具体转发规则由 nginx 完成（rewrite 到后端 /api/* 或 /small--api/*）。
+    return this.apiProfile === "small" ? "/small--api/test" : "/api/test";
   }
 }
 
