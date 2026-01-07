@@ -36,7 +36,13 @@ export default function App() {
   const isElectron =
     typeof navigator !== "undefined" &&
     navigator.userAgent?.toLowerCase().includes("electron");
-  const Router = isElectron ? HashRouter : BrowserRouter;
+  const isTauri =
+    typeof window !== "undefined" && !!(window as any).__TAURI__;
+  const isFileProtocol =
+    typeof window !== "undefined" &&
+    window.location.protocol === "file:";
+  const Router =
+    isElectron || isTauri || isFileProtocol ? HashRouter : BrowserRouter;
 
   return (
     <ErrorBoundary>

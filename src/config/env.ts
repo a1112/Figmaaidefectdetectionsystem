@@ -79,6 +79,15 @@ class EnvironmentConfig {
     return typeof window !== "undefined" && window.location.protocol === "file:";
   }
 
+  private isDesktopShell(): boolean {
+    if (typeof window === "undefined") return false;
+    if (this.isFileProtocolInternal()) return true;
+    return (
+      !!(window as any).electronWindow ||
+      !!(window as any).__TAURI__
+    );
+  }
+
   isFileProtocol(): boolean {
     return this.isFileProtocolInternal();
   }
@@ -210,7 +219,7 @@ class EnvironmentConfig {
     if (this.mode === "cors") {
       return this.getCorsBaseUrl().replace(/\/+$/, "");
     }
-    if (this.isFileProtocolInternal()) {
+    if (this.isDesktopShell()) {
       return this.getLocalBaseUrl();
     }
     return "";
@@ -240,7 +249,7 @@ class EnvironmentConfig {
     // 具体转发规则由 nginx 完成（rewrite 到后端 /api/* 或 /small--api/*）。
     const basePath =
       this.apiProfile === "small" ? "/small--api/test" : "/api/test";
-    if (this.isFileProtocolInternal()) {
+    if (this.isDesktopShell()) {
       return `${this.getLocalBaseUrl()}${basePath}`;
     }
     return basePath;

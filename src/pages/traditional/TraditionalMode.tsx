@@ -157,6 +157,35 @@ export default function TraditionalMode() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDiagnosticOpen, setIsDiagnosticOpen] = useState(false);
   const isElectron = typeof window !== "undefined" && !!window.electronWindow;
+  const isTauri =
+    typeof window !== "undefined" && !!(window as any).__TAURI__;
+  const canDrag = isElectron || isTauri;
+  const useElectronDragRegion = isElectron;
+  const hasWindowControls = isElectron || isTauri;
+  const withTauriWindow = async (
+    action: (appWindow: any) => Promise<void> | void,
+  ) => {
+    if (!isTauri) return;
+    try {
+      const { appWindow } = await import("@tauri-apps/api/window");
+      await action(appWindow);
+    } catch {
+      // Ignore missing API in non-Tauri runtimes
+    }
+  };
+  const handleTauriDragStart = (event: React.MouseEvent<HTMLElement>) => {
+    if (!isTauri || event.button !== 0) return;
+    const target = event.target as HTMLElement | null;
+    if (
+      target?.closest(
+        'button, a, input, select, textarea, [role="button"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [data-radix-collection-item], [data-no-drag="true"]',
+      )
+    ) {
+      return;
+    }
+    event.preventDefault();
+    void withTauriWindow((appWindow) => appWindow.startDragging());
+  };
   const [isMaximized, setIsMaximized] = useState(false);
   const diagnosticButtonRef = useRef<HTMLButtonElement>(null);
   const [gridCols, setGridCols] = useState(6);
@@ -172,6 +201,17 @@ export default function TraditionalMode() {
       .then(setIsMaximized)
       .catch(() => undefined);
   }, [isElectron]);
+  useEffect(() => {
+    if (!isTauri) return;
+    let active = true;
+    withTauriWindow(async (appWindow) => {
+      const next = await appWindow.isMaximized();
+      if (active && typeof next === "boolean") setIsMaximized(next);
+    });
+    return () => {
+      active = false;
+    };
+  }, [isTauri]);
 
   // Image Analysis State
   const [analysisScrollState, setAnalysisScrollState] = useState({ top: 0, height: 1, clientHeight: 1 });
@@ -1606,9 +1646,12 @@ export default function TraditionalMode() {
             animate={{ height: 40, opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
-            className={`bg-[#161b22] border-b border-[#30363d] flex items-center px-3 shrink-0 overflow-hidden relative ${isElectron ? "electron-drag" : ""}`}
+            className={`bg-[#161b22] border-b border-[#30363d] flex items-center px-3 shrink-0 overflow-hidden relative ${useElectronDragRegion ? "electron-drag" : ""}`}
+            onMouseDown={handleTauriDragStart}
           >
-            <div className={`flex items-center gap-4 ${isElectron ? "electron-no-drag" : ""}`}>
+            <div
+              className={`flex items-center gap-4 ${canDrag ? "electron-no-drag" : ""}`}
+            >
               <div className="flex items-center gap-2 pr-4 border-r border-[#30363d] relative">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -1700,7 +1743,9 @@ export default function TraditionalMode() {
               </nav>
             </div>
 
-            <div className={`absolute left-1/2 -translate-x-1/2 ${isElectron ? "electron-no-drag" : ""}`}>
+            <div
+              className={`absolute left-1/2 -translate-x-1/2 ${canDrag ? "electron-no-drag" : ""}`}
+            >
               <button 
                 onClick={() => setIsDataSourceOpen(true)}
                 className="flex flex-col items-center group cursor-pointer hover:bg-[#30363d]/30 px-4 py-1 rounded transition-colors"
@@ -1713,7 +1758,9 @@ export default function TraditionalMode() {
               </button>
             </div>
 
-            <div className={`ml-auto flex items-center gap-2 text-[11px] ${isElectron ? "electron-no-drag" : ""}`}>
+            <div
+              className={`ml-auto flex items-center gap-2 text-[11px] ${canDrag ? "electron-no-drag" : ""}`}
+            >
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#30363d]/30 text-[#8b949e] border border-[#30363d]">
                   <div className="text-[9px] uppercase font-bold opacity-60">CAM TEMP</div>
@@ -1816,11 +1863,19 @@ export default function TraditionalMode() {
                   <Settings className="w-4 h-4" />
                 </button>
               </div>
-              {isElectron && (
+              {hasWindowControls && (
                 <div className="flex items-center gap-1 text-[#c9d1d9]">
                   <button
                     className="p-1.5 hover:bg-white/10 rounded"
-                    onClick={() => window.electronWindow?.minimize?.()}
+                    onClick={() => {
+                      if (isElectron) {
+                        window.electronWindow?.minimize?.();
+                      } else {
+                        void withTauriWindow((appWindow) =>
+                          appWindow.minimize(),
+                        );
+                      }
+                    }}
                     title="最小化"
                   >
                     <Minus className="w-4 h-4" />
@@ -1836,8 +1891,16 @@ export default function TraditionalMode() {
                         await document.exitFullscreen();
                         return;
                       }
-                      const next = await window.electronWindow?.toggleMaximize?.();
-                      if (typeof next === "boolean") setIsMaximized(next);
+                      if (isElectron) {
+                        const next = await window.electronWindow?.toggleMaximize?.();
+                        if (typeof next === "boolean") setIsMaximized(next);
+                      } else {
+                        await withTauriWindow(async (appWindow) => {
+                          await appWindow.toggleMaximize();
+                          const next = await appWindow.isMaximized();
+                          if (typeof next === "boolean") setIsMaximized(next);
+                        });
+                      }
                     }}
                     title={isImmersiveMode || document.fullscreenElement ? "还原" : isMaximized ? "还原" : "最大化"}
                   >
@@ -1845,7 +1908,13 @@ export default function TraditionalMode() {
                   </button>
                   <button
                     className="p-1.5 hover:bg-red-500/80 rounded"
-                    onClick={() => window.electronWindow?.close?.()}
+                    onClick={() => {
+                      if (isElectron) {
+                        window.electronWindow?.close?.();
+                      } else {
+                        void withTauriWindow((appWindow) => appWindow.close());
+                      }
+                    }}
                     title="关闭"
                   >
                     <X className="w-4 h-4" />

@@ -90,6 +90,35 @@ export const BackendManagement: React.FC = () => {
   const navigate = useNavigate();
   const { currentTheme } = useTheme();
   const isElectron = typeof window !== "undefined" && !!window.electronWindow;
+  const isTauri =
+    typeof window !== "undefined" && !!(window as any).__TAURI__;
+  const canDrag = isElectron || isTauri;
+  const useElectronDragRegion = isElectron;
+  const hasWindowControls = isElectron || isTauri;
+  const withTauriWindow = async (
+    action: (appWindow: any) => Promise<void> | void,
+  ) => {
+    if (!isTauri) return;
+    try {
+      const { appWindow } = await import("@tauri-apps/api/window");
+      await action(appWindow);
+    } catch {
+      // Ignore missing API in non-Tauri runtimes
+    }
+  };
+  const handleTauriDragStart = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!isTauri || event.button !== 0) return;
+    const target = event.target as HTMLElement | null;
+    if (
+      target?.closest(
+        'button, a, input, select, textarea, [role="button"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [data-radix-collection-item], [data-no-drag="true"]',
+      )
+    ) {
+      return;
+    }
+    event.preventDefault();
+    void withTauriWindow((appWindow) => appWindow.startDragging());
+  };
   const [isMaximized, setIsMaximized] = useState(false);
   const [activeMenu, setActiveMenu] =
     useState<MenuKey>("system");
@@ -146,6 +175,17 @@ export const BackendManagement: React.FC = () => {
       .then(setIsMaximized)
       .catch(() => undefined);
   }, [isElectron]);
+  useEffect(() => {
+    if (!isTauri) return;
+    let active = true;
+    withTauriWindow(async (appWindow) => {
+      const next = await appWindow.isMaximized();
+      if (active && typeof next === "boolean") setIsMaximized(next);
+    });
+    return () => {
+      active = false;
+    };
+  }, [isTauri]);
 
   const meta = mate?.meta;
   const modeLabel =
@@ -185,8 +225,11 @@ export const BackendManagement: React.FC = () => {
   return (
     <div className="h-screen w-full bg-background text-foreground flex flex-col overflow-hidden font-mono selection:bg-primary/30">
       {/* Title Bar - Matching Main App TitleBar Style */}
-      <div className={`h-12 bg-card border-b border-border flex items-center justify-between px-4 select-none shrink-0 relative z-20 shadow-sm ${isElectron ? "electron-drag" : ""}`}>
-        <div className={`flex items-center gap-4 ${isElectron ? "electron-no-drag" : ""}`}>
+      <div
+        className={`h-12 bg-card border-b border-border flex items-center justify-between px-4 select-none shrink-0 relative z-20 shadow-sm ${useElectronDragRegion ? "electron-drag" : ""}`}
+        onMouseDown={handleTauriDragStart}
+      >
+        <div className={`flex items-center gap-4 ${canDrag ? "electron-no-drag" : ""}`}>
           <button
             onClick={handleClose}
             className="flex items-center gap-2 px-3 py-1.5 rounded-sm bg-primary/10 text-primary border border-primary/20 hover:bg-primary hover:text-primary-foreground transition-all group"
@@ -207,7 +250,7 @@ export const BackendManagement: React.FC = () => {
           </div>
         </div>
         
-        <div className={`flex items-center gap-6 ${isElectron ? "electron-no-drag" : ""}`}>
+        <div className={`flex items-center gap-6 ${canDrag ? "electron-no-drag" : ""}`}>
           <div className="hidden md:flex items-center gap-4 text-[10px] font-mono border-l border-border pl-6 py-1">
             <div className="flex flex-col items-end">
               <span className="text-muted-foreground uppercase opacity-50">Mode</span>
@@ -259,11 +302,19 @@ export const BackendManagement: React.FC = () => {
               <X className="w-5 h-5" />
             </button>
           )}
-          {isElectron && (
+          {hasWindowControls && (
             <div className="flex items-center gap-1">
               <button
                 className="p-1.5 hover:bg-muted/60 rounded"
-                onClick={() => window.electronWindow?.minimize?.()}
+                onClick={() => {
+                  if (isElectron) {
+                    window.electronWindow?.minimize?.();
+                  } else {
+                    void withTauriWindow((appWindow) =>
+                      appWindow.minimize(),
+                    );
+                  }
+                }}
                 title="最小化"
               >
                 <Minus className="w-4 h-4" />
@@ -271,8 +322,16 @@ export const BackendManagement: React.FC = () => {
               <button
                 className="p-1.5 hover:bg-muted/60 rounded"
                 onClick={async () => {
-                  const next = await window.electronWindow?.toggleMaximize?.();
-                  if (typeof next === "boolean") setIsMaximized(next);
+                  if (isElectron) {
+                    const next = await window.electronWindow?.toggleMaximize?.();
+                    if (typeof next === "boolean") setIsMaximized(next);
+                  } else {
+                    await withTauriWindow(async (appWindow) => {
+                      await appWindow.toggleMaximize();
+                      const next = await appWindow.isMaximized();
+                      if (typeof next === "boolean") setIsMaximized(next);
+                    });
+                  }
                 }}
                 title={isMaximized ? "还原" : "最大化"}
               >
@@ -280,7 +339,13 @@ export const BackendManagement: React.FC = () => {
               </button>
               <button
                 className="p-1.5 hover:bg-red-500/80 rounded"
-                onClick={() => window.electronWindow?.close?.()}
+                onClick={() => {
+                  if (isElectron) {
+                    window.electronWindow?.close?.();
+                  } else {
+                    void withTauriWindow((appWindow) => appWindow.close());
+                  }
+                }}
                 title="关闭"
               >
                 <X className="w-4 h-4" />

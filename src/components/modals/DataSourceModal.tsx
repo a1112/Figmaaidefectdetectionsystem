@@ -37,6 +37,9 @@ export function DataSourceModal({
 }: DataSourceModalProps) {
   const isElectron =
     typeof window !== "undefined" && !!window.electronWindow;
+  const isTauri =
+    typeof window !== "undefined" && !!(window as any).__TAURI__;
+  const isDesktop = isElectron || isTauri;
   const [selected, setSelected] = useState("");
   const [apiProfile, setApiProfile] = useState<"small" | "large">(env.getApiProfile() === "small" ? "small" : "large");
   const [appMode, setAppMode] = useState<"development" | "production">(env.getMode() === "development" ? "development" : "production");
@@ -146,7 +149,7 @@ export function DataSourceModal({
         env.setCorsBaseUrl(corsUrl);
       }
       env.setMode(finalMode);
-      if (isElectron && finalMode === "production") {
+      if (isDesktop && finalMode === "production") {
         env.setProductionBaseUrl(productionBaseUrl);
       }
       
@@ -474,7 +477,7 @@ export function DataSourceModal({
                   刷新配置
                 </Button>
               </div>
-              {isElectron && appMode === "production" && !corsProxy && (
+              {isDesktop && appMode === "production" && !corsProxy && (
                 <div className="rounded-md border border-border/70 bg-muted/20 p-3">
                   <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                     生产模式服务地址
