@@ -7,6 +7,8 @@ export type AppMode = "development" | "production" | "cors";
 export type ApiProfile = "default" | "small";
 const LINE_COOKIE = "line_name";
 const DEFAULT_CORS_BASE_URL = "http://9qwygl8e.zjz-service.cn:80";
+const DEFAULT_LOCAL_BASE_URL = "http://127.0.0.1:80";
+const PRODUCTION_BASE_URL_KEY = "production_base_url";
 
 // 从 localStorage 读取用户偏好，默认为开发模式
 const getInitialMode = (): AppMode => {
@@ -25,6 +27,13 @@ const getInitialApiProfile = (): ApiProfile => {
 const getInitialCorsBaseUrl = (): string => {
   const stored = localStorage.getItem("cors_base_url");
   return stored && stored.trim() ? stored.trim() : DEFAULT_CORS_BASE_URL;
+};
+
+const getInitialProductionBaseUrl = (): string => {
+  const stored = localStorage.getItem(PRODUCTION_BASE_URL_KEY);
+  return stored && stored.trim()
+    ? stored.trim()
+    : DEFAULT_LOCAL_BASE_URL;
 };
 
 const getCookieValue = (name: string): string | null => {
@@ -56,12 +65,22 @@ class EnvironmentConfig {
   private apiProfile: ApiProfile;
   private lineName: string;
   private corsBaseUrl: string;
+  private productionBaseUrl: string;
 
   constructor() {
     this.mode = getInitialMode();
     this.apiProfile = getInitialApiProfile();
     this.lineName = getInitialLineName();
     this.corsBaseUrl = getInitialCorsBaseUrl();
+    this.productionBaseUrl = getInitialProductionBaseUrl();
+  }
+
+  private isFileProtocolInternal(): boolean {
+    return typeof window !== "undefined" && window.location.protocol === "file:";
+  }
+
+  isFileProtocol(): boolean {
+    return this.isFileProtocolInternal();
   }
 
   /**
@@ -147,6 +166,24 @@ class EnvironmentConfig {
     );
   }
 
+  getProductionBaseUrl(): string {
+    return this.productionBaseUrl;
+  }
+
+  setProductionBaseUrl(url: string): void {
+    const normalized = url.trim();
+    this.productionBaseUrl = normalized || DEFAULT_LOCAL_BASE_URL;
+    localStorage.setItem(
+      PRODUCTION_BASE_URL_KEY,
+      this.productionBaseUrl,
+    );
+    window.dispatchEvent(
+      new CustomEvent("production_base_url_change", {
+        detail: this.productionBaseUrl,
+      }),
+    );
+  }
+
   private getCorsApiBaseUrl(): string {
     const raw = this.corsBaseUrl.trim();
     if (!raw) {
@@ -159,6 +196,24 @@ class EnvironmentConfig {
       return raw.slice(0, -1);
     }
     return `${raw.replace(/\/+$/, "")}/api`;
+  }
+
+  private getLocalBaseUrl(): string {
+    const raw = (this.productionBaseUrl || DEFAULT_LOCAL_BASE_URL).trim();
+    return raw.replace(/\/+$/, "") || DEFAULT_LOCAL_BASE_URL;
+  }
+
+  getConfigBaseUrl(): string {
+    if (this.mode === "development") {
+      return "";
+    }
+    if (this.mode === "cors") {
+      return this.getCorsBaseUrl().replace(/\/+$/, "");
+    }
+    if (this.isFileProtocolInternal()) {
+      return this.getLocalBaseUrl();
+    }
+    return "";
   }
 
   /**
@@ -183,7 +238,12 @@ class EnvironmentConfig {
     // Windows + nginx 测试环境下：
     // 前端统一走 /api/test 或 /small--api/test，
     // 具体转发规则由 nginx 完成（rewrite 到后端 /api/* 或 /small--api/*）。
-    return this.apiProfile === "small" ? "/small--api/test" : "/api/test";
+    const basePath =
+      this.apiProfile === "small" ? "/small--api/test" : "/api/test";
+    if (this.isFileProtocolInternal()) {
+      return `${this.getLocalBaseUrl()}${basePath}`;
+    }
+    return basePath;
   }
 }
 

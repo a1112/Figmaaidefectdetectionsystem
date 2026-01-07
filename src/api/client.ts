@@ -571,10 +571,8 @@ export async function getApiList(): Promise<ApiNode[]> {
   if (env.isDevelopment()) {
     return mock.mockGetApiList();
   }
-  const url =
-    env.getMode() === "cors"
-      ? `${env.getCorsBaseUrl().replace(/\/+$/, "")}/config/api_list`
-      : "/config/api_list";
+  const configBase = env.getConfigBaseUrl();
+  const url = configBase ? `${configBase}/config/api_list` : "/config/api_list";
   
   try {
     const response = await fetch(url, { cache: "no-store" });

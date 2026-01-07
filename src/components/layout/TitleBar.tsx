@@ -30,7 +30,7 @@ import type {
   SteelPlate,
 } from "../../types/app.types";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LoginModal } from "../auth/LoginModal";
 import {
   Avatar,
@@ -84,9 +84,11 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   onRefreshApiNodes,
   onOpenSettings,
 }) => {
+  const isElectron = typeof window !== "undefined" && !!window.electronWindow;
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isDataSourceOpen, setIsDataSourceOpen] =
     useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
   const [currentUser, setCurrentUser] =
     useState<AuthUser | null>(() => {
       const raw = window.localStorage.getItem("auth_user");
@@ -108,6 +110,14 @@ export const TitleBar: React.FC<TitleBarProps> = ({
       JSON.stringify(user),
     );
   };
+
+  useEffect(() => {
+    if (!isElectron || !window.electronWindow?.isMaximized) return;
+    window.electronWindow
+      .isMaximized()
+      .then(setIsMaximized)
+      .catch(() => undefined);
+  }, [isElectron]);
 
   const handlePrevPlate = () => {
     if (filteredSteelPlates.length === 0) return;
@@ -144,9 +154,9 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   })();
 
   return (
-    <div className="h-10 bg-muted/40 backdrop-blur-md border-b border-white/10 flex items-center justify-between px-4 select-none shrink-0 z-20">
+    <div className={`h-10 bg-muted/40 backdrop-blur-md border-b border-white/10 flex items-center justify-between px-4 select-none shrink-0 z-20 ${isElectron ? "electron-drag" : ""}`}>
       {/* Left: Menu and Tab Buttons */}
-      <div className="flex items-center gap-3">
+      <div className={`flex items-center gap-3 ${isElectron ? "electron-no-drag" : ""}`}>
         <button
           onClick={() =>
             setIsSidebarCollapsed(!isSidebarCollapsed)
@@ -236,7 +246,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
         <button
           type="button"
           onClick={() => setIsDataSourceOpen(true)}
-          className="flex items-center gap-1 text-sm font-medium tracking-wider hover:text-primary transition-colors cursor-pointer"
+          className={`flex items-center gap-1 text-sm font-medium tracking-wider hover:text-primary transition-colors cursor-pointer ${isElectron ? "electron-no-drag" : ""}`}
           title="切换数据源"
         >
           {lineLabel || "STEEL-EYE PRO v2.0.1"}
@@ -245,7 +255,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
       </div>
 
       {/* Right: Status and Window Controls */}
-      <div className="flex items-center gap-4 shrink-0">
+      <div className={`flex items-center gap-4 shrink-0 ${isElectron ? "electron-no-drag" : ""}`}>
         {/* 钢板导航 */}
         {filteredSteelPlates.length > 0 && (
           <div className="flex items-center gap-2 px-2 py-1 bg-background/50 border border-border rounded">
@@ -436,14 +446,29 @@ export const TitleBar: React.FC<TitleBarProps> = ({
           <div className="w-px h-4 bg-border mx-1 hidden"></div>
 
           {/* 窗口控制按钮 - 仅桌面版本显示 */}
-          <div className="hidden">
-            <button className="p-1.5 hover:bg-white/10 rounded">
+          <div className={isElectron ? "flex items-center gap-1" : "hidden"}>
+            <button
+              className="p-1.5 hover:bg-white/10 rounded"
+              onClick={() => window.electronWindow?.minimize?.()}
+              title="最小化"
+            >
               <Minus className="w-4 h-4" />
             </button>
-            <button className="p-1.5 hover:bg-white/10 rounded">
+            <button
+              className="p-1.5 hover:bg-white/10 rounded"
+              onClick={async () => {
+                const next = await window.electronWindow?.toggleMaximize?.();
+                if (typeof next === "boolean") setIsMaximized(next);
+              }}
+              title={isMaximized ? "还原" : "最大化"}
+            >
               <Maximize2 className="w-4 h-4" />
             </button>
-            <button className="p-1.5 hover:bg-red-500/80 rounded">
+            <button
+              className="p-1.5 hover:bg-red-500/80 rounded"
+              onClick={() => window.electronWindow?.close?.()}
+              title="关闭"
+            >
               <X className="w-4 h-4" />
             </button>
           </div>

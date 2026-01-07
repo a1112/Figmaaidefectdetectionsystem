@@ -14,6 +14,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
+  Maximize2,
+  Minus,
 } from "lucide-react";
 import { StatusBar } from "../components/layout/StatusBar";
 import { UISettings } from "../components/backend/UISettings";
@@ -87,6 +89,8 @@ const menuItems: MenuItem[] = [
 export const BackendManagement: React.FC = () => {
   const navigate = useNavigate();
   const { currentTheme } = useTheme();
+  const isElectron = typeof window !== "undefined" && !!window.electronWindow;
+  const [isMaximized, setIsMaximized] = useState(false);
   const [activeMenu, setActiveMenu] =
     useState<MenuKey>("system");
   const [mate, setMate] = useState<ConfigMatePayload | null>(
@@ -135,6 +139,14 @@ export const BackendManagement: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isElectron || !window.electronWindow?.isMaximized) return;
+    window.electronWindow
+      .isMaximized()
+      .then(setIsMaximized)
+      .catch(() => undefined);
+  }, [isElectron]);
+
   const meta = mate?.meta;
   const modeLabel =
     meta?.connection_mode === "development"
@@ -173,8 +185,8 @@ export const BackendManagement: React.FC = () => {
   return (
     <div className="h-screen w-full bg-background text-foreground flex flex-col overflow-hidden font-mono selection:bg-primary/30">
       {/* Title Bar - Matching Main App TitleBar Style */}
-      <div className="h-12 bg-card border-b border-border flex items-center justify-between px-4 select-none shrink-0 relative z-20 shadow-sm">
-        <div className="flex items-center gap-4">
+      <div className={`h-12 bg-card border-b border-border flex items-center justify-between px-4 select-none shrink-0 relative z-20 shadow-sm ${isElectron ? "electron-drag" : ""}`}>
+        <div className={`flex items-center gap-4 ${isElectron ? "electron-no-drag" : ""}`}>
           <button
             onClick={handleClose}
             className="flex items-center gap-2 px-3 py-1.5 rounded-sm bg-primary/10 text-primary border border-primary/20 hover:bg-primary hover:text-primary-foreground transition-all group"
@@ -195,7 +207,7 @@ export const BackendManagement: React.FC = () => {
           </div>
         </div>
         
-        <div className="flex items-center gap-6">
+        <div className={`flex items-center gap-6 ${isElectron ? "electron-no-drag" : ""}`}>
           <div className="hidden md:flex items-center gap-4 text-[10px] font-mono border-l border-border pl-6 py-1">
             <div className="flex flex-col items-end">
               <span className="text-muted-foreground uppercase opacity-50">Mode</span>
@@ -239,12 +251,42 @@ export const BackendManagement: React.FC = () => {
             </div>
           </div>
           
-          <button
-            onClick={handleClose}
-            className="w-8 h-8 flex items-center justify-center hover:bg-destructive hover:text-destructive-foreground transition-colors rounded-sm"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          {!isElectron && (
+            <button
+              onClick={handleClose}
+              className="w-8 h-8 flex items-center justify-center hover:bg-destructive hover:text-destructive-foreground transition-colors rounded-sm"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
+          {isElectron && (
+            <div className="flex items-center gap-1">
+              <button
+                className="p-1.5 hover:bg-muted/60 rounded"
+                onClick={() => window.electronWindow?.minimize?.()}
+                title="最小化"
+              >
+                <Minus className="w-4 h-4" />
+              </button>
+              <button
+                className="p-1.5 hover:bg-muted/60 rounded"
+                onClick={async () => {
+                  const next = await window.electronWindow?.toggleMaximize?.();
+                  if (typeof next === "boolean") setIsMaximized(next);
+                }}
+                title={isMaximized ? "还原" : "最大化"}
+              >
+                <Maximize2 className="w-4 h-4" />
+              </button>
+              <button
+                className="p-1.5 hover:bg-red-500/80 rounded"
+                onClick={() => window.electronWindow?.close?.()}
+                title="关闭"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

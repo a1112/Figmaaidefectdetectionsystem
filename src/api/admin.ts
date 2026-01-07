@@ -219,7 +219,8 @@ const getAdminBaseUrl = (): string => {
     return `${base}/config`;
   }
   if (env.getMode() === "production") {
-    return "/config";
+    const base = env.getConfigBaseUrl();
+    return base ? `${base}/config` : "/config";
   }
   return "";
 };
@@ -240,6 +241,12 @@ const toWebSocketUrl = (base: string): string => {
 const getAdminWsBaseUrl = (): string => {
   if (env.getMode() === "cors") {
     return `${toWebSocketUrl(env.getCorsBaseUrl().replace(/\/+$/, ""))}/config`;
+  }
+  if (env.getMode() === "production") {
+    const base = env.getConfigBaseUrl();
+    if (base) {
+      return `${toWebSocketUrl(base)}/config`;
+    }
   }
   return `${toWebSocketUrl(window.location.origin)}/config`;
 };
@@ -681,6 +688,9 @@ export const getConfigSpeedTestUrl = (options?: {
     const raw = env.getCorsBaseUrl().trim();
     const root = raw || env.getCorsBaseUrl().trim();
     base = `${root.replace(/\/+$/, "")}/config`;
+  } else if (env.getMode() === "production") {
+    const configBase = env.getConfigBaseUrl();
+    base = configBase ? `${configBase}/config` : "/config";
   } else {
     base = "/config";
   }

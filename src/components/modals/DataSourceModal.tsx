@@ -35,11 +35,16 @@ export function DataSourceModal({
   onConfirm,
   onRefresh,
 }: DataSourceModalProps) {
+  const isElectron =
+    typeof window !== "undefined" && !!window.electronWindow;
   const [selected, setSelected] = useState("");
   const [apiProfile, setApiProfile] = useState<"small" | "large">(env.getApiProfile() === "small" ? "small" : "large");
   const [appMode, setAppMode] = useState<"development" | "production">(env.getMode() === "development" ? "development" : "production");
   const [corsProxy, setCorsProxy] = useState<boolean>(env.getMode() === "cors");
   const [corsUrl, setCorsUrl] = useState(env.getCorsBaseUrl());
+  const [productionBaseUrl, setProductionBaseUrl] = useState(
+    env.getProductionBaseUrl(),
+  );
   const [isMobile, setIsMobile] = useState(false);
   const [latency, setLatency] = useState<number | null>(null);
   const [isLatencyError, setIsLatencyError] = useState(false);
@@ -62,6 +67,7 @@ export function DataSourceModal({
       return;
     }
     onRefresh();
+    setProductionBaseUrl(env.getProductionBaseUrl());
     
     // Only set initial selection if the user hasn't interacted yet
     if (!hasUserSelectedRef.current) {
@@ -140,6 +146,9 @@ export function DataSourceModal({
         env.setCorsBaseUrl(corsUrl);
       }
       env.setMode(finalMode);
+      if (isElectron && finalMode === "production") {
+        env.setProductionBaseUrl(productionBaseUrl);
+      }
       
       onConfirm(selected);
     }
@@ -207,6 +216,7 @@ export function DataSourceModal({
       params.set("chunk_kb", "1024");
       // total_mb=0 表示后端持续输出，由前端控制测试时长（60秒）
       params.set("total_mb", "0");
+      const isFileProtocol = env.isFileProtocol();
 
       const buildLineSpeedTestUrl = (node: ApiNode): string => {
         // 计算最终模式：是否走 CORS 代理
@@ -233,7 +243,8 @@ export function DataSourceModal({
 
         // 本地 / 生产：根据 API Profile 选择 /api 或 /small--api
         const basePath = apiProfile === "small" ? "/small--api" : "/api";
-        return `${basePath}/${encodeURIComponent(
+        const prefix = isFileProtocol ? `${env.getConfigBaseUrl()}${basePath}` : basePath;
+        return `${prefix}/${encodeURIComponent(
           lineKey,
         )}/speed_test?${params.toString()}`;
       };
@@ -463,6 +474,27 @@ export function DataSourceModal({
                   刷新配置
                 </Button>
               </div>
+              {isElectron && appMode === "production" && !corsProxy && (
+                <div className="rounded-md border border-border/70 bg-muted/20 p-3">
+                  <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                    生产模式服务地址
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={productionBaseUrl}
+                      onChange={(e) =>
+                        setProductionBaseUrl(e.target.value)
+                      }
+                      placeholder="http://192.168.1.10:80"
+                      className="w-full bg-background border border-border rounded px-2 py-1.5 text-[11px] font-mono focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all"
+                    />
+                  </div>
+                  <div className="mt-1 text-[10px] text-muted-foreground">
+                    仅 Electron 生效，保存后会持久化到本地配置。
+                  </div>
+                </div>
+              )}
               {nodes.length === 0 && (
                 <div className="text-sm text-muted-foreground">
                   暂无可用数据源，请确认后端已启并提供 /config/api_list。

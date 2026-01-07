@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { 
   Menu, Bell, User, Settings, Database, Shield, Monitor, 
   ChevronLeft, ChevronRight, Search, Play, Pause, Square,
-  Maximize2, Minimize2, ZoomIn, ZoomOut, RefreshCcw, Clock, RotateCw, Gavel,
+  Maximize2, Minimize2, Minus, ZoomIn, ZoomOut, RefreshCcw, Clock, RotateCw, Gavel,
   Layout, BarChart3, AlertCircle, FileText, ChevronDown, Activity,
   LogOut, Box, Terminal, Home, Calendar, LayoutGrid, Filter, ArrowUpToLine, X, Link2, ArrowLeftRight,
   PanelRightOpen, PanelRightClose, Target, Locate
@@ -156,6 +156,8 @@ export default function TraditionalMode() {
   const [showMainMenu, setShowMainMenu] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDiagnosticOpen, setIsDiagnosticOpen] = useState(false);
+  const isElectron = typeof window !== "undefined" && !!window.electronWindow;
+  const [isMaximized, setIsMaximized] = useState(false);
   const diagnosticButtonRef = useRef<HTMLButtonElement>(null);
   const [gridCols, setGridCols] = useState(6);
   const [isImageFit, setIsImageFit] = useState(true);
@@ -163,6 +165,14 @@ export default function TraditionalMode() {
   const [sidebarTab, setSidebarTab] = useState<'records' | 'defects'>('records');
   const [refreshLimit, setRefreshLimit] = useState(20);
   
+  useEffect(() => {
+    if (!isElectron || !window.electronWindow?.isMaximized) return;
+    window.electronWindow
+      .isMaximized()
+      .then(setIsMaximized)
+      .catch(() => undefined);
+  }, [isElectron]);
+
   // Image Analysis State
   const [analysisScrollState, setAnalysisScrollState] = useState({ top: 0, height: 1, clientHeight: 1 });
   const [selectedDefectId, setSelectedDefectId] = useState<string | null>(null);
@@ -1596,9 +1606,9 @@ export default function TraditionalMode() {
             animate={{ height: 40, opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
-            className="bg-[#161b22] border-b border-[#30363d] flex items-center justify-between px-3 shrink-0 overflow-hidden"
+            className={`bg-[#161b22] border-b border-[#30363d] flex items-center px-3 shrink-0 overflow-hidden relative ${isElectron ? "electron-drag" : ""}`}
           >
-            <div className="flex items-center gap-4">
+            <div className={`flex items-center gap-4 ${isElectron ? "electron-no-drag" : ""}`}>
               <div className="flex items-center gap-2 pr-4 border-r border-[#30363d] relative">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -1690,7 +1700,7 @@ export default function TraditionalMode() {
               </nav>
             </div>
 
-            <div className="flex items-center gap-6">
+            <div className={`absolute left-1/2 -translate-x-1/2 ${isElectron ? "electron-no-drag" : ""}`}>
               <button 
                 onClick={() => setIsDataSourceOpen(true)}
                 className="flex flex-col items-center group cursor-pointer hover:bg-[#30363d]/30 px-4 py-1 rounded transition-colors"
@@ -1703,7 +1713,7 @@ export default function TraditionalMode() {
               </button>
             </div>
 
-            <div className="flex items-center gap-4 text-[11px]">
+            <div className={`ml-auto flex items-center gap-2 text-[11px] ${isElectron ? "electron-no-drag" : ""}`}>
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#30363d]/30 text-[#8b949e] border border-[#30363d]">
                   <div className="text-[9px] uppercase font-bold opacity-60">CAM TEMP</div>
@@ -1806,6 +1816,42 @@ export default function TraditionalMode() {
                   <Settings className="w-4 h-4" />
                 </button>
               </div>
+              {isElectron && (
+                <div className="flex items-center gap-1 text-[#c9d1d9]">
+                  <button
+                    className="p-1.5 hover:bg-white/10 rounded"
+                    onClick={() => window.electronWindow?.minimize?.()}
+                    title="最小化"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
+                  <button
+                    className="p-1.5 hover:bg-white/10 rounded"
+                    onClick={async () => {
+                      if (isImmersiveMode) {
+                        setIsImmersiveMode(false);
+                        return;
+                      }
+                      if (document.fullscreenElement && document.exitFullscreen) {
+                        await document.exitFullscreen();
+                        return;
+                      }
+                      const next = await window.electronWindow?.toggleMaximize?.();
+                      if (typeof next === "boolean") setIsMaximized(next);
+                    }}
+                    title={isImmersiveMode || document.fullscreenElement ? "还原" : isMaximized ? "还原" : "最大化"}
+                  >
+                    <Maximize2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    className="p-1.5 hover:bg-red-500/80 rounded"
+                    onClick={() => window.electronWindow?.close?.()}
+                    title="关闭"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
             </div>
           </motion.header>
         )}

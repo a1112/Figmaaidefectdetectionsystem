@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, HashRouter, Routes, Route } from "react-router-dom";
 import { Dashboard } from "./pages/Dashboard";
 import { BackendManagement } from "./pages/BackendManagement";
 import TraditionalMode from "./pages/traditional/TraditionalMode";
@@ -33,10 +33,15 @@ export default function App() {
     };
   }, []);
 
+  const isElectron =
+    typeof navigator !== "undefined" &&
+    navigator.userAgent?.toLowerCase().includes("electron");
+  const Router = isElectron ? HashRouter : BrowserRouter;
+
   return (
     <ErrorBoundary>
       <ThemeProvider>
-        <BrowserRouter>
+        <Router>
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route
@@ -45,7 +50,7 @@ export default function App() {
             />
             <Route path="/TraditionalMode" element={<TraditionalMode />} />
           </Routes>
-        </BrowserRouter>
+        </Router>
       </ThemeProvider>
     </ErrorBoundary>
   );
