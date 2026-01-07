@@ -78,6 +78,42 @@ interface LargeImageViewerProps {
    * 鼠标滚轮行为：缩放或滚动
    */
   wheelMode?: "zoom" | "scroll";
+  /**
+   * 强制缩放比例（用于同步锁定）
+   */
+  forcedScale?: number | null;
+  /**
+   * 输出当前变换信息（缩放 + 偏移）
+   */
+  onTransformChange?: (info: { x: number; y: number; scale: number }) => void;
+  /**
+   * 传入鼠标指针样式（例如 pointer / grab）
+   */
+  cursor?: string;
+  /**
+   * 鼠标移动时输出世界坐标
+   */
+  onPointerMove?: (info: {
+    worldX: number;
+    worldY: number;
+    screenX: number;
+    screenY: number;
+    scale: number;
+  }) => void;
+  /**
+   * 鼠标移出画布
+   */
+  onPointerLeave?: () => void;
+  /**
+   * 鼠标按下（返回 true 表示阻止拖拽）
+   */
+  onPointerDown?: (info: {
+    worldX: number;
+    worldY: number;
+    screenX: number;
+    screenY: number;
+    scale: number;
+  }) => boolean | void;
 }
 
 export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
@@ -100,6 +136,12 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
   fitToWidth,
   lockScale = false,
   wheelMode = "zoom",
+  forcedScale,
+  onTransformChange,
+  cursor,
+  onPointerMove,
+  onPointerLeave,
+  onPointerDown,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   // 双 canvas：底层保留上一轮内容，顶层用于当前绘制（便于后续扩展双 LOD 图层）
@@ -126,6 +168,8 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
     height: number;
   } | null>(null);
   const lastViewportEmitAtRef = useRef<number>(0);
+  const lastTransformEmitAtRef = useRef<number>(0);
+  const lastTransformRef = useRef<{ x: number; y: number; scale: number } | null>(null);
 
   const computePreferredLevel = useCallback(
     (scale: number) => {
@@ -190,11 +234,10 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
       : fitToHeight
         ? ch / imageHeight
         : Math.min(cw / imageWidth, ch / imageHeight);
-    const maxScale = 1.0;
     if (lockScale) {
-      const locked = Math.min(fitScale, maxScale);
-      return { minScale: locked, maxScale: locked };
+      return { minScale: fitScale, maxScale: fitScale };
     }
+    const maxScale = 1.0;
     const minScale = Math.min(fitScale, maxScale);
     return { minScale, maxScale };
   }, [containerSize, imageWidth, imageHeight, fitToHeight, fitToWidth, lockScale]);
@@ -287,6 +330,21 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
         onViewportChange(visibleRect);
       }
     }
+    if (onTransformChange) {
+      const now = performance.now();
+      const current = transform.current;
+      const last = lastTransformRef.current;
+      const shouldEmit =
+        !last ||
+        Math.abs(last.x - current.x) > 0.5 ||
+        Math.abs(last.y - current.y) > 0.5 ||
+        Math.abs(last.scale - current.scale) > 0.0005;
+      if (shouldEmit && now - lastTransformEmitAtRef.current > 80) {
+        lastTransformRef.current = { ...current };
+        lastTransformEmitAtRef.current = now;
+        onTransformChange({ x: current.x, y: current.y, scale: current.scale });
+      }
+    }
 
     const safeScale = Math.max(scale, 1e-6);
     const extra = Math.max(0, prefetchMargin) / safeScale;
@@ -358,6 +416,7 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
     imageWidth,
     maxLevelProp,
     onPreferredLevelChange,
+    onTransformChange,
     onViewportChange,
     prefetchMargin,
     renderOverlay,
@@ -404,6 +463,39 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
     didInitRef.current = true;
     setTick(t => t + 1);
   }, [containerSize, imageWidth, imageHeight, getConstraints, clampTransform, initialScale]);
+
+  useEffect(() => {
+    if (!lockScale || containerSize.width === 0 || containerSize.height === 0) {
+      return;
+    }
+    const { minScale } = getConstraints();
+    const nextScale = minScale;
+    const current = transform.current;
+    const viewportCenterX = containerSize.width / 2;
+    const viewportCenterY = containerSize.height / 2;
+    const centerWorldX = (viewportCenterX - current.x) / current.scale;
+    const centerWorldY = (viewportCenterY - current.y) / current.scale;
+    const newX = viewportCenterX - centerWorldX * nextScale;
+    const newY = viewportCenterY - centerWorldY * nextScale;
+    transform.current = clampTransform({ x: newX, y: newY, scale: nextScale });
+    setTick(t => t + 1);
+  }, [lockScale, containerSize, getConstraints, clampTransform]);
+
+  useEffect(() => {
+    if (forcedScale == null || containerSize.width === 0 || containerSize.height === 0) {
+      return;
+    }
+    const nextScale = forcedScale;
+    const current = transform.current;
+    const viewportCenterX = containerSize.width / 2;
+    const viewportCenterY = containerSize.height / 2;
+    const centerWorldX = (viewportCenterX - current.x) / current.scale;
+    const centerWorldY = (viewportCenterY - current.y) / current.scale;
+    const newX = viewportCenterX - centerWorldX * nextScale;
+    const newY = viewportCenterY - centerWorldY * nextScale;
+    transform.current = clampTransform({ x: newX, y: newY, scale: nextScale });
+    setTick(t => t + 1);
+  }, [forcedScale, containerSize, clampTransform]);
 
   // Center Target - keep scale, only pan to a point
   useEffect(() => {
@@ -507,10 +599,34 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
     };
   }, [handleWheel]);
 
+  const resolvePointerInfo = useCallback((clientX: number, clientY: number) => {
+    const rect = frontCanvasRef.current?.getBoundingClientRect();
+    if (!rect) return null;
+    const screenX = clientX - rect.left;
+    const screenY = clientY - rect.top;
+    const current = transform.current;
+    const worldX = (screenX - current.x) / current.scale;
+    const worldY = (screenY - current.y) / current.scale;
+    return {
+      worldX,
+      worldY,
+      screenX,
+      screenY,
+      scale: current.scale,
+    };
+  }, []);
+
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    const info = resolvePointerInfo(e.clientX, e.clientY);
+    if (info && onPointerDown) {
+      const handled = onPointerDown(info);
+      if (handled) {
+        return;
+      }
+    }
     isDragging.current = true;
     lastMousePosition.current = { x: e.clientX, y: e.clientY };
-  }, []);
+  }, [onPointerDown, resolvePointerInfo]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!isDragging.current) return;
@@ -524,6 +640,17 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
       y: current.y + dy,
     });
   }, [clampTransform]);
+
+  const handleHoverMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (!onPointerMove || isDragging.current) return;
+      const info = resolvePointerInfo(e.clientX, e.clientY);
+      if (info) {
+        onPointerMove(info);
+      }
+    },
+    [onPointerMove, resolvePointerInfo],
+  );
 
   const handleMouseUp = useCallback(() => {
     isDragging.current = false;
@@ -650,11 +777,18 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
       />
       <canvas
         ref={frontCanvasRef}
-        className="absolute inset-0 block touch-none cursor-move"
+        className={`absolute inset-0 block touch-none ${cursor ? "" : "cursor-move"}`}
+        style={cursor ? { cursor } : undefined}
         onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
+        onMouseMove={(e) => {
+          handleMouseMove(e);
+          handleHoverMove(e);
+        }}
         onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+        onMouseLeave={() => {
+          handleMouseUp();
+          if (onPointerLeave) onPointerLeave();
+        }}
         onTouchStart={(e) => {
           if (e.cancelable && e.nativeEvent.cancelable) e.preventDefault();
           handleTouchStart(e);

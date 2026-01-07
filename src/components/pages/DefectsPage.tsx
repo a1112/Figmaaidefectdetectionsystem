@@ -54,6 +54,8 @@ interface DefectsPageProps {
   maxTileLevel: number;
   showDistributionImages: boolean;
   showTileBorders: boolean;
+  onDefectHover?: (defect: Defect, position: { screenX: number; screenY: number }) => void;
+  onDefectHoverEnd?: () => void;
 }
 
 export const DefectsPage: React.FC<DefectsPageProps> = ({
@@ -83,6 +85,8 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
   maxTileLevel,
   showDistributionImages,
   showTileBorders,
+  onDefectHover,
+  onDefectHoverEnd,
 }) => {
   const activeDefects: Defect[] = plateDefects;
 
@@ -205,6 +209,8 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
                   imageViewMode={imageViewMode}
                   selectedDefectId={selectedDefectId}
                   onDefectSelect={setSelectedDefectId}
+                  onDefectHover={onDefectHover}
+                  onDefectHoverEnd={onDefectHoverEnd}
                   surfaceImageInfo={surfaceImageInfo}
                   onViewportChange={setViewportInfo}
                   centerTarget={centerTarget}
@@ -229,6 +235,8 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
               surfaceImageInfo={surfaceImageInfo}
               selectedDefectId={selectedDefectId}
               onDefectSelect={setSelectedDefectId}
+              onDefectHover={onDefectHover}
+              onDefectHoverEnd={onDefectHoverEnd}
               viewportInfo={viewportInfo}
               viewportSurface={selectedDefect?.surface ?? null}
               imageOrientation={imageOrientation}
@@ -312,6 +320,8 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
                 defectColors={defectColors}
                 selectedDefectId={selectedDefectId}
                 onDefectSelect={setSelectedDefectId}
+                onDefectHover={onDefectHover}
+                onDefectHoverEnd={onDefectHoverEnd}
               />
             </div>
 

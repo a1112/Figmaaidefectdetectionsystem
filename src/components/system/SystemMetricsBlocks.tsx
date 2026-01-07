@@ -55,7 +55,7 @@ export const DiskUsagePanel = ({
   <div className="bg-muted/30 border border-border/50 p-3">
     <SectionHeader
       icon={<HardDrive className="w-4 h-4 text-purple-400" />}
-      title="Disk Usage"
+      title="磁盘使用率"
     />
     <div className={cn("space-y-2 overflow-y-auto pr-1", maxHeightClass)}>
       {disks && disks.length > 0 ? (
@@ -73,7 +73,7 @@ export const DiskUsagePanel = ({
           </div>
         ))
       ) : (
-        <div className="text-xs text-muted-foreground">No disks detected.</div>
+        <div className="text-xs text-muted-foreground">暂无磁盘数据。</div>
       )}
     </div>
   </div>
@@ -106,7 +106,7 @@ export const ServerResourcesPanel = ({
               <Gauge className="w-4 h-4 text-orange-400" />
             )
           }
-          title="CPU Resources"
+          title="CPU 资源"
         />
         {variant === "chart" ? (
           <div className="space-y-3">
@@ -131,7 +131,7 @@ export const ServerResourcesPanel = ({
               </RechartsAreaChart>
             </ChartContainer>
             <div className="bg-background/50 border border-border/30 p-2 text-xs">
-              <div className="text-muted-foreground mb-1">CPU Usage</div>
+              <div className="text-muted-foreground mb-1">CPU 使用率</div>
               <div className="font-mono font-bold">
                 {formatPercent(resources?.cpu_percent ?? null)}
               </div>
@@ -141,7 +141,7 @@ export const ServerResourcesPanel = ({
           <div className="space-y-3 text-xs">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">CPU Usage</span>
+                <span className="text-muted-foreground">CPU 使用率</span>
                 <span className="font-mono font-bold">
                   {formatPercent(resources?.cpu_percent ?? null)}
                 </span>
@@ -161,7 +161,7 @@ export const ServerResourcesPanel = ({
               <Gauge className="w-4 h-4 text-blue-400" />
             )
           }
-          title="Memory Resources"
+          title="内存资源"
         />
         {variant === "chart" ? (
           <div className="space-y-3">
@@ -186,7 +186,7 @@ export const ServerResourcesPanel = ({
               </RechartsAreaChart>
             </ChartContainer>
             <div className="bg-background/50 border border-border/30 p-2 text-xs">
-              <div className="text-muted-foreground mb-1">Memory Usage</div>
+              <div className="text-muted-foreground mb-1">内存使用率</div>
               <div className="font-mono font-bold">
                 {formatPercent(resources?.memory_percent ?? null)}
               </div>
@@ -196,7 +196,7 @@ export const ServerResourcesPanel = ({
           <div className="space-y-3 text-xs">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Memory Usage</span>
+                <span className="text-muted-foreground">内存使用率</span>
                 <span className="font-mono font-bold">
                   {formatPercent(resources?.memory_percent ?? null)}
                 </span>
@@ -218,14 +218,14 @@ export const NetworkStatusPanel = ({
   <div className="bg-muted/30 border border-border/50 p-3">
     <SectionHeader
       icon={<Network className="w-4 h-4 text-green-400" />}
-      title="Network Status"
+      title="网络状态"
     />
     <div className="space-y-2 text-xs">
-      <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr] gap-2 text-[10px] text-muted-foreground uppercase">
-        <span>Name</span>
-        <span>RX</span>
-        <span>TX</span>
-        <span>Max</span>
+      <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr] gap-2 text-[10px] text-muted-foreground">
+        <span>接口</span>
+        <span>接收</span>
+        <span>发送</span>
+        <span>速率</span>
       </div>
       {interfaces && interfaces.length > 0 ? (
         interfaces.map((item) => (
@@ -254,7 +254,7 @@ export const NetworkStatusPanel = ({
           </div>
         ))
       ) : (
-        <div className="text-muted-foreground text-xs">No interfaces detected.</div>
+        <div className="text-muted-foreground text-xs">暂无网络接口数据。</div>
       )}
     </div>
   </div>

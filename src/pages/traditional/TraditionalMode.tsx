@@ -22,6 +22,7 @@ import {
   searchSteels,
   getGlobalMeta,
 } from "../../api/client";
+import { getConfigMate } from "../../api/admin";
 import type { SteelItem, DefectItem, SurfaceImageInfo, ApiNode } from "../../api/types";
 import { toast } from "sonner@2.0.3";
 import { DataSourceModal } from "../../components/modals/DataSourceModal";
@@ -47,6 +48,7 @@ import type { SearchCriteria } from "../../components/SearchDialog";
 import type { FilterCriteria } from "../../components/FilterDialog";
 import { FilterDialog } from "../../components/FilterDialog";
 import { LargeImageViewer } from "../../components/LargeImageViewer/LargeImageViewer";
+import { DefectHoverTooltip } from "../../components/DefectHoverTooltip";
 import type { Tile } from "../../components/LargeImageViewer/utils";
 import { drawTileImage, tryDrawFallbackTile } from "../../utils/tileFallback";
 import {
@@ -59,7 +61,7 @@ import {
 import type { ImageOrientation } from "../../types/app.types";
 
 // Separate Clock component to prevent full page re-renders every second
-const DEFECT_TYPES = [
+const DEFAULT_DEFECT_TYPES = [
   { label: "划痕", color: "#3fb950" }, { label: "辊印", color: "#f85149" }, 
   { label: "头尾", color: "#d29922" }, { label: "氧化铁皮", color: "#58a6ff" },
   { label: "异物压入", color: "#bc8cff" }, { label: "周期性缺陷", color: "#ffffff" },
@@ -168,14 +170,21 @@ export default function TraditionalMode() {
   const [bottomCenterTarget, setBottomCenterTarget] = useState<{ x: number; y: number } | null>(null);
   const topViewportRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
   const bottomViewportRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
+  const topScaleRef = useRef<number>(1);
+  const bottomScaleRef = useRef<number>(1);
   const syncLockRef = useRef(false);
   const [isAnalysisSyncEnabled, setIsAnalysisSyncEnabled] = useState(true);
   const [isWidthLockEnabled, setIsWidthLockEnabled] = useState(true);
+  const [topForcedScale, setTopForcedScale] = useState<number | null>(null);
+  const [bottomForcedScale, setBottomForcedScale] = useState<number | null>(null);
 
   // Data Source State
   const [isDataSourceOpen, setIsDataSourceOpen] = useState(false);
   const [apiNodes, setApiNodes] = useState<ApiNode[]>([]);
-  const [currentLine, setCurrentLine] = useState("1780热轧");
+  const [currentLine, setCurrentLine] = useState("");
+  const [currentLineKey, setCurrentLineKey] = useState(() => {
+    return (env as any).getLineName?.() ?? "";
+  });
   // 搜索与过滤状态（复用现代仪表盘逻辑）
   const [searchCriteria, setSearchCriteria] = useState<SearchCriteria>({});
   const [filterCriteria, setFilterCriteria] = useState<FilterCriteria>({ levels: [] });
@@ -253,7 +262,12 @@ export default function TraditionalMode() {
   const [pickerDragStart, setPickerDragStart] = useState({ x: 0, y: 0 });
 
   // Defect Selection State
-  const [selectedDefectTypes, setSelectedDefectTypes] = useState<string[]>(DEFECT_TYPES.map(t => t.label));
+  const [defectTypeOptions, setDefectTypeOptions] = useState(
+    DEFAULT_DEFECT_TYPES,
+  );
+  const [selectedDefectTypes, setSelectedDefectTypes] = useState<string[]>(
+    DEFAULT_DEFECT_TYPES.map((t) => t.label),
+  );
 
   // Defect Chart Data
   const defectChartData = useMemo(() => {
@@ -262,7 +276,7 @@ export default function TraditionalMode() {
     plateDefects.forEach(d => {
       counts[d.type] = (counts[d.type] || 0) + 1;
     });
-    return DEFECT_TYPES
+    return defectTypeOptions
       .map(t => ({
         name: t.label,
         count: counts[t.label] || 0,
@@ -270,7 +284,7 @@ export default function TraditionalMode() {
       }))
       .filter(d => d.count > 0)
       .sort((a, b) => b.count - a.count);
-  }, [plateDefects]);
+  }, [plateDefects, defectTypeOptions]);
 
   // Image Viewer State
   const [imgScale, setImgScale] = useState(1);
@@ -285,7 +299,16 @@ export default function TraditionalMode() {
   const [isDefectListOpen, setIsDefectListOpen] = useState(true);
   const [isImmersiveMode, setIsImmersiveMode] = useState(false);
   const [isMapMode, setIsMapMode] = useState(false);
+  const [companyName, setCompanyName] = useState("数据测试平台");
   const [mapViewport, setMapViewport] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [mapCursor, setMapCursor] = useState("grab");
+  const [topCursor, setTopCursor] = useState("grab");
+  const [bottomCursor, setBottomCursor] = useState("grab");
+  const [hoveredDefect, setHoveredDefect] = useState<{
+    defect: DefectItem;
+    screenX: number;
+    screenY: number;
+  } | null>(null);
   const [showMapCrop, setShowMapCrop] = useState(false);
   const [defectCropExpand, setDefectCropExpand] = useState(DEFAULT_DEFECT_CROP_EXPAND);
   const defectImageRef = useRef<HTMLImageElement>(null);
@@ -324,6 +347,17 @@ export default function TraditionalMode() {
       }),
     [plates, filterCriteria, listFilter]
   );
+  const visibleDefects = useMemo(() => {
+    if (!plateDefects || plateDefects.length === 0) return [];
+    if (selectedDefectTypes.length === 0) return [];
+    return plateDefects.filter((defect) =>
+      selectedDefectTypes.includes(defect.type),
+    );
+  }, [plateDefects, selectedDefectTypes]);
+  const distributionDefects = useMemo(() => {
+    if (surfaceFilter === "all") return visibleDefects;
+    return visibleDefects.filter((defect) => defect.surface === surfaceFilter);
+  }, [visibleDefects, surfaceFilter]);
 
   const analysisOrientation: ImageOrientation = "vertical";
   const analysisTopMeta = useMemo(
@@ -381,7 +415,7 @@ export default function TraditionalMode() {
   );
   const topDefectRects = useMemo(() => {
     if (topLayout.surfaces.length === 0) return [];
-    return plateDefects
+    return visibleDefects
       .map((defect) => {
         const surfaceLayout = topLayout.surfaces.find(
           (surface) => surface.surface === defect.surface,
@@ -404,10 +438,10 @@ export default function TraditionalMode() {
           rect: { x: number; y: number; width: number; height: number };
         } => item !== null,
       );
-  }, [topLayout, plateDefects, analysisOrientation]);
+  }, [topLayout, visibleDefects, analysisOrientation]);
   const bottomDefectRects = useMemo(() => {
     if (bottomLayout.surfaces.length === 0) return [];
-    return plateDefects
+    return visibleDefects
       .map((defect) => {
         const surfaceLayout = bottomLayout.surfaces.find(
           (surface) => surface.surface === defect.surface,
@@ -430,7 +464,81 @@ export default function TraditionalMode() {
           rect: { x: number; y: number; width: number; height: number };
         } => item !== null,
       );
-  }, [bottomLayout, plateDefects, analysisOrientation]);
+  }, [bottomLayout, visibleDefects, analysisOrientation]);
+
+  const hitTestTopDefect = useCallback(
+    (worldX: number, worldY: number) => {
+      for (const item of topDefectRects) {
+        const rect = item.rect;
+        if (
+          worldX >= rect.x &&
+          worldX <= rect.x + rect.width &&
+          worldY >= rect.y &&
+          worldY <= rect.y + rect.height
+        ) {
+          return item.defect;
+        }
+      }
+      return null;
+    },
+    [topDefectRects],
+  );
+
+  const hitTestBottomDefect = useCallback(
+    (worldX: number, worldY: number) => {
+      for (const item of bottomDefectRects) {
+        const rect = item.rect;
+        if (
+          worldX >= rect.x &&
+          worldX <= rect.x + rect.width &&
+          worldY >= rect.y &&
+          worldY <= rect.y + rect.height
+        ) {
+          return item.defect;
+        }
+      }
+      return null;
+    },
+    [bottomDefectRects],
+  );
+
+  const handleTopPointerMove = useCallback(
+    (info: { worldX: number; worldY: number; screenX: number; screenY: number }) => {
+      if (activeNav !== "图像分析") return;
+      const hit = hitTestTopDefect(info.worldX, info.worldY);
+      setTopCursor(hit ? "pointer" : "grab");
+      if (hit) {
+        setHoveredDefect({ defect: hit, screenX: info.screenX, screenY: info.screenY });
+      } else {
+        setHoveredDefect(null);
+      }
+    },
+    [activeNav, hitTestTopDefect],
+  );
+
+  const handleBottomPointerMove = useCallback(
+    (info: { worldX: number; worldY: number; screenX: number; screenY: number }) => {
+      if (activeNav !== "图像分析") return;
+      const hit = hitTestBottomDefect(info.worldX, info.worldY);
+      setBottomCursor(hit ? "pointer" : "grab");
+      if (hit) {
+        setHoveredDefect({ defect: hit, screenX: info.screenX, screenY: info.screenY });
+      } else {
+        setHoveredDefect(null);
+      }
+    },
+    [activeNav, hitTestBottomDefect],
+  );
+
+  const handleTopPointerLeave = useCallback(() => {
+    setTopCursor("grab");
+    setHoveredDefect(null);
+  }, []);
+
+  const handleBottomPointerLeave = useCallback(() => {
+    setBottomCursor("grab");
+    setHoveredDefect(null);
+  }, []);
   const analysisSeverityColor = useCallback((severity: DefectItem["severity"]) => {
     switch (severity) {
       case "high":
@@ -594,8 +702,8 @@ export default function TraditionalMode() {
           ctx.fillStyle = stroke;
           ctx.fillText(
             surfaceLayout.surface === "top"
-              ? "TOP SURFACE"
-              : "BOTTOM SURFACE",
+              ? "上表"
+              : "下表",
             0,
             0,
           );
@@ -725,6 +833,9 @@ export default function TraditionalMode() {
                 ? bottomViewportRef.current.x + bottomViewportRef.current.width / 2
                 : bottomLayout.worldWidth / 2;
             setBottomCenterTarget({ x: centerX, y: centerY });
+            if (surfaceFilter === "all" && isAnalysisSyncEnabled && !isWidthLockEnabled) {
+              setBottomForcedScale(topScaleRef.current);
+            }
           }
         }, 16); // ~60fps for smooth motion
       } else {
@@ -738,7 +849,7 @@ export default function TraditionalMode() {
       }
     }
     return () => clearInterval(timer);
-  }, [isPlaying, plates, activeNav, surfaceFilter, topLayout, bottomLayout, isAnalysisSyncEnabled]);
+  }, [isPlaying, plates, activeNav, surfaceFilter, topLayout, bottomLayout, isAnalysisSyncEnabled, isWidthLockEnabled]);
 
   // 3D Model Control State
   const [rotX, setRotX] = useState(-12);
@@ -755,9 +866,65 @@ export default function TraditionalMode() {
           const nodesData = await getApiList().catch(() => []);
           if (!mounted) return;
           setApiNodes(nodesData);
+          const mate = await getConfigMate().catch(() => null);
+          if (mate?.meta?.company_name) {
+            setCompanyName(mate.meta.company_name);
+          }
+          const resolvedKey =
+            (env as any).getLineName?.() ?? currentLineKey ?? "";
+          const findLabel = (key: string) => {
+            if (!key) return "";
+            const node = nodesData.find(
+              (item) =>
+                (item as any).key === key ||
+                (item as any).line_key === key,
+            );
+            return (node as any)?.name || (node as any)?.line_name || key;
+          };
+          if (resolvedKey) {
+            setCurrentLineKey(resolvedKey);
+            setCurrentLine(findLabel(resolvedKey));
+          } else if (nodesData.length > 0) {
+            const firstKey =
+              (nodesData[0] as any).key ||
+              (nodesData[0] as any).line_key ||
+              "";
+            setCurrentLineKey(firstKey);
+            setCurrentLine(findLabel(firstKey));
+          }
           const meta = await getGlobalMeta().catch(() => null);
           if (meta && typeof meta.defect_cache_expand === "number") {
             setDefectCropExpand(meta.defect_cache_expand);
+          }
+          if (meta?.defect_classes?.items && Array.isArray(meta.defect_classes.items)) {
+            const normalize = (value: unknown) => {
+              const num = typeof value === "number" ? value : Number(value);
+              if (!Number.isFinite(num)) return 0;
+              return Math.max(0, Math.min(255, Math.round(num)));
+            };
+            const toHex = (value: number) => value.toString(16).padStart(2, "0");
+            const options = meta.defect_classes.items.map((item: any) => {
+              const label =
+                item?.desc?.toString()?.trim() ||
+                item?.name?.toString()?.trim() ||
+                item?.tag?.toString()?.trim() ||
+                "未知缺陷";
+              const colorObj = item?.color || {};
+              const red = normalize(colorObj.red);
+              const green = normalize(colorObj.green);
+              const blue = normalize(colorObj.blue);
+              return {
+                label,
+                color: `#${toHex(red)}${toHex(green)}${toHex(blue)}`,
+              };
+            });
+            const deduped = options.filter((item, index) => {
+              return options.findIndex((opt) => opt.label === item.label) === index;
+            });
+            if (deduped.length > 0) {
+              setDefectTypeOptions(deduped);
+              setSelectedDefectTypes(deduped.map((item) => item.label));
+            }
           }
           await loadPlatesWithCriteria({}, 50, false);
         } catch (error) {
@@ -791,6 +958,8 @@ export default function TraditionalMode() {
 
         if (!mounted) return;
 
+        const normalizeSurface = (value: unknown) =>
+          value === "top" ? "top" : "bottom";
         setPlateDefects(defectsRes.defects.map(d => ({
           id: d.defect_id,
           type: d.defect_type as any,
@@ -800,8 +969,12 @@ export default function TraditionalMode() {
           width: d.width,
           height: d.height,
           confidence: d.confidence,
-          surface: d.surface,
-          imageIndex: d.image_index
+          surface: normalizeSurface(d.surface),
+          imageIndex: d.image_index,
+          xMm: d.x_mm,
+          yMm: d.y_mm,
+          widthMm: d.width_mm,
+          heightMm: d.height_mm,
         })));
         
         setSurfaceImages(metaRes.surface_images || []);
@@ -816,7 +989,7 @@ export default function TraditionalMode() {
 
   useEffect(() => {
     if (activeNav !== "图像分析" || !selectedDefectId) return;
-    const defect = plateDefects.find((d) => d.id === selectedDefectId);
+    const defect = visibleDefects.find((d) => d.id === selectedDefectId);
     if (!defect) return;
     if (defect.surface === "top" && topLayout.surfaces.length > 0) {
       const rect = topDefectRects.find((item) => item.defect.id === defect.id)?.rect;
@@ -836,7 +1009,44 @@ export default function TraditionalMode() {
         });
       }
     }
-  }, [activeNav, selectedDefectId, plateDefects, topLayout, bottomLayout, topDefectRects, bottomDefectRects]);
+  }, [activeNav, selectedDefectId, visibleDefects, topLayout, bottomLayout, topDefectRects, bottomDefectRects]);
+
+  useEffect(() => {
+    if (!selectedDefectId) return;
+    const exists = visibleDefects.some((d) => d.id === selectedDefectId);
+    if (!exists) {
+      setSelectedDefectId(visibleDefects[0]?.id ?? null);
+    }
+  }, [selectedDefectId, visibleDefects]);
+
+  useEffect(() => {
+    if (activeNav !== "图像分析" || surfaceFilter !== "all") {
+      setTopForcedScale(null);
+      setBottomForcedScale(null);
+      return;
+    }
+    if (!isAnalysisSyncEnabled) {
+      setTopForcedScale(null);
+      setBottomForcedScale(null);
+      return;
+    }
+    if (topViewportRef.current) {
+      const info = topViewportRef.current;
+      setBottomCenterTarget({
+        x: info.x + info.width / 2,
+        y: info.y + info.height / 2,
+      });
+      if (!isWidthLockEnabled) {
+        setBottomForcedScale(topScaleRef.current);
+      }
+    }
+  }, [activeNav, surfaceFilter, isAnalysisSyncEnabled, isWidthLockEnabled]);
+
+  useEffect(() => {
+    if (!isWidthLockEnabled) return;
+    setTopForcedScale(null);
+    setBottomForcedScale(null);
+  }, [isWidthLockEnabled]);
 
   const handleDistributionInteraction = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (e.buttons !== 1 && e.type !== 'mousedown') return;
@@ -931,13 +1141,13 @@ export default function TraditionalMode() {
 
   // 当前选中的缺陷（优先使用选中 ID，其次回退到列表首个缺陷）
   const currentDefect = useMemo(() => {
-    if (!plateDefects || plateDefects.length === 0) return null;
+    if (!visibleDefects || visibleDefects.length === 0) return null;
     if (selectedDefectId) {
-      const found = plateDefects.find(d => d.id === selectedDefectId);
+      const found = visibleDefects.find(d => d.id === selectedDefectId);
       if (found) return found;
     }
-    return plateDefects[0];
-  }, [plateDefects, selectedDefectId]);
+    return visibleDefects[0];
+  }, [visibleDefects, selectedDefectId]);
 
   const updateDefectImageMetrics = useCallback(() => {
     const img = defectImageRef.current;
@@ -996,6 +1206,28 @@ export default function TraditionalMode() {
     );
   }, [mapFrameWidth, mapTileSize]);
 
+  const hitTestMapDefect = useCallback(
+    (worldX: number, worldY: number) => {
+      if (!mapSurface || !mapFrameHeight) return null;
+      for (const defect of visibleDefects) {
+        if (defect.surface !== mapSurface) continue;
+        const frameIndex = Math.max(0, defect.imageIndex - 1);
+        const rectX = defect.x;
+        const rectY = defect.y + frameIndex * mapFrameHeight;
+        if (
+          worldX >= rectX &&
+          worldX <= rectX + defect.width &&
+          worldY >= rectY &&
+          worldY <= rectY + defect.height
+        ) {
+          return defect;
+        }
+      }
+      return null;
+    },
+    [mapSurface, mapFrameHeight, visibleDefects],
+  );
+
   const mapDefectWorld = useMemo(() => {
     if (!currentDefect || !mapFrameHeight) return null;
     const frameIndex = Math.max(0, currentDefect.imageIndex - 1);
@@ -1020,7 +1252,7 @@ export default function TraditionalMode() {
 
   const mapPrefetchHint = useMemo(() => {
     if (!isMapMode || !currentDefect) return null;
-    const sameSurface = plateDefects.filter(d => d.surface === currentDefect.surface);
+    const sameSurface = visibleDefects.filter(d => d.surface === currentDefect.surface);
     if (sameSurface.length === 0) return null;
     const idx = sameSurface.findIndex(d => d.id === currentDefect.id);
     const nextDefect = idx >= 0 && idx < sameSurface.length - 1 ? sameSurface[idx + 1] : sameSurface[0];
@@ -1030,7 +1262,26 @@ export default function TraditionalMode() {
       y: nextDefect.y + nextDefect.height / 2,
       imageIndex: Math.max(0, nextDefect.imageIndex - 1),
     };
-  }, [isMapMode, currentDefect, plateDefects]);
+  }, [isMapMode, currentDefect, visibleDefects]);
+
+  const handleMapPointerMove = useCallback(
+    (info: { worldX: number; worldY: number; screenX: number; screenY: number }) => {
+      if (!isMapMode) return;
+      const hit = hitTestMapDefect(info.worldX, info.worldY);
+      setMapCursor(hit ? "pointer" : "grab");
+      if (hit) {
+        setHoveredDefect({ defect: hit, screenX: info.screenX, screenY: info.screenY });
+      } else {
+        setHoveredDefect(null);
+      }
+    },
+    [isMapMode, hitTestMapDefect],
+  );
+
+  const handleMapPointerLeave = useCallback(() => {
+    setMapCursor("grab");
+    setHoveredDefect(null);
+  }, []);
 
   const mapCropStyle = useMemo(() => {
     if (!showMapCrop || !mapViewport || !currentDefect || !mapDefectWorld) {
@@ -1090,18 +1341,25 @@ export default function TraditionalMode() {
       ) {
         syncLockRef.current = true;
         setBottomCenterTarget({
-          x: getViewportCenterX(
-            bottomViewportRef.current,
-            bottomLayout.worldWidth,
-          ),
+          x: info.x + info.width / 2,
           y: info.y + info.height / 2,
         });
+        if (!isWidthLockEnabled) {
+          setBottomForcedScale(topScaleRef.current);
+        }
         window.setTimeout(() => {
           syncLockRef.current = false;
         }, 60);
       }
     },
-    [surfaceFilter, isAnalysisSyncEnabled, topLayout, bottomLayout, getViewportCenterX],
+    [surfaceFilter, isAnalysisSyncEnabled, isWidthLockEnabled, topLayout, bottomLayout, getViewportCenterX],
+  );
+
+  const handleTopTransformChange = useCallback(
+    (info: { x: number; y: number; scale: number }) => {
+      topScaleRef.current = info.scale;
+    },
+    [],
   );
 
   const handleBottomViewportChange = useCallback(
@@ -1120,18 +1378,25 @@ export default function TraditionalMode() {
       ) {
         syncLockRef.current = true;
         setTopCenterTarget({
-          x: getViewportCenterX(
-            topViewportRef.current,
-            topLayout.worldWidth,
-          ),
+          x: info.x + info.width / 2,
           y: info.y + info.height / 2,
         });
+        if (!isWidthLockEnabled) {
+          setTopForcedScale(bottomScaleRef.current);
+        }
         window.setTimeout(() => {
           syncLockRef.current = false;
         }, 60);
       }
     },
-    [surfaceFilter, isAnalysisSyncEnabled, topLayout, bottomLayout, getViewportCenterX],
+    [surfaceFilter, isAnalysisSyncEnabled, isWidthLockEnabled, topLayout, bottomLayout, getViewportCenterX],
+  );
+
+  const handleBottomTransformChange = useCallback(
+    (info: { x: number; y: number; scale: number }) => {
+      bottomScaleRef.current = info.scale;
+    },
+    [],
   );
   const currentImageUrl = useMemo(() => {
     // 若有选中缺陷，则优先展示该缺陷的小图（缺陷分析视图）
@@ -1160,6 +1425,7 @@ export default function TraditionalMode() {
       tileSize: surfaceImages[0].image_height || 512
     });
   }, [currentDefect, selectedPlate, surfaceImages]);
+
 
   const renderMapTile = useCallback(
     (ctx: CanvasRenderingContext2D, tile: Tile, tileSizeArg: number, scale: number) => {
@@ -1251,7 +1517,7 @@ export default function TraditionalMode() {
         }
       };
 
-      plateDefects.forEach((defect) => {
+      visibleDefects.forEach((defect) => {
         if (defect.surface !== mapSurface) return;
         const rectX = defect.x;
         const frameIndex = Math.max(0, defect.imageIndex - 1);
@@ -1266,7 +1532,7 @@ export default function TraditionalMode() {
         ctx.restore();
       });
     },
-    [mapSurface, mapFrameHeight, plateDefects, selectedDefectId],
+    [mapSurface, mapFrameHeight, visibleDefects, selectedDefectId],
   );
 
   // Dynamic Scale Calculation based on Actual Dimensions
@@ -1307,6 +1573,21 @@ export default function TraditionalMode() {
           animation: steel-idle-float 4s ease-in-out infinite;
         }
       `}</style>
+      {hoveredDefect && (
+        <DefectHoverTooltip
+          defect={hoveredDefect.defect}
+          screenX={hoveredDefect.screenX}
+          screenY={hoveredDefect.screenY}
+          plateSize={
+            selectedPlate
+              ? {
+                  width: selectedPlate.dimensions.width,
+                  length: selectedPlate.dimensions.length,
+                }
+              : undefined
+          }
+        />
+      )}
       {/* Header */}
       <AnimatePresence>
         {!isImmersiveMode && (
@@ -1415,7 +1696,7 @@ export default function TraditionalMode() {
                 className="flex flex-col items-center group cursor-pointer hover:bg-[#30363d]/30 px-4 py-1 rounded transition-colors"
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-[14px] font-bold text-[#f0f6fc] tracking-[0.2em]">宝武集团不锈钢有限公司</span>
+                  <span className="text-[14px] font-bold text-[#f0f6fc] tracking-[0.2em]">{companyName}</span>
                   <ChevronDown className={`w-4 h-4 text-[#8b949e] transition-transform ${isDataSourceOpen ? 'rotate-180' : ''} group-hover:text-[#58a6ff]`} />
                 </div>
                 <span className="text-[10px] text-[#8b949e] uppercase group-hover:text-[#c9d1d9]">{currentLine}表面检测系统</span>
@@ -2129,7 +2410,7 @@ export default function TraditionalMode() {
 
     {/* Central Map Strip (Vertical) */}
         <AnimatePresence>
-          {surfaceFilter !== 'bottom' && (
+          {(
             <motion.div
               initial={{ width: 0, opacity: 0 }}
               animate={{ width: 180, opacity: 1 }}
@@ -2138,7 +2419,13 @@ export default function TraditionalMode() {
               className="bg-[#0d1117] flex flex-col border border-[#30363d] overflow-hidden whitespace-nowrap"
             >
              <div className="h-6 bg-[#161b22] border-b border-[#30363d] flex items-center justify-between px-1 text-[9px]">
-               <span>{surfaceFilter === 'all' ? '上表分布' : '纵向分布'}</span>
+               <span>
+                 {surfaceFilter === 'bottom'
+                   ? '下表分布'
+                   : surfaceFilter === 'top'
+                     ? '上表分布'
+                     : '纵向分布'}
+               </span>
                <div className="flex gap-1">
                  <ZoomIn className="w-3 h-3" />
                  <ZoomOut className="w-3 h-3" />
@@ -2176,28 +2463,45 @@ export default function TraditionalMode() {
                  <div className="w-full h-px bg-[#30363d]/20 absolute top-[75%]" />
                  
                  {/* Real Defect points mapping */}
-                  {plateDefects.map((defect, index) => {
+                  {distributionDefects.map((defect, index) => {
                    const plateLength = selectedPlate?.dimensions.length || 8000;
                    const plateWidth = selectedPlate?.dimensions.width || 2000;
+                   const xMm = defect.xMm ?? defect.x;
+                   const yMm = defect.yMm ?? defect.y;
                    
-                   // Fix: X is length (vertical), Y is width (horizontal) to match system coordinates
-                   const topPos = (defect.x / plateLength) * 100;
-                   const leftPos = (defect.y / plateWidth) * 100;
+                   // 纵向分布：Y 方向对应长度，X 方向对应宽度
+                   const topPos = (yMm / plateLength) * 100;
+                   const leftPos = (xMm / plateWidth) * 100;
                    
                      const keySuffix = `${defect.id ?? index}-${defect.surface ?? "unknown"}`;
                      return (
                        <div 
                         key={`dist-dot-${keySuffix}`}
-                       className={`absolute w-2 h-2 rounded-full border border-white/30 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10 ${
-                         defect.surface === 'top' ? 'bg-[#58a6ff]' : 'bg-[#f85149]'
-                       }`}
-                       style={{ 
-                         top: `${topPos}%`, 
-                         left: `${leftPos}%`,
-                         boxShadow: `0 0 6px ${defect.surface === 'top' ? 'rgba(88,166,255,0.6)' : 'rgba(248,81,73,0.6)'}`
-                       }}
-                     />
-                   );
+                        onMouseEnter={(e) =>
+                          setHoveredDefect({
+                            defect,
+                            screenX: e.clientX,
+                            screenY: e.clientY,
+                          })
+                        }
+                        onMouseMove={(e) =>
+                          setHoveredDefect({
+                            defect,
+                            screenX: e.clientX,
+                            screenY: e.clientY,
+                          })
+                        }
+                        onMouseLeave={() => setHoveredDefect(null)}
+                        className={`absolute w-2 h-2 rounded-full border border-white/30 -translate-x-1/2 -translate-y-1/2 z-10 ${
+                          defect.surface === 'top' ? 'bg-[#58a6ff]' : 'bg-[#f85149]'
+                        }`}
+                        style={{
+                          top: `${Math.max(0, Math.min(100, topPos))}%`,
+                          left: `${Math.max(0, Math.min(100, leftPos))}%`,
+                          boxShadow: `0 0 6px ${defect.surface === 'top' ? 'rgba(88,166,255,0.6)' : 'rgba(248,81,73,0.6)'}`
+                        }}
+                      />
+                    );
                  })}
 
                  {/* Viewport Indicator inside plate */}
@@ -2253,17 +2557,32 @@ export default function TraditionalMode() {
                   </>
                 )}
                 {activeNav === "图像分析" && (
-                  <button
-                    className={`p-1 transition-colors ${
-                      isWidthLockEnabled
-                        ? 'bg-[#30363d] text-[#58a6ff]'
-                        : 'hover:bg-[#30363d] text-[#8b949e]'
-                    }`}
-                    onClick={() => setIsWidthLockEnabled((prev) => !prev)}
-                    title={isWidthLockEnabled ? "关闭宽度锁定" : "开启宽度锁定"}
-                  >
-                    <ArrowLeftRight className="w-4 h-4" />
-                  </button>
+                  <>
+                    <button
+                      className={`p-1 transition-colors ${
+                        isWidthLockEnabled
+                          ? 'bg-[#30363d] text-[#58a6ff]'
+                          : 'hover:bg-[#30363d] text-[#8b949e]'
+                      }`}
+                      onClick={() => setIsWidthLockEnabled((prev) => !prev)}
+                      title={isWidthLockEnabled ? "关闭宽度锁定" : "开启宽度锁定"}
+                    >
+                      <ArrowLeftRight className="w-4 h-4" />
+                    </button>
+                    {surfaceFilter === "all" && (
+                    <button
+                        onClick={() => setIsAnalysisSyncEnabled((prev) => !prev)}
+                        className={`p-1 transition-colors ${
+                          isAnalysisSyncEnabled
+                            ? 'bg-[#30363d] text-[#58a6ff]'
+                            : 'hover:bg-[#30363d] text-[#8b949e]'
+                        }`}
+                        title={isAnalysisSyncEnabled ? "关闭同步锁定" : "开启同步锁定"}
+                      >
+                        <Link2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </>
                 )}
                 <div className="w-px h-3 bg-[#30363d] mx-1 self-center" />
                 
@@ -2426,13 +2745,13 @@ export default function TraditionalMode() {
           {/* Detail Bar */}
           <div className="h-8 bg-[#161b22] border border-[#30363d] flex items-center justify-between px-1 shrink-0 overflow-hidden">
             <div className="flex items-center gap-1 overflow-x-auto whitespace-nowrap scrollbar-hide flex-1">
-              {plateDefects.length > 0 ? (
+              {currentDefect ? (
                 <>
                   <div className="flex items-center gap-1 bg-[#238636]/10 border border-[#238636]/30 px-2 py-0.5 rounded text-[10px] text-[#3fb950]">
-                    <span>当前缺陷</span><span className="font-bold">{plateDefects[0].type}</span>
+                    <span>当前缺陷</span><span className="font-bold">{currentDefect.type}</span>
                   </div>
                   <div className="flex items-center gap-1 bg-[#d29922]/10 border border-[#d29922]/30 px-2 py-0.5 rounded text-[10px] text-[#d29922]">
-                    <span>置信度</span><span className="font-bold">{(plateDefects[0].confidence * 100).toFixed(1)}%</span>
+                    <span>置信度</span><span className="font-bold">{(currentDefect.confidence * 100).toFixed(1)}%</span>
                   </div>
                 </>
               ) : (
@@ -2500,19 +2819,6 @@ export default function TraditionalMode() {
               >
                 {isDefectListOpen ? <PanelRightClose className="w-3.5 h-3.5" /> : <PanelRightOpen className="w-3.5 h-3.5" />}
               </button>
-              {activeNav === "图像分析" && surfaceFilter === "all" && (
-                <button
-                  onClick={() => setIsAnalysisSyncEnabled((prev) => !prev)}
-                  className={`h-6 w-7 flex items-center justify-center rounded border transition-colors ${
-                    isAnalysisSyncEnabled
-                      ? "bg-[#58a6ff]/10 text-[#58a6ff] border-[#58a6ff]/30"
-                      : "text-[#8b949e] border-[#30363d] hover:bg-[#30363d]"
-                  }`}
-                  title={isAnalysisSyncEnabled ? "关闭同步滚动" : "开启同步滚动"}
-                >
-                  <Link2 className="w-3.5 h-3.5" />
-                </button>
-              )}
             </div>
           </div>
 
@@ -2544,7 +2850,7 @@ export default function TraditionalMode() {
                         }`}
                       >
                         <div className="absolute top-2 left-2 px-2 py-0.5 bg-black/60 text-[10px] text-[#58a6ff] font-bold z-10 border border-[#58a6ff]/30 rounded-sm">
-                          TOP SURFACE
+                          上表
                         </div>
                         {analysisSeqNo && topLayout.worldWidth > 0 ? (
                           <LargeImageViewer
@@ -2558,18 +2864,25 @@ export default function TraditionalMode() {
                             renderOverlay={renderTopOverlay}
                             centerTarget={topCenterTarget}
                             onViewportChange={handleTopViewportChange}
-                            panMargin={200}
+                            onTransformChange={handleTopTransformChange}
+                            onPointerMove={handleTopPointerMove}
+                            onPointerLeave={handleTopPointerLeave}
+                            cursor={topCursor}
+                            panMargin={
+                              activeNav === "图像分析" && isWidthLockEnabled ? 0 : 200
+                            }
                             fitToHeight={analysisOrientation === "vertical"}
                             fitToWidth={activeNav === "图像分析" && isWidthLockEnabled}
                             lockScale={activeNav === "图像分析" && isWidthLockEnabled}
+                            forcedScale={
+                              activeNav === "图像分析" && !isWidthLockEnabled
+                                ? topForcedScale
+                                : null
+                            }
                             wheelMode={
                               activeNav === "图像分析" && isWidthLockEnabled
                                 ? "scroll"
-                                : activeNav === "图像分析" &&
-                                    surfaceFilter === "all" &&
-                                    isAnalysisSyncEnabled
-                                  ? "scroll"
-                                  : "zoom"
+                                : "zoom"
                             }
                           />
                         ) : (
@@ -2587,7 +2900,7 @@ export default function TraditionalMode() {
                         }`}
                       >
                         <div className="absolute top-2 left-2 px-2 py-0.5 bg-black/60 text-[10px] text-[#f85149] font-bold z-10 border border-[#f85149]/30 rounded-sm">
-                          BOTTOM SURFACE
+                          下表
                         </div>
                         {analysisSeqNo && bottomLayout.worldWidth > 0 ? (
                           <LargeImageViewer
@@ -2601,18 +2914,25 @@ export default function TraditionalMode() {
                             renderOverlay={renderBottomOverlay}
                             centerTarget={bottomCenterTarget}
                             onViewportChange={handleBottomViewportChange}
-                            panMargin={200}
+                            onTransformChange={handleBottomTransformChange}
+                            onPointerMove={handleBottomPointerMove}
+                            onPointerLeave={handleBottomPointerLeave}
+                            cursor={bottomCursor}
+                            panMargin={
+                              activeNav === "图像分析" && isWidthLockEnabled ? 0 : 200
+                            }
                             fitToHeight={analysisOrientation === "vertical"}
                             fitToWidth={activeNav === "图像分析" && isWidthLockEnabled}
                             lockScale={activeNav === "图像分析" && isWidthLockEnabled}
+                            forcedScale={
+                              activeNav === "图像分析" && !isWidthLockEnabled
+                                ? bottomForcedScale
+                                : null
+                            }
                             wheelMode={
                               activeNav === "图像分析" && isWidthLockEnabled
                                 ? "scroll"
-                                : activeNav === "图像分析" &&
-                                    surfaceFilter === "all" &&
-                                    isAnalysisSyncEnabled
-                                  ? "scroll"
-                                  : "zoom"
+                                : "zoom"
                             }
                           />
                         ) : (
@@ -2634,7 +2954,7 @@ export default function TraditionalMode() {
                       gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))` 
                     }}
                     >
-                      {plateDefects.map((defect, index) => {
+                      {visibleDefects.map((defect, index) => {
                         const defectImageUrl = getDefectImageUrl({
                           defectId: defect.id,
                           surface: defect.surface,
@@ -2647,6 +2967,21 @@ export default function TraditionalMode() {
                               setSelectedDefectId(defect.id);
                               setIsGridView(false);
                             }}
+                            onMouseEnter={(e) =>
+                              setHoveredDefect({
+                                defect,
+                                screenX: e.clientX,
+                                screenY: e.clientY,
+                              })
+                            }
+                            onMouseMove={(e) =>
+                              setHoveredDefect({
+                                defect,
+                                screenX: e.clientX,
+                                screenY: e.clientY,
+                              })
+                            }
+                            onMouseLeave={() => setHoveredDefect(null)}
                             className="aspect-square bg-[#161b22] border border-[#30363d] relative group cursor-pointer overflow-hidden"
                           >
                             <img 
@@ -2660,10 +2995,12 @@ export default function TraditionalMode() {
                           </motion.div>
                         );
                       })}
-                    {plateDefects.length === 0 && (
+                    {visibleDefects.length === 0 && (
                       <div className="col-span-full h-full flex flex-col items-center justify-center text-[#8b949e]">
                         <LayoutGrid className="w-12 h-12 mb-2 opacity-20" />
-                        <span className="text-xs">暂无缺陷数据</span>
+                        <span className="text-xs">
+                          {plateDefects.length === 0 ? "暂无缺陷数据" : "无匹配缺陷"}
+                        </span>
                       </div>
                     )}
                   </motion.div>
@@ -2682,13 +3019,16 @@ export default function TraditionalMode() {
                           imageHeight={mapWorldHeight}
                           tileSize={mapTileSize}
                           className="bg-[#0d1117]"
-                          initialScale="fit"
+                          initialScale={1}
                           maxLevel={mapMaxLevel}
                           prefetchMargin={400}
                           renderTile={renderMapTile}
                           renderOverlay={renderMapOverlay}
                           focusTarget={mapFocusTarget}
                           onViewportChange={setMapViewport}
+                          onPointerMove={handleMapPointerMove}
+                          onPointerLeave={handleMapPointerLeave}
+                          cursor={mapCursor}
                           panMargin={200}
                         />
                         {showMapCrop && currentDefect && (
@@ -2783,12 +3123,18 @@ export default function TraditionalMode() {
                   className="bg-[#161b22] border-l border-[#30363d] flex flex-col"
                 >
                   <div className="h-8 border-b border-[#30363d] flex items-center px-3 justify-between shrink-0">
-                    <span className="text-[11px] font-bold text-[#f0f6fc]">缺陷列表 ({plateDefects.length})</span>
+                    <span className="text-[11px] font-bold text-[#f0f6fc]">
+                      缺陷列表 ({visibleDefects.length}
+                      {visibleDefects.length !== plateDefects.length
+                        ? `/${plateDefects.length}`
+                        : ""}
+                      )
+                    </span>
                     <Activity className="w-3 h-3 text-[#58a6ff]" />
                   </div>
                   
                     <div className="flex-1 overflow-y-auto custom-scrollbar p-1.5 space-y-1">
-                      {plateDefects.map((defect, idx) => {
+                      {visibleDefects.map((defect, idx) => {
                         const xMm = defect.xMm ?? defect.x;
                         const yMm = defect.yMm ?? defect.y;
                         const wMm = defect.widthMm ?? 0;
@@ -2812,6 +3158,21 @@ export default function TraditionalMode() {
                               setImgScale(1);
                               setImgOffset({ x: 0, y: 0 });
                             }}
+                            onMouseEnter={(e) =>
+                              setHoveredDefect({
+                                defect,
+                                screenX: e.clientX,
+                                screenY: e.clientY,
+                              })
+                            }
+                            onMouseMove={(e) =>
+                              setHoveredDefect({
+                                defect,
+                                screenX: e.clientX,
+                                screenY: e.clientY,
+                              })
+                            }
+                            onMouseLeave={() => setHoveredDefect(null)}
                             className={`p-2 bg-[#0d1117] border rounded-sm transition-colors cursor-pointer group ${
                               selectedDefectId === defect.id ? 'border-[#58a6ff] bg-[#58a6ff]/5' : 'border-[#30363d] hover:border-[#58a6ff]/50'
                             }`}
@@ -2863,10 +3224,12 @@ export default function TraditionalMode() {
                           </div>
                         );
                       })}
-                    {plateDefects.length === 0 && (
+                    {visibleDefects.length === 0 && (
                       <div className="h-full flex flex-col items-center justify-center opacity-30 mt-10">
                         <Search className="w-8 h-8 mb-2" />
-                        <span className="text-[10px]">无缺陷数据</span>
+                        <span className="text-[10px]">
+                          {plateDefects.length === 0 ? "无缺陷数据" : "无匹配缺陷"}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -2880,7 +3243,7 @@ export default function TraditionalMode() {
              {/* Left: Defect Grid */}
              <div className="flex-1 p-2 overflow-y-auto custom-scrollbar">
                <div className="grid grid-cols-5 gap-x-1 gap-y-1.5">
-                 {DEFECT_TYPES.map((item, i) => {
+                 {defectTypeOptions.map((item, i) => {
                    const isSelected = selectedDefectTypes.includes(item.label);
                    const count = plateDefects.filter(d => d.type === item.label).length;
                    const confirmedCount = plateDefects.filter(d => d.type === item.label && (d as any).isConfirmed).length;
@@ -2940,7 +3303,7 @@ export default function TraditionalMode() {
              {/* Right: Action Buttons (Vertical) */}
              <div className="w-[80px] bg-[#161b22] border-l border-[#30363d] flex flex-col p-1 gap-1">
                <button 
-                 onClick={() => setSelectedDefectTypes(DEFECT_TYPES.map(t => t.label))}
+                 onClick={() => setSelectedDefectTypes(defectTypeOptions.map(t => t.label))}
                  className="flex-1 flex flex-col items-center justify-center gap-1 bg-[#21262d] hover:bg-[#30363d] text-[#58a6ff] transition-all border border-[#30363d]"
                >
                  <Layout className="w-3.5 h-3.5" />
@@ -3008,12 +3371,18 @@ export default function TraditionalMode() {
         onClose={() => setIsDataSourceOpen(false)}
         nodes={apiNodes}
         onRefresh={refreshDataSources}
-        currentLineKey={apiNodes.find(n => n?.line_name?.includes("1780"))?.line_key || ""}
+        currentLineKey={currentLineKey}
         onConfirm={(lineKey) => {
-          const node = apiNodes.find(n => n.line_key === lineKey);
+          const node = apiNodes.find(
+            (n) => (n as any).key === lineKey || (n as any).line_key === lineKey,
+          );
           if (node) {
-            setCurrentLine(node.line_name);
-            toast.success(`已切换至: ${node.line_name}`);
+            const label =
+              (node as any).name || (node as any).line_name || lineKey;
+            setCurrentLine(label);
+            setCurrentLineKey(lineKey);
+            env.setLineName(lineKey);
+            toast.success(`已切换至: ${label}`);
           }
           setIsDataSourceOpen(false);
         }}

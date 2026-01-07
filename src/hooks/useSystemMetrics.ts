@@ -123,6 +123,27 @@ export const useSystemMetrics = (options: UseSystemMetricsOptions = {}) => {
       };
     }
 
+    let pollingTimer: number | null = null;
+    let wsActive = true;
+    const startPolling = () => {
+      if (pollingTimer !== null) return;
+      pollingTimer = window.setInterval(async () => {
+        try {
+          const info = await getSystemInfo();
+          const payload: SystemMetricsPayload = {
+            timestamp: new Date().toISOString(),
+            resources: info.resources,
+            disks: info.disks,
+            network_interfaces: info.network_interfaces,
+          };
+          setMetrics(payload);
+          pushHistory(payload);
+        } catch {
+          // ignore polling errors
+        }
+      }, mockIntervalMs);
+    };
+
     const ws = new WebSocket(getSystemMetricsWsUrl());
     ws.onmessage = (event) => {
       try {
@@ -133,9 +154,21 @@ export const useSystemMetrics = (options: UseSystemMetricsOptions = {}) => {
         // ignore malformed payloads
       }
     };
+    ws.onerror = () => {
+      if (!wsActive) return;
+      startPolling();
+    };
+    ws.onclose = () => {
+      if (!wsActive) return;
+      startPolling();
+    };
 
     return () => {
+      wsActive = false;
       ws.close();
+      if (pollingTimer !== null) {
+        window.clearInterval(pollingTimer);
+      }
     };
   }, [enabled, isLive, mockIntervalMs, historySize]);
 

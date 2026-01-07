@@ -24,6 +24,8 @@ interface DefectDistributionChartProps {
   surfaceImageInfo?: SurfaceImageInfo[] | null;
   selectedDefectId?: string | null;
   onDefectSelect?: (id: string | null) => void;
+  onDefectHover?: (defect: Defect, position: { screenX: number; screenY: number }) => void;
+  onDefectHoverEnd?: () => void;
   seqNo?: number;
   defaultTileSize?: number;
   maxTileLevel?: number;
@@ -103,6 +105,8 @@ export function DefectDistributionChart({
   surfaceImageInfo,
   selectedDefectId,
   onDefectSelect,
+  onDefectHover,
+  onDefectHoverEnd,
   seqNo,
   defaultTileSize,
   maxTileLevel,
@@ -633,6 +637,7 @@ export function DefectDistributionChart({
           className="relative border-2 border-foreground/60 bg-muted/5 overflow-hidden"
           style={{ width: plateWidth, height: perSurfaceHeight }}
           onDragStart={(e) => e.preventDefault()}
+          onMouseLeave={() => onDefectHoverEnd?.()}
           onClick={(e) => {
             if (
               !meta ||
@@ -753,6 +758,13 @@ export function DefectDistributionChart({
                   e.stopPropagation();
                   onDefectSelect?.(defect.id);
                 }}
+                onMouseEnter={(e) =>
+                  onDefectHover?.(defect, { screenX: e.clientX, screenY: e.clientY })
+                }
+                onMouseMove={(e) =>
+                  onDefectHover?.(defect, { screenX: e.clientX, screenY: e.clientY })
+                }
+                onMouseLeave={() => onDefectHoverEnd?.()}
                 className={`absolute border-2 ${borderColor} ${showSampleData ? "opacity-40" : "opacity-30"} ${
                   isSelected
                     ? "ring-2 ring-offset-2 ring-primary/80 ring-offset-background"

@@ -152,6 +152,9 @@ export interface ConfigMateMeta {
   connection_mode?: "development" | "production" | "cors" | string;
   api_base_url?: string;
   service_name?: string;
+  company_name?: string;
+  service_version?: string;
+  ui_version?: string;
 }
 
 export interface ConfigMatePayload {
@@ -851,6 +854,9 @@ export async function getConfigMate(): Promise<ConfigMatePayload> {
         connection_mode: "development",
         api_base_url: "http://127.0.0.1:8120/api",
         service_name: "Defect Detection",
+        company_name: "数据测试平台",
+        service_version: "0.0.0",
+        ui_version: "0.0.0",
       },
       lines: [],
       defaults: {},

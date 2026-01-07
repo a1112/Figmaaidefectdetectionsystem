@@ -38,6 +38,8 @@ interface DefectImageViewProps {
   imageViewMode: "full" | "single";
   selectedDefectId: string | null;
   onDefectSelect: (id: string | null) => void;
+  onDefectHover?: (defect: Defect, position: { screenX: number; screenY: number }) => void;
+  onDefectHoverEnd?: () => void;
   surfaceImageInfo?: SurfaceImageInfo[] | null;
   onViewportChange?: (info: ViewportInfo | null) => void;
   centerTarget?: { x: number; y: number } | null;
@@ -59,6 +61,8 @@ export function DefectImageView({
   imageViewMode,
   selectedDefectId,
   onDefectSelect,
+  onDefectHover,
+  onDefectHoverEnd,
   surfaceImageInfo,
   onViewportChange,
   centerTarget,
@@ -69,6 +73,7 @@ export function DefectImageView({
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [isLoadingImage, setIsLoadingImage] = useState(false);
+  const [cursor, setCursor] = useState("grab");
 
   const seqNo = useMemo(() => {
     if (!selectedPlate) return null;
@@ -141,6 +146,24 @@ export function DefectImageView({
         } => item !== null,
       );
   }, [defects, layout, imageOrientation]);
+
+  const hitTestDefect = useCallback(
+    (worldX: number, worldY: number) => {
+      for (const item of worldDefectRects) {
+        const rect = item.rect;
+        if (
+          worldX >= rect.x &&
+          worldX <= rect.x + rect.width &&
+          worldY >= rect.y &&
+          worldY <= rect.y + rect.height
+        ) {
+          return item.defect;
+        }
+      }
+      return null;
+    },
+    [worldDefectRects],
+  );
 
   useEffect(() => {
     onViewportChange?.(null);
@@ -372,8 +395,8 @@ export function DefectImageView({
         ctx.fillStyle = stroke;
         ctx.fillText(
           surfaceLayout.surface === "top"
-            ? "TOP SURFACE"
-            : "BOTTOM SURFACE",
+            ? "上表"
+            : "下表",
           0,
           0,
         );
@@ -474,6 +497,20 @@ export function DefectImageView({
       focusTarget={focusTarget}
       centerTarget={centerTarget ?? null}
       onViewportChange={(info) => onViewportChange?.(info)}
+      onPointerMove={(info) => {
+        const hit = hitTestDefect(info.worldX, info.worldY);
+        setCursor(hit ? "pointer" : "grab");
+        if (hit && onDefectHover) {
+          onDefectHover(hit, { screenX: info.screenX, screenY: info.screenY });
+        } else {
+          onDefectHoverEnd?.();
+        }
+      }}
+      onPointerLeave={() => {
+        setCursor("grab");
+        onDefectHoverEnd?.();
+      }}
+      cursor={cursor}
       panMargin={PAN_MARGIN}
       fitToHeight={imageOrientation === "vertical"}
     />

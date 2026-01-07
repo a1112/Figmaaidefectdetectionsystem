@@ -28,6 +28,8 @@ interface ImagesTabProps {
   onPreferredLevelChange: (level: number) => void;
   defaultTileSize: number;
   maxTileLevel: number;
+  onDefectHover?: (defect: Defect, position: { screenX: number; screenY: number }) => void;
+  onDefectHoverEnd?: () => void;
 }
 
 export function ImagesTab({
@@ -42,18 +44,46 @@ export function ImagesTab({
   onPreferredLevelChange,
   defaultTileSize,
   maxTileLevel,
+  onDefectHover,
+  onDefectHoverEnd,
 }: ImagesTabProps) {
+  const [hoveredDefect, setHoveredDefect] = useState<Defect | null>(null);
+  const [cursor, setCursor] = useState("grab");
+  const selectedPlate = useMemo(
+    () =>
+      selectedPlateId
+        ? steelPlates.find((plate) => plate.serialNumber === selectedPlateId)
+        : undefined,
+    [selectedPlateId, steelPlates],
+  );
+  const plateWidth = selectedPlate?.dimensions.width ?? 0;
+  const plateLength = selectedPlate?.dimensions.length ?? 0;
+  const distLeft = hoveredDefect ? Math.round(hoveredDefect.x) : null;
+  const distHead = hoveredDefect ? Math.round(hoveredDefect.y) : null;
+  const distRight =
+    hoveredDefect && plateWidth > 0
+      ? Math.max(0, Math.round(plateWidth - (hoveredDefect.x + hoveredDefect.width)))
+      : null;
+  const distTail =
+    hoveredDefect && plateLength > 0
+      ? Math.max(0, Math.round(plateLength - (hoveredDefect.y + hoveredDefect.height)))
+      : null;
+
   return (
     <div className="h-full flex flex-col gap-2">
       <div className="text-xs text-muted-foreground flex items-center justify-between gap-2">
-        <span>钢板长带虚拟图像（滚轮缩放，拖动平移）</span>
+        <span>缺陷信息栏</span>
+        {hoveredDefect ? (
+          <span className="text-[11px] font-mono">
+            {hoveredDefect.type} | {hoveredDefect.surface === "top" ? "上表" : "下表"} | ID: {hoveredDefect.id} | 距头:{distHead} 距尾:{distTail ?? "--"} 距左:{distLeft} 距右:{distRight ?? "--"}
+          </span>
+        ) : (
+          <span className="text-[11px] font-mono">--</span>
+        )}
         <span className="font-mono">当前瓦片等级: L{activeTileLevel}</span>
       </div>
       <div className="flex-1 min-h-0 bg-card border border-border relative">
         {(() => {
-          const selectedPlate = selectedPlateId
-            ? steelPlates.find((plate) => plate.serialNumber === selectedPlateId)
-            : undefined;
           if (!selectedPlate) {
             return (
               <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
@@ -157,6 +187,20 @@ export function ImagesTab({
                 return "#22c55e";
             }
           };
+          const hitTestDefect = (worldX: number, worldY: number) => {
+            for (const item of defectWorldRects) {
+              const rect = item.rect;
+              if (
+                worldX >= rect.x &&
+                worldX <= rect.x + rect.width &&
+                worldY >= rect.y &&
+                worldY <= rect.y + rect.height
+              ) {
+                return item.defect;
+              }
+            }
+            return null;
+          };
           const renderTile = (
             ctx: CanvasRenderingContext2D,
             tile: Tile,
@@ -165,7 +209,7 @@ export function ImagesTab({
           ) => {
             const surfaceLayout = pickSurfaceForTile(layout, tile);
             if (!surfaceLayout) {
-              ctx.fillStyle = "#f1f5f9";
+              ctx.fillStyle = "#0b1220";
               ctx.fillRect(tile.x, tile.y, tile.width, tile.height);
               return;
             }
@@ -179,7 +223,7 @@ export function ImagesTab({
               tileSize: tileSizeArg,
             });
             if (!requestInfo) {
-              ctx.fillStyle = "#f1f5f9";
+              ctx.fillStyle = "#0b1220";
               ctx.fillRect(tile.x, tile.y, tile.width, tile.height);
               return;
             }
@@ -228,9 +272,9 @@ export function ImagesTab({
                 };
               }
               if (!drewFallback) {
-                ctx.fillStyle = "#e2e8f0";
+                ctx.fillStyle = "#0b1220";
                 ctx.fillRect(tile.x, tile.y, tile.width, tile.height);
-                ctx.strokeStyle = "#94a3b8";
+                ctx.strokeStyle = "#1f2937";
                 ctx.lineWidth = 1 / scale;
                 ctx.strokeRect(tile.x, tile.y, tile.width, tile.height);
               }
@@ -294,8 +338,8 @@ export function ImagesTab({
               ctx.fillStyle = stroke;
               ctx.fillText(
                 surfaceLayout.surface === "top"
-                  ? "TOP SURFACE"
-                  : "BOTTOM SURFACE",
+                  ? "上表"
+                  : "下表",
                 0,
                 0,
               );
@@ -307,13 +351,37 @@ export function ImagesTab({
               imageWidth={layout.worldWidth}
               imageHeight={layout.worldHeight}
               tileSize={viewerTileSize}
-              className="bg-slate-50"
+              className="bg-[#0d1117]"
               maxLevel={maxTileLevel}
               prefetchMargin={400}
               onPreferredLevelChange={onPreferredLevelChange}
               renderTile={renderTile}
               renderOverlay={renderOverlay}
               panMargin={200}
+              cursor={cursor}
+              onPointerMove={(info) => {
+                const hit = hitTestDefect(info.worldX, info.worldY);
+                setCursor(hit ? "pointer" : "grab");
+                if (hit) {
+                  setHoveredDefect(hit);
+                  if (activeTileLevel > 1) {
+                    onDefectHover?.(hit, {
+                      screenX: info.screenX,
+                      screenY: info.screenY,
+                    });
+                  } else {
+                    onDefectHoverEnd?.();
+                  }
+                } else {
+                  setHoveredDefect(null);
+                  onDefectHoverEnd?.();
+                }
+              }}
+              onPointerLeave={() => {
+                setCursor("grab");
+                setHoveredDefect(null);
+                onDefectHoverEnd?.();
+              }}
             />
           );
         })()}

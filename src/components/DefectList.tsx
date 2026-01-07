@@ -9,6 +9,8 @@ interface DefectListProps {
   };
   selectedDefectId?: string | null;
   onDefectSelect?: (id: string | null) => void;
+  onDefectHover?: (defect: Defect, position: { screenX: number; screenY: number }) => void;
+  onDefectHoverEnd?: () => void;
 }
 
 export function DefectList({
@@ -17,6 +19,8 @@ export function DefectList({
   defectColors,
   selectedDefectId,
   onDefectSelect,
+  onDefectHover,
+  onDefectHoverEnd,
 }: DefectListProps) {
   const getSeverityColor = (severity: string) => {
     switch (severity) {
@@ -137,6 +141,13 @@ export function DefectList({
             <div
               key={`${defect.id}-${index}`}
               onClick={() => onDefectSelect?.(defect.id)}
+              onMouseEnter={(e) =>
+                onDefectHover?.(defect, { screenX: e.clientX, screenY: e.clientY })
+              }
+              onMouseMove={(e) =>
+                onDefectHover?.(defect, { screenX: e.clientX, screenY: e.clientY })
+              }
+              onMouseLeave={() => onDefectHoverEnd?.()}
               className={`flex items-center gap-2 px-2 py-1.5 border bg-card hover:bg-accent/50 transition-colors text-xs cursor-pointer ${
                 isSelected
                   ? "border-primary bg-primary/10"

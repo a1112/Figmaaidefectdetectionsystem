@@ -3,6 +3,7 @@ import {
   useEffect,
   useRef,
   useCallback,
+  useMemo,
 } from "react";
 import { DefectReport } from "../components/DefectReport";
 import {
@@ -63,6 +64,7 @@ import { PlatesTab } from "./PlatesTab";
 import { ImagesTab } from "./ImagesTab";
 import { useTheme } from "../components/ThemeContext";
 import { ModernSettingsModal } from "../components/modals/ModernSettingsModal";
+import { DefectHoverTooltip } from "../components/DefectHoverTooltip";
 
 export function Dashboard() {
   const { currentTheme } = useTheme();
@@ -86,6 +88,11 @@ export function Dashboard() {
   const [selectedDefectId, setSelectedDefectId] = useState<
     string | null
   >(null); // 选中的缺陷ID
+  const [hoveredDefect, setHoveredDefect] = useState<{
+    defect: Defect;
+    screenX: number;
+    screenY: number;
+  } | null>(null);
   const [imageViewMode, setImageViewMode] = useState<
     "full" | "single"
   >("full"); // 图像显示模式：大图/单缺陷
@@ -112,6 +119,17 @@ export function Dashboard() {
 
   const [showDistributionImages, setShowDistributionImages] = useState(true);
   const [showTileBorders, setShowTileBorders] = useState(false);
+
+  const handleDefectHover = useCallback(
+    (defect: Defect, position: { screenX: number; screenY: number }) => {
+      setHoveredDefect({ defect, screenX: position.screenX, screenY: position.screenY });
+    },
+    [],
+  );
+
+  const handleDefectHoverEnd = useCallback(() => {
+    setHoveredDefect(null);
+  }, []);
   
   const [manualConfirmStatus, setManualConfirmStatus] =
     useState<
@@ -460,6 +478,14 @@ export function Dashboard() {
     const [steelPlates, setSteelPlates] = useState<SteelPlate[]>(
       [],
     );
+    const hoveredPlate = useMemo(() => {
+      if (!selectedPlateId) return null;
+      return (
+        steelPlates.find(
+          (plate) => plate.serialNumber === selectedPlateId,
+        ) || null
+      );
+    }, [selectedPlateId, steelPlates]);
     const [isLoadingSteels, setIsLoadingSteels] = useState(false);
     const [surfaceImageInfo, setSurfaceImageInfo] = useState<
       SurfaceImageInfo[] | null
@@ -940,6 +966,8 @@ export function Dashboard() {
                     }
                     defaultTileSize={defaultTileSize}
                     maxTileLevel={maxTileLevel}
+                    onDefectHover={handleDefectHover}
+                    onDefectHoverEnd={handleDefectHoverEnd}
                   />
                 )}
 
@@ -975,6 +1003,8 @@ export function Dashboard() {
                     maxTileLevel={maxTileLevel}
                     showDistributionImages={showDistributionImages}
                     showTileBorders={showTileBorders}
+                    onDefectHover={handleDefectHover}
+                    onDefectHoverEnd={handleDefectHoverEnd}
                   />
                 )}
 
@@ -1128,6 +1158,21 @@ export function Dashboard() {
         setShowTileBorders={setShowTileBorders}
       />
       <Toaster />
+      {hoveredDefect && (
+        <DefectHoverTooltip
+          defect={hoveredDefect.defect}
+          screenX={hoveredDefect.screenX}
+          screenY={hoveredDefect.screenY}
+          plateSize={
+            hoveredPlate
+              ? {
+                  width: hoveredPlate.dimensions.width,
+                  length: hoveredPlate.dimensions.length,
+                }
+              : undefined
+          }
+        />
+      )}
     </div>
   );
 }
