@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import {
   Shield,
   Palette,
-  Factory,
   Network,
   X,
   ArrowLeft,
@@ -21,7 +20,6 @@ import { StatusBar } from "../components/layout/StatusBar";
 import { UISettings } from "../components/backend/UISettings";
 import { MockDataEditor } from "../components/backend/MockDataEditor";
 import { PermissionsPanel } from "../components/backend/PermissionsPanel";
-import { LineConfigTable } from "../components/backend/LineConfigTable";
 import { ProxySettings } from "../components/backend/ProxySettings";
 import { SystemInfoPanel } from "../components/backend/SystemInfoPanel";
 import { ServiceSettings } from "../components/backend/ServiceSettings";
@@ -36,7 +34,6 @@ type MenuKey =
   | "system"
   | "permissions"
   | "ui"
-  | "production"
   | "proxy"
   | "proxy"
   | "cache"
@@ -63,11 +60,6 @@ const menuItems: MenuItem[] = [
     key: "ui",
     label: "UI设置",
     icon: <Palette className="w-5 h-5" />,
-  },
-  {
-    key: "production",
-    label: "产线编辑",
-    icon: <Factory className="w-5 h-5" />,
   },
   {
     key: "cache",
@@ -232,8 +224,6 @@ export const BackendManagement: React.FC = () => {
         return <SystemInfoPanel />;
       case "ui":
         return <UISettings />;
-      case "production":
-        return <LineConfigTable />;
       case "proxy":
         return <ProxySettings />;
       case "cache":

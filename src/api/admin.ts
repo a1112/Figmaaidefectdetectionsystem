@@ -203,27 +203,28 @@ export interface CacheLineConfig {
   ip?: string;
   port?: number | null;
   overrides?: { images?: Record<string, any> };
-  effective?: { images?: Record<string, any> };
+  views?: { view: string; images: Record<string, any> }[];
 }
 
 export interface CacheConfig {
   hostname?: string;
-  map_root?: string;
-  map_root_name?: string;
+  config_root?: string;
+  config_root_name?: string;
+  map_path?: string;
+  server_path?: string;
   templates: {
     default?: Record<string, any>;
-    small?: Record<string, any>;
   };
   defaults: {
     images?: Record<string, any>;
     [key: string]: any;
   };
+  views?: Record<string, any>;
   lines?: CacheLineConfig[];
 }
 
 export interface CacheTemplateUpdatePayload {
   default?: Record<string, any>;
-  small?: Record<string, any>;
 }
 
 export interface CacheLineUpdatePayload {
@@ -989,8 +990,10 @@ export async function getCacheConfig(): Promise<CacheConfig> {
   if (env.isDevelopment()) {
     return {
       hostname: "local-dev",
-      map_root: "configs/net_tabel/DATA/LOCAL-DEV",
-      map_root_name: "LOCAL-DEV",
+      config_root: "configs/current",
+      config_root_name: "current",
+      map_path: "configs/current/map.json",
+      server_path: "configs/current/server.json",
       templates: {
         default: {
           disk_cache_enabled: true,
@@ -999,16 +1002,21 @@ export async function getCacheConfig(): Promise<CacheConfig> {
           defect_cache_enabled: true,
           defect_cache_expand: 100,
         },
-        small: {
-          disk_cache_enabled: true,
-          disk_cache_max_tiles: 7000,
-          disk_cache_max_defects: 5000,
-          defect_cache_enabled: true,
-          defect_cache_expand: 100,
-        },
       },
       defaults: {
         images: {},
+      },
+      views: {
+        "2D": {
+          frame_width: 16384,
+          frame_height: 1024,
+          pixel_scale: 1.0,
+        },
+        small: {
+          frame_width: 8192,
+          frame_height: 512,
+          pixel_scale: 0.5,
+        },
       },
       lines: [
         {
@@ -1018,13 +1026,30 @@ export async function getCacheConfig(): Promise<CacheConfig> {
           mode: "direct",
           ip: "127.0.0.1",
           port: 8120,
-          effective: {
-            images: {
-              disk_cache_enabled: true,
-              defect_cache_enabled: true,
-              defect_cache_expand: 100,
+          views: [
+            {
+              view: "2D",
+              images: {
+                disk_cache_enabled: true,
+                defect_cache_enabled: true,
+                defect_cache_expand: 100,
+                frame_width: 16384,
+                frame_height: 1024,
+                pixel_scale: 1.0,
+              },
             },
-          },
+            {
+              view: "small",
+              images: {
+                disk_cache_enabled: true,
+                defect_cache_enabled: true,
+                defect_cache_expand: 100,
+                frame_width: 8192,
+                frame_height: 512,
+                pixel_scale: 0.5,
+              },
+            },
+          ],
         },
       ],
     };

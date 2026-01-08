@@ -232,9 +232,9 @@ export const LineConfigTable: React.FC = () => {
           </div>
           <div>
             <h2 className="text-lg font-bold tracking-tighter uppercase">Production Line Edit</h2>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-mono">
-              Source: net_tabel/map.json
-            </p>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-mono">
+                      Source: configs/current/map.json
+                    </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
