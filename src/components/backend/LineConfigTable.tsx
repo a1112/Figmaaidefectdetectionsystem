@@ -21,8 +21,9 @@ import {
 import { toast } from "sonner@2.0.3";
 import {
   getLineConfig,
+  getConfigApiList,
+  restartLine,
   saveLineConfig,
-  type LineConfigPayload,
   type ConfigApiNode,
 } from "../../api/admin";
 
@@ -47,7 +48,7 @@ const defaultLine: LineItem = {
 
 export const LineConfigTable: React.FC = () => {
   const [lines, setLines] = useState<LineItem[]>([]);
-  const [defaults, setDefaults] = useState<Record<string, any>>({});
+  const [views, setViews] = useState<Record<string, any>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [apiStatus, setApiStatus] = useState<Record<string, ConfigApiNode>>({});
@@ -62,7 +63,7 @@ export const LineConfigTable: React.FC = () => {
         getConfigApiList(),
       ]);
       setLines(payload.lines ?? []);
-      setDefaults(payload.defaults ?? {});
+      setViews(payload.views ?? {});
       const statusMap: Record<string, ConfigApiNode> = {};
       status.forEach((item) => {
         if (item.key) statusMap[item.key] = item;
@@ -114,7 +115,7 @@ export const LineConfigTable: React.FC = () => {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await saveLineConfig({ lines, defaults });
+      await saveLineConfig({ lines, views });
       toast.success("产线配置已保存");
     } catch (error) {
       const message =

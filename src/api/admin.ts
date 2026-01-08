@@ -58,7 +58,7 @@ export interface AdminPolicyPayload {
 
 export interface LineConfigPayload {
   lines: Record<string, any>[];
-  defaults?: Record<string, any>;
+  views?: Record<string, any>;
 }
 
 export interface ConfigApiNode {
@@ -234,8 +234,39 @@ export interface CacheLineUpdatePayload {
 
 export interface CacheConfigUpdatePayload {
   templates?: CacheTemplateUpdatePayload;
-  defaults?: Record<string, any>;
   lines?: CacheLineUpdatePayload[];
+}
+
+export interface TemplateConfigPayload {
+  server: {
+    database?: Record<string, any>;
+    images?: Record<string, any>;
+    cache?: Record<string, any>;
+  };
+  defect_class: Record<string, any>;
+}
+
+export interface TemplateConfigUpdatePayload {
+  server?: {
+    database?: Record<string, any>;
+    images?: Record<string, any>;
+    cache?: Record<string, any>;
+  };
+  defect_class?: Record<string, any>;
+}
+
+export interface LineViewOverridePayload {
+  view: string;
+  database?: Record<string, any>;
+  images?: Record<string, any>;
+  cache?: Record<string, any>;
+}
+
+export interface LineSettingsPayload {
+  key: string;
+  views: LineViewOverridePayload[];
+  defect_class_mode: "template" | "custom";
+  defect_class?: Record<string, any>;
 }
 
 const UI_SETTINGS_KEY = "admin_ui_settings";
@@ -660,13 +691,13 @@ export async function getLineConfig(): Promise<LineConfigPayload> {
       return { lines: [] };
     }
     const data = await response.json();
-    return { lines: data.lines ?? [], defaults: data.defaults ?? {} };
+    return { lines: data.lines ?? [], views: data.views ?? {} };
   } catch (error) {
     console.warn("⚠️ getLineConfig failed:", error);
     if (error instanceof TypeError && error.message === "Failed to fetch") {
       console.error(`Fetch error at ${url}. Possible CORS or Network issue.`);
     }
-    return { lines: [] };
+    return { lines: [], views: {} };
   }
 }
 
@@ -997,8 +1028,7 @@ export async function getCacheConfig(): Promise<CacheConfig> {
       templates: {
         default: {
           disk_cache_enabled: true,
-          disk_cache_max_tiles: 2000,
-          disk_cache_max_defects: 1000,
+          disk_cache_max_records: 20000,
           defect_cache_enabled: true,
           defect_cache_expand: 100,
         },
@@ -1098,6 +1128,81 @@ export async function updateCacheConfig(payload: CacheConfigUpdatePayload): Prom
     console.error("❌ updateCacheConfig failed:", error);
     throw error;
   }
+}
+
+export async function getTemplateConfig(): Promise<TemplateConfigPayload> {
+  if (env.isDevelopment()) {
+    return {
+      server: { database: {}, images: {}, cache: {} },
+      defect_class: {},
+    };
+  }
+  const url = `${getAdminBaseUrl()}/config/template`;
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new Error(data?.detail || "加载模板配置失败");
+  }
+  return (await response.json()) as TemplateConfigPayload;
+}
+
+export async function updateTemplateConfig(
+  payload: TemplateConfigUpdatePayload,
+): Promise<TemplateConfigPayload> {
+  if (env.isDevelopment()) {
+    console.warn("updateTemplateConfig called in development mode; no-op.");
+    return getTemplateConfig();
+  }
+  const url = `${getAdminBaseUrl()}/config/template`;
+  const response = await fetch(url, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new Error(data?.detail || "保存模板配置失败");
+  }
+  return (await response.json()) as TemplateConfigPayload;
+}
+
+export async function getLineSettings(key: string): Promise<LineSettingsPayload> {
+  if (env.isDevelopment()) {
+    return {
+      key,
+      views: [],
+      defect_class_mode: "template",
+      defect_class: {},
+    };
+  }
+  const url = `${getAdminBaseUrl()}/config/line-settings/${encodeURIComponent(key)}`;
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new Error(data?.detail || "加载产线配置失败");
+  }
+  return (await response.json()) as LineSettingsPayload;
+}
+
+export async function updateLineSettings(
+  key: string,
+  payload: Omit<LineSettingsPayload, "key">,
+): Promise<LineSettingsPayload> {
+  if (env.isDevelopment()) {
+    console.warn("updateLineSettings called in development mode; no-op.");
+    return getLineSettings(key);
+  }
+  const url = `${getAdminBaseUrl()}/config/line-settings/${encodeURIComponent(key)}`;
+  const response = await fetch(url, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new Error(data?.detail || "保存产线配置失败");
+  }
+  return (await response.json()) as LineSettingsPayload;
 }
 
 export async function restartLine(lineKey: string): Promise<void> {

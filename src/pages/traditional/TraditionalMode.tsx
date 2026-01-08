@@ -6,7 +6,7 @@ import {
   Maximize2, Minimize2, Minus, ZoomIn, ZoomOut, RefreshCcw, Clock, RotateCw, Gavel,
   Layout, BarChart3, AlertCircle, FileText, ChevronDown, Activity, Download,
   LogOut, Box, Terminal, Home, Calendar, LayoutGrid, Filter, ArrowUpToLine, X, Link2, ArrowLeftRight,
-  PanelRightOpen, PanelRightClose, Target, Locate
+  PanelRightOpen, PanelRightClose, Target, Locate, Wrench, FlaskConical
 } from "lucide-react";
 import { StatusBar } from "../../components/layout/StatusBar";
 import { motion, AnimatePresence } from 'motion/react';
@@ -36,6 +36,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from "../../components/ui/dropdown-menu";
+import { getTestModelStatus } from "../../api/testModel";
 import {
   Avatar,
   AvatarFallback,
@@ -155,6 +156,7 @@ export default function TraditionalMode() {
   const [activeNav, setActiveNav] = useState("缺陷分析");
   const [showMainMenu, setShowMainMenu] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [testModelEnabled, setTestModelEnabled] = useState(false);
   const [isDiagnosticOpen, setIsDiagnosticOpen] = useState(false);
   const isElectron = typeof window !== "undefined" && !!window.electronWindow;
   const isTauri =
@@ -273,6 +275,20 @@ export default function TraditionalMode() {
     } catch (error) {
       console.error("Failed to refresh data sources", error);
     }
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    getTestModelStatus()
+      .then((status) => {
+        if (mounted) setTestModelEnabled(Boolean(status.enabled));
+      })
+      .catch(() => {
+        if (mounted) setTestModelEnabled(false);
+      });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const loadPlatesWithCriteria = useCallback(
@@ -1796,6 +1812,69 @@ export default function TraditionalMode() {
                 </div>
               </div>
               <div className="flex items-center gap-3 text-[#8b949e]">
+                <LiveClock formatTime={formatTime} />
+                {isWebOnly && (
+                  <button
+                    onClick={() => navigate("/download")}
+                    className="text-[#8b949e] hover:text-[#58a6ff] transition-colors"
+                    title="下载中心"
+                  >
+                    <Download className="w-4 h-4" />
+                  </button>
+                )}
+                <button
+                  onClick={() => navigate("/reports")}
+                  className="text-[#8b949e] hover:text-[#58a6ff] transition-colors"
+                  title="报表"
+                >
+                  <BarChart3 className="w-4 h-4" />
+                </button>
+                <button
+                  ref={diagnosticButtonRef}
+                  onClick={() => setIsDiagnosticOpen(true)}
+                  className="text-[#8b949e] hover:text-[#58a6ff] transition-colors"
+                  title="系统诊断"
+                >
+                  <Activity className="w-4 h-4" />
+                </button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className="text-[#8b949e] hover:text-[#58a6ff] transition-colors"
+                      title="工具"
+                    >
+                      <Wrench className="w-4 h-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    className="w-48 bg-[#161b22] border-[#30363d] text-[#c9d1d9]"
+                  >
+                    <DropdownMenuLabel className="text-[#8b949e] font-normal">
+                      工具
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator className="bg-[#30363d]" />
+                    <DropdownMenuItem
+                      onClick={() => navigate("/cache")}
+                      className="cursor-pointer focus:bg-[#21262d] focus:text-[#f0f6fc] text-xs flex items-center gap-2"
+                    >
+                      <Database className="w-3.5 h-3.5" />
+                      缓存调试
+                    </DropdownMenuItem>
+                    {testModelEnabled && (
+                      <DropdownMenuItem
+                        onClick={() => navigate("/test_model")}
+                        className="cursor-pointer focus:bg-[#21262d] focus:text-[#f0f6fc] text-xs flex items-center gap-2"
+                      >
+                        <FlaskConical className="w-3.5 h-3.5" />
+                        模拟运行测试
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <button onClick={() => setIsSettingsOpen(true)} className="text-[#8b949e] hover:text-white transition-colors" title="系统设置">
+                  <Settings className="w-4 h-4" />
+                </button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button className="relative inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full p-0 shadow-sm shadow-black/30 focus:outline-none hover:text-white transition-colors">
@@ -1870,34 +1949,6 @@ export default function TraditionalMode() {
                     )}
                   </DropdownMenuContent>
                 </DropdownMenu>
-                {isWebOnly && (
-                  <button
-                    onClick={() => navigate("/download")}
-                    className="text-[#8b949e] hover:text-[#58a6ff] transition-colors"
-                    title="下载中心"
-                  >
-                    <Download className="w-4 h-4" />
-                  </button>
-                )}
-                <button
-                  onClick={() => navigate("/reports")}
-                  className="text-[#8b949e] hover:text-[#58a6ff] transition-colors"
-                  title="报表"
-                >
-                  <BarChart3 className="w-4 h-4" />
-                </button>
-                <button
-                  ref={diagnosticButtonRef}
-                  onClick={() => setIsDiagnosticOpen(true)}
-                  className="text-[#8b949e] hover:text-[#58a6ff] transition-colors"
-                  title="系统诊断"
-                >
-                  <Activity className="w-4 h-4" />
-                </button>
-                <LiveClock formatTime={formatTime} />
-                <button onClick={() => setIsSettingsOpen(true)} className="text-[#8b949e] hover:text-white transition-colors" title="系统设置">
-                  <Settings className="w-4 h-4" />
-                </button>
               </div>
               {hasWindowControls && (
                 <div className="flex items-center gap-1 text-[#c9d1d9]">

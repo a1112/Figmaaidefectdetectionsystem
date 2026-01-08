@@ -16,6 +16,8 @@ import {
   Database,
   Shield,
   Monitor,
+  Wrench,
+  FlaskConical,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -43,6 +45,7 @@ import { DataSourceModal } from "../modals/DataSourceModal";
 import type { ApiNode } from "../../api/types";
 import { useNavigate } from "react-router-dom";
 import type { AuthUser } from "../../api/admin";
+import { getTestModelStatus } from "../../api/testModel";
 
 interface TitleBarProps {
   activeTab: ActiveTab;
@@ -159,6 +162,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   const [isDataSourceOpen, setIsDataSourceOpen] =
     useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
+  const [clockNow, setClockNow] = useState(new Date());
   const [currentUser, setCurrentUser] =
     useState<AuthUser | null>(() => {
       const raw = window.localStorage.getItem("auth_user");
@@ -169,6 +173,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
         return null;
       }
     });
+  const [testModelEnabled, setTestModelEnabled] = useState(false);
   const navigate = useNavigate();
   const saveUser = (user: AuthUser | null) => {
     if (!user) {
@@ -188,6 +193,25 @@ export const TitleBar: React.FC<TitleBarProps> = ({
       .then(setIsMaximized)
       .catch(() => undefined);
   }, [isElectron]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setClockNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    getTestModelStatus()
+      .then((status) => {
+        if (mounted) setTestModelEnabled(Boolean(status.enabled));
+      })
+      .catch(() => {
+        if (mounted) setTestModelEnabled(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handlePrevPlate = () => {
     if (filteredSteelPlates.length === 0) return;
@@ -398,6 +422,19 @@ export const TitleBar: React.FC<TitleBarProps> = ({
 
         <div className="flex items-center gap-2">
           {/* 功能按钮 */}
+          <div className="flex items-center gap-2 rounded-sm border border-border bg-background/50 px-2 py-1 text-[11px] text-muted-foreground font-mono">
+            <span>
+              {clockNow.toLocaleString("zh-CN", {
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                hour12: false,
+              }).replace(/\//g, "-")}
+            </span>
+          </div>
           {isWebOnly && (
             <button
               onClick={() => navigate("/download")}
@@ -425,6 +462,39 @@ export const TitleBar: React.FC<TitleBarProps> = ({
           >
             <Activity className="w-4 h-4" />
           </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="p-1.5 hover:bg-white/10 rounded transition-colors"
+                title="工具"
+              >
+                <Wrench className="w-4 h-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              className="w-44 bg-card border-border text-foreground"
+            >
+              <DropdownMenuLabel>工具</DropdownMenuLabel>
+              <DropdownMenuSeparator className="bg-border" />
+              <DropdownMenuItem
+                onClick={() => navigate("/cache")}
+                className="cursor-pointer focus:bg-accent focus:text-accent-foreground text-xs flex items-center gap-2"
+              >
+                <Database className="w-3.5 h-3.5" />
+                缓存调试
+              </DropdownMenuItem>
+              {testModelEnabled && (
+                <DropdownMenuItem
+                  onClick={() => navigate("/test_model")}
+                  className="cursor-pointer focus:bg-accent focus:text-accent-foreground text-xs flex items-center gap-2"
+                >
+                  <FlaskConical className="w-3.5 h-3.5" />
+                  模拟运行测试
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <button
             onClick={onOpenSettings}
             className="p-1.5 hover:bg-white/10 rounded transition-colors"
