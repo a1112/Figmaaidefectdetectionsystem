@@ -168,6 +168,33 @@ export interface ConfigMateResponse {
   payload: ConfigMatePayload | ConfigMatePayload[] | Record<string, any>;
 }
 
+export interface DownloadBuild {
+  version: string;
+  label: string;
+  file_name: string;
+  size_bytes: number;
+  size_display: string;
+  download_url: string;
+  released_at?: string | null;
+}
+
+export interface DownloadPlatform {
+  key: string;
+  label: string;
+  supported: boolean;
+  requirements: string[];
+  builds: DownloadBuild[];
+  latest_version?: string;
+}
+
+export interface DownloadInfo {
+  latest_version: string;
+  history_versions: string[];
+  platforms: DownloadPlatform[];
+  updated_at?: string;
+  notes?: string[];
+}
+
 export interface CacheLineConfig {
   name?: string;
   key: string;
@@ -892,6 +919,70 @@ export async function getConfigMate(): Promise<ConfigMatePayload> {
     console.warn("⚠️ getConfigMate failed:", error);
     return { lines: [], defaults: {} };
   }
+}
+
+export async function getDownloadInfo(): Promise<DownloadInfo> {
+  if (env.isDevelopment()) {
+    return {
+      latest_version: "0.1.0",
+      history_versions: ["0.1.0"],
+      platforms: [
+        {
+          key: "windows",
+          label: "Windows",
+          supported: true,
+          requirements: ["Windows 10/11", "x64 处理器", "建议 8GB 内存"],
+          latest_version: "0.1.0",
+          builds: [
+            {
+              version: "0.1.0",
+              label: "Windows 安装包 (EXE)",
+              file_name: "DefectDetection Setup 0.1.0.exe",
+              size_bytes: 0,
+              size_display: "--",
+              download_url: "/config/download/files/0.1.0/windows/DefectDetection%20Setup%200.1.0.exe",
+              released_at: null,
+            },
+          ],
+        },
+        {
+          key: "linux",
+          label: "Linux",
+          supported: false,
+          requirements: [],
+          builds: [],
+        },
+        {
+          key: "macos",
+          label: "macOS",
+          supported: false,
+          requirements: [],
+          builds: [],
+        },
+        {
+          key: "android",
+          label: "Android",
+          supported: false,
+          requirements: [],
+          builds: [],
+        },
+        {
+          key: "ios",
+          label: "iOS",
+          supported: false,
+          requirements: [],
+          builds: [],
+        },
+      ],
+      updated_at: new Date().toISOString(),
+    };
+  }
+  const url = `${getAdminBaseUrl()}/download/info`;
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`加载下载信息失败: ${response.status}`);
+  }
+  return (await response.json()) as DownloadInfo;
 }
 
 export async function getCacheConfig(): Promise<CacheConfig> {

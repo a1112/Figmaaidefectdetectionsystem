@@ -4,7 +4,7 @@ import {
   Menu, Bell, User, Settings, Database, Shield, Monitor, 
   ChevronLeft, ChevronRight, Search, Play, Pause, Square,
   Maximize2, Minimize2, Minus, ZoomIn, ZoomOut, RefreshCcw, Clock, RotateCw, Gavel,
-  Layout, BarChart3, AlertCircle, FileText, ChevronDown, Activity,
+  Layout, BarChart3, AlertCircle, FileText, ChevronDown, Activity, Download,
   LogOut, Box, Terminal, Home, Calendar, LayoutGrid, Filter, ArrowUpToLine, X, Link2, ArrowLeftRight,
   PanelRightOpen, PanelRightClose, Target, Locate
 } from "lucide-react";
@@ -162,6 +162,7 @@ export default function TraditionalMode() {
   const canDrag = isElectron || isTauri;
   const useElectronDragRegion = isElectron;
   const hasWindowControls = isElectron || isTauri;
+  const isWebOnly = !isElectron && !isTauri;
   const withTauriWindow = async (
     action: (appWindow: any) => Promise<void> | void,
   ) => {
@@ -175,6 +176,7 @@ export default function TraditionalMode() {
   };
   const handleTauriDragStart = (event: React.MouseEvent<HTMLElement>) => {
     if (!isTauri || event.button !== 0) return;
+    if (event.detail > 1) return;
     const target = event.target as HTMLElement | null;
     if (
       target?.closest(
@@ -185,6 +187,28 @@ export default function TraditionalMode() {
     }
     event.preventDefault();
     void withTauriWindow((appWindow) => appWindow.startDragging());
+  };
+  const handleDragDoubleClick = (event: React.MouseEvent<HTMLElement>) => {
+    const target = event.target as HTMLElement | null;
+    if (
+      target?.closest(
+        'button, a, input, select, textarea, [role="button"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [data-radix-collection-item], [data-no-drag="true"]',
+      )
+    ) {
+      return;
+    }
+    event.preventDefault();
+    if (isElectron) {
+      window.electronWindow?.toggleMaximize?.().then((next) => {
+        if (typeof next === "boolean") setIsMaximized(next);
+      });
+      return;
+    }
+    void withTauriWindow(async (appWindow) => {
+      await appWindow.toggleMaximize();
+      const next = await appWindow.isMaximized();
+      if (typeof next === "boolean") setIsMaximized(next);
+    });
   };
   const [isMaximized, setIsMaximized] = useState(false);
   const diagnosticButtonRef = useRef<HTMLButtonElement>(null);
@@ -1648,6 +1672,7 @@ export default function TraditionalMode() {
             transition={{ duration: 0.3, ease: "easeInOut" }}
             className={`bg-[#161b22] border-b border-[#30363d] flex items-center px-3 shrink-0 overflow-hidden relative ${useElectronDragRegion ? "electron-drag" : ""}`}
             onMouseDown={handleTauriDragStart}
+            onDoubleClick={handleDragDoubleClick}
           >
             <div
               className={`flex items-center gap-4 ${canDrag ? "electron-no-drag" : ""}`}
@@ -1743,24 +1768,19 @@ export default function TraditionalMode() {
               </nav>
             </div>
 
-            <div
-              className={`absolute left-1/2 -translate-x-1/2 ${canDrag ? "electron-no-drag" : ""}`}
-            >
-              <button 
+            <div className={`flex items-center gap-6 flex-1 justify-center ${canDrag ? "electron-no-drag" : ""}`}>
+              <button
                 onClick={() => setIsDataSourceOpen(true)}
-                className="flex flex-col items-center group cursor-pointer hover:bg-[#30363d]/30 px-4 py-1 rounded transition-colors"
+                className="flex items-center gap-2 group cursor-pointer hover:bg-[#30363d]/30 px-4 py-1 rounded transition-colors"
               >
-                <div className="flex items-center gap-2">
-                  <span className="text-[14px] font-bold text-[#f0f6fc] tracking-[0.2em]">{companyName}</span>
-                  <ChevronDown className={`w-4 h-4 text-[#8b949e] transition-transform ${isDataSourceOpen ? 'rotate-180' : ''} group-hover:text-[#58a6ff]`} />
-                </div>
-                <span className="text-[10px] text-[#8b949e] uppercase group-hover:text-[#c9d1d9]">{currentLine}表面检测系统</span>
+                <span className="text-[14px] font-bold text-[#f0f6fc] tracking-[0.2em]">
+                  {currentLine || companyName}
+                </span>
+                <ChevronDown className={`w-4 h-4 text-[#8b949e] transition-transform ${isDataSourceOpen ? 'rotate-180' : ''} group-hover:text-[#58a6ff]`} />
               </button>
             </div>
 
-            <div
-              className={`ml-auto flex items-center gap-2 text-[11px] ${canDrag ? "electron-no-drag" : ""}`}
-            >
+            <div className={`shrink-0 flex items-center gap-2 text-[11px] ${canDrag ? "electron-no-drag" : ""}`}>
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#30363d]/30 text-[#8b949e] border border-[#30363d]">
                   <div className="text-[9px] uppercase font-bold opacity-60">CAM TEMP</div>
@@ -1850,6 +1870,22 @@ export default function TraditionalMode() {
                     )}
                   </DropdownMenuContent>
                 </DropdownMenu>
+                {isWebOnly && (
+                  <button
+                    onClick={() => navigate("/download")}
+                    className="text-[#8b949e] hover:text-[#58a6ff] transition-colors"
+                    title="下载中心"
+                  >
+                    <Download className="w-4 h-4" />
+                  </button>
+                )}
+                <button
+                  onClick={() => navigate("/reports")}
+                  className="text-[#8b949e] hover:text-[#58a6ff] transition-colors"
+                  title="报表"
+                >
+                  <BarChart3 className="w-4 h-4" />
+                </button>
                 <button
                   ref={diagnosticButtonRef}
                   onClick={() => setIsDiagnosticOpen(true)}

@@ -3,6 +3,8 @@ import { BrowserRouter, HashRouter, Routes, Route } from "react-router-dom";
 import { Dashboard } from "./pages/Dashboard";
 import { BackendManagement } from "./pages/BackendManagement";
 import TraditionalMode from "./pages/traditional/TraditionalMode";
+import DownloadPage from "./pages/Download";
+import ReportsRoute from "./pages/Reports";
 import { toast } from "sonner@2.0.3";
 import { ThemeProvider } from "./components/ThemeContext";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -55,6 +57,8 @@ export default function App() {
               element={<BackendManagement />}
             />
             <Route path="/TraditionalMode" element={<TraditionalMode />} />
+            <Route path="/download" element={<DownloadPage />} />
+            <Route path="/reports" element={<ReportsRoute />} />
           </Routes>
         </Router>
       </ThemeProvider>

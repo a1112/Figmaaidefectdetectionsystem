@@ -6,6 +6,7 @@ import {
   Activity,
   Settings,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import type { SteelPlate } from "../../types/app.types";
 import type {
   SearchCriteria,
@@ -42,6 +43,7 @@ export const PlatesPanel: React.FC<PlatesPanelProps> = ({
   setActiveTab,
   setIsDiagnosticDialogOpen,
 }) => {
+  const navigate = useNavigate();
   return (
     <div className="h-full flex flex-col bg-background">
       {/* 手机模式：顶部搜索栏 */}
@@ -264,8 +266,8 @@ export const PlatesPanel: React.FC<PlatesPanelProps> = ({
       >
         <button
           onClick={() => {
-            setActiveTab("reports");
             setShowPlatesPanel(false);
+            navigate("/reports");
           }}
           className={`flex items-center justify-center gap-2 rounded-lg transition-colors flex-1 text-muted-foreground hover:text-primary hover:bg-accent/50 ${
             isMobileDevice

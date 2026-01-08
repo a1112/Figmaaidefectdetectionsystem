@@ -11,6 +11,7 @@ import {
   AlertCircle,
   Images,
   BarChart3,
+  Download,
   Settings,
   Database,
   Shield,
@@ -90,6 +91,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   const canDrag = isElectron || isTauri;
   const useElectronDragRegion = isElectron;
   const hasWindowControls = isElectron || isTauri;
+  const isWebOnly = !isElectron && !isTauri;
   const withTauriWindow = async (
     action: (appWindow: any) => Promise<void> | void,
   ) => {
@@ -103,6 +105,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   };
   const handleTauriDragStart = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!isTauri || event.button !== 0) return;
+    if (event.detail > 1) return;
     const target = event.target as HTMLElement | null;
     if (
       target?.closest(
@@ -113,6 +116,18 @@ export const TitleBar: React.FC<TitleBarProps> = ({
     }
     event.preventDefault();
     void withTauriWindow((appWindow) => appWindow.startDragging());
+  };
+  const handleDragDoubleClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement | null;
+    if (
+      target?.closest(
+        'button, a, input, select, textarea, [role="button"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [data-radix-collection-item], [data-no-drag="true"]',
+      )
+    ) {
+      return;
+    }
+    event.preventDefault();
+    void handleToggleMaximize();
   };
   const handleMinimize = () => {
     if (isElectron) {
@@ -212,6 +227,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
     <div
       className={`h-10 bg-muted/40 backdrop-blur-md border-b border-white/10 flex items-center justify-between px-4 select-none shrink-0 z-20 ${useElectronDragRegion ? "electron-drag" : ""}`}
       onMouseDown={handleTauriDragStart}
+      onDoubleClick={handleDragDoubleClick}
     >
       {/* Left: Menu and Tab Buttons */}
       <div className={`flex items-center gap-3 ${canDrag ? "electron-no-drag" : ""}`}>
@@ -382,10 +398,19 @@ export const TitleBar: React.FC<TitleBarProps> = ({
 
         <div className="flex items-center gap-2">
           {/* 功能按钮 */}
+          {isWebOnly && (
+            <button
+              onClick={() => navigate("/download")}
+              className="p-1.5 hover:bg-white/10 rounded transition-colors"
+              title="下载中心"
+            >
+              <Download className="w-4 h-4" />
+            </button>
+          )}
           <button
             onClick={() => {
-              setActiveTab("reports");
               setShowPlatesPanel(false);
+              navigate("/reports");
             }}
             className="p-1.5 hover:bg-white/10 rounded transition-colors"
             title="报表"

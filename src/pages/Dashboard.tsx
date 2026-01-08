@@ -5,7 +5,7 @@ import {
   useCallback,
   useMemo,
 } from "react";
-import { DefectReport } from "../components/DefectReport";
+import { useNavigate } from "react-router-dom";
 import {
   SearchDialog,
   SearchCriteria,
@@ -67,6 +67,7 @@ import { ModernSettingsModal } from "../components/modals/ModernSettingsModal";
 import { DefectHoverTooltip } from "../components/DefectHoverTooltip";
 
 export function Dashboard() {
+  const navigate = useNavigate();
   const { currentTheme } = useTheme();
   const theme = currentTheme.colors.background === "#ffffff" ? "light" : "dark";
   
@@ -833,25 +834,8 @@ export function Dashboard() {
     });
   }, [activeTab, selectedPlateId, steelPlates]);
 
-  const getDefectStats = () => {
-    const stats: { [key: string]: number } = {};
-
-    availableDefectTypes.forEach((type) => {
-      stats[type] = 0;
-    });
-
-    history.forEach((record) => {
-      record.defects.forEach((defect) => {
-        if (stats[defect.type] !== undefined) {
-          stats[defect.type]++;
-        }
-      });
-    });
-
-    return availableDefectTypes.map((type) => ({
-      type,
-      count: stats[type] || Math.floor(Math.random() * 20) + 5,
-    }));
+  const navigateToReports = () => {
+    navigate("/reports");
   };
 
   return (
@@ -1008,14 +992,6 @@ export function Dashboard() {
                   />
                 )}
 
-                {activeTab === "reports" && (
-                  <DefectReport
-                    data={getDefectStats()}
-                    steelPlates={steelPlates}
-                    accentColors={defectAccentMap}
-                  />
-                )}
-
                 {activeTab === "plates" && (
                   <PlatesTab
                     isMobileDevice={isMobileDevice}
@@ -1054,8 +1030,8 @@ export function Dashboard() {
         >
           <button
             onClick={() => {
-              setActiveTab("reports");
               setShowPlatesPanel(false);
+              navigateToReports();
             }}
             className={`flex items-center justify-center gap-2 rounded-lg transition-colors flex-1 text-muted-foreground hover:text-primary hover:bg-accent/50 ${
               isMobileDevice
