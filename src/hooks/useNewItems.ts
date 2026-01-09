@@ -41,11 +41,11 @@ export function useNewItemKeys<T>(
     if (added.size > 0) {
       setNewKeys(added);
       timerRef.current = window.setTimeout(() => {
-        setNewKeys(new Set());
+        setNewKeys((prev) => (prev.size > 0 ? new Set() : prev));
         timerRef.current = null;
       }, durationMs);
     } else {
-      setNewKeys(new Set());
+      setNewKeys((prev) => (prev.size > 0 ? new Set() : prev));
     }
   }, [items, durationMs]);
 

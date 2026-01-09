@@ -1,17 +1,30 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, HardDrive, RefreshCcw, Settings, Trash2, RotateCw, FolderSync, Wrench } from "lucide-react";
+import {
+  ArrowLeft,
+  HardDrive,
+  RefreshCcw,
+  Settings,
+  Trash2,
+  RotateCw,
+  FolderSync,
+  Wrench,
+  PauseCircle,
+  PlayCircle,
+} from "lucide-react";
 import { toast } from "sonner@2.0.3";
 import { env } from "../config/env";
 import {
   deleteCacheRecords,
   getCacheSettings,
   getCacheStatus,
+  getCacheLogs,
   listCacheRecords,
   migrateCacheRoots,
+  pauseCache,
   precacheRecord,
   rebuildCacheRecords,
-  scanCacheRecord,
+  resumeCache,
   updateCacheSettings,
   type CacheSettingsResponse,
   type CacheStatus,
@@ -25,10 +38,13 @@ import {
   DialogTitle,
 } from "../components/ui/dialog";
 
-const STATUS_META = {
-  none: { label: "未缓存", color: "bg-muted-foreground/60" },
-  partial: { label: "缓存中", color: "bg-amber-400" },
-  complete: { label: "完成", color: "bg-emerald-500" },
+const STATUS_COLORS: Record<string, string> = {
+  missing: "bg-rose-500",
+  out_range: "bg-purple-500",
+  stale: "bg-blue-500",
+  running: "bg-amber-400",
+  complete: "bg-emerald-500",
+  none: "bg-muted-foreground/60",
 };
 
 const CACHE_FIELDS: Array<{
@@ -53,6 +69,20 @@ const CACHE_FIELDS: Array<{
   { key: "disk_precache_workers", label: "缓存线程数", type: "number" },
 ];
 
+const TASK_LABELS: Record<string, string> = {
+  delete: "删除",
+  rebuild: "重建",
+  auto: "自动缓存",
+  precache: "预热",
+};
+
+const MODE_LABELS: Record<string, string> = {
+  delete: "缓存删除模式",
+  rebuild: "缓存重建模式",
+  auto: "实时运行模式",
+  precache: "预热模式",
+};
+
 const formatTime = (value?: string | null) => {
   if (!value) return "--";
   const date = new Date(value);
@@ -72,13 +102,14 @@ export default function CacheDebug() {
   const navigate = useNavigate();
   const [items, setItems] = useState<CacheRecordItem[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(20);
+  const [pageSize] = useState(200);
   const [isLoading, setIsLoading] = useState(false);
-  const [scanTarget, setScanTarget] = useState<CacheRecordItem | null>(null);
   const [precacheTarget, setPrecacheTarget] = useState<CacheRecordItem | null>(null);
   const [precacheLevels, setPrecacheLevels] = useState(4);
   const [cacheStatus, setCacheStatus] = useState<CacheStatus | null>(null);
+  const [cacheLogs, setCacheLogs] = useState<any[]>([]);
+  const cacheLogCursorRef = useRef(0);
+  const logRef = useRef<HTMLDivElement | null>(null);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isRebuildOpen, setIsRebuildOpen] = useState(false);
   const [isMigrateOpen, setIsMigrateOpen] = useState(false);
@@ -95,20 +126,19 @@ export default function CacheDebug() {
   const [migrateTopRoot, setMigrateTopRoot] = useState("");
   const [migrateBottomRoot, setMigrateBottomRoot] = useState("");
   const [cacheSettings, setCacheSettings] = useState<CacheSettingsResponse | null>(null);
+  const [cacheRangeMin, setCacheRangeMin] = useState<number | null>(null);
 
   const lineKey = env.getLineName() || "未选择";
   const apiProfile = env.getApiProfile() === "small" ? "small" : "full";
-  const totalPages = useMemo(
-    () => Math.max(1, Math.ceil(total / pageSize)),
-    [total, pageSize],
-  );
+
 
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const resp = await listCacheRecords(page, pageSize);
+      const resp = await listCacheRecords(1, pageSize);
       setItems(resp.items);
       setTotal(resp.total);
+      setCacheRangeMin(resp.cache_range_min ?? null);
     } catch (error) {
       console.error("Load cache records failed", error);
       toast.error("加载缓存记录失败");
@@ -118,8 +148,13 @@ export default function CacheDebug() {
   };
 
   useEffect(() => {
+    let timer: number | null = null;
     void loadData();
-  }, [page]);
+    timer = window.setInterval(loadData, 5000);
+    return () => {
+      if (timer) window.clearInterval(timer);
+    };
+  }, [pageSize]);
 
   useEffect(() => {
     let timer: number | null = null;
@@ -138,18 +173,34 @@ export default function CacheDebug() {
     };
   }, []);
 
-  const handleScan = async () => {
-    if (!scanTarget) return;
-    try {
-      await scanCacheRecord(scanTarget.seq_no);
-      toast.success("缓存状态已刷新");
-      setScanTarget(null);
-      await loadData();
-    } catch (error) {
-      console.error("Scan cache failed", error);
-      toast.error("缓存状态刷新失败");
-    }
-  };
+  useEffect(() => {
+    let timer: number | null = null;
+    const loadLogs = async () => {
+      try {
+        const resp = await getCacheLogs(200, cacheLogCursorRef.current);
+        const nextItems = resp.items || [];
+        if (cacheLogCursorRef.current === 0) {
+          setCacheLogs(nextItems);
+        } else if (nextItems.length) {
+          setCacheLogs((prev) => [...prev, ...nextItems].slice(-500));
+        }
+        const nextCursor = resp.cursor || cacheLogCursorRef.current;
+        cacheLogCursorRef.current = nextCursor;
+      } catch (error) {
+        console.error("Load cache logs failed", error);
+      }
+    };
+    void loadLogs();
+    timer = window.setInterval(loadLogs, 2000);
+    return () => {
+      if (timer) window.clearInterval(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!logRef.current) return;
+    logRef.current.scrollTop = logRef.current.scrollHeight;
+  }, [cacheLogs]);
 
   const handlePrecache = async () => {
     if (!precacheTarget) return;
@@ -161,6 +212,22 @@ export default function CacheDebug() {
     } catch (error) {
       console.error("Precache failed", error);
       toast.error("磁盘缓存触发失败");
+    }
+  };
+
+  const handleTogglePause = async () => {
+    try {
+      if (cacheStatus?.paused) {
+        await resumeCache();
+        toast.success("缓存已恢复");
+      } else {
+        await pauseCache();
+        toast.success("缓存已暂停");
+      }
+      await loadCacheStatus();
+    } catch (error) {
+      console.error("Toggle cache pause failed", error);
+      toast.error("缓存暂停/恢复失败");
     }
   };
 
@@ -236,6 +303,23 @@ export default function CacheDebug() {
     }
   };
 
+  const resolveSurface = (item: CacheRecordItem, surface: "top" | "bottom") =>
+    item.surfaces.find((entry) => entry.surface === surface);
+
+  const resolveCellState = (item: CacheRecordItem, surface: "top" | "bottom") => {
+    const target = resolveSurface(item, surface);
+    if (target?.image_missing) return "missing";
+    if (cacheRangeMin !== null && item.seq_no < cacheRangeMin) return "out_range";
+    if (target?.stale) return "stale";
+    if (cacheStatus?.seq_no === item.seq_no && cacheStatus?.state !== "ready") {
+      if (!cacheStatus.surface || cacheStatus.surface === surface) {
+        return "running";
+      }
+    }
+    if (target?.cached) return "complete";
+    return "none";
+  };
+
   return (
     <div className="h-screen w-full bg-background text-foreground flex flex-col overflow-hidden">
       <div className="h-12 bg-card border-b border-border flex items-center justify-between px-4 shrink-0 shadow-sm">
@@ -266,6 +350,9 @@ export default function CacheDebug() {
           <div className="flex items-center gap-2 px-2 py-1 border border-border rounded-sm bg-background/60">
             模式 <span className="font-mono text-foreground">{apiProfile}</span>
           </div>
+          <div className="flex items-center gap-2 px-2 py-1 border border-border rounded-sm bg-background/60">
+            记录 <span className="font-mono text-foreground">{total}</span>
+          </div>
           <button
             onClick={loadData}
             disabled={isLoading}
@@ -278,174 +365,214 @@ export default function CacheDebug() {
       </div>
 
       <div className="flex-1 p-4 overflow-hidden">
-        <div className="grid grid-cols-[1.2fr_1fr] gap-3 mb-3">
-          <div className="border border-border rounded-sm p-3 bg-card/70 flex flex-col gap-2">
-            <div className="text-xs font-semibold flex items-center gap-2">
-              <HardDrive className="w-4 h-4 text-primary" />
-              缓存运行状态
+        <div className="mb-3">
+          <div className="grid gap-3 lg:grid-cols-3">
+            <div className="border border-border rounded-sm p-3 bg-card/70">
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-xs font-semibold flex items-center gap-2">
+                    <HardDrive className="w-4 h-4 text-primary" />
+                    缓存运行状态
+                  </div>
+                  <button
+                    onClick={handleTogglePause}
+                    className="inline-flex items-center justify-center rounded-sm border border-border text-muted-foreground hover:text-foreground hover:bg-muted/60 h-7 w-7"
+                    title={cacheStatus?.paused ? "恢复缓存" : "暂停缓存"}
+                  >
+                    {cacheStatus?.paused ? <PlayCircle className="w-4 h-4" /> : <PauseCircle className="w-4 h-4" />}
+                  </button>
+                </div>
+                <div className="text-[12px] text-muted-foreground">
+                  {cacheStatus?.paused
+                    ? "服务暂停中"
+                    : MODE_LABELS[cacheStatus?.task?.type || "auto"] || "实时运行模式"}
+                </div>
+                <div className="text-[12px] text-muted-foreground">
+                  {cacheStatus ? (
+                    <span className="text-foreground font-medium">{cacheStatus.message}</span>
+                  ) : (
+                    "状态获取中..."
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                  {cacheStatus?.seq_no ? <span>流水号：{cacheStatus.seq_no}</span> : null}
+                  {cacheStatus?.surface ? <span>表面：{cacheStatus.surface}</span> : null}
+                  {cacheStatus?.task ? (
+                    <span>
+                      任务：{TASK_LABELS[cacheStatus.task.type || ""] || "未知"}
+                      {cacheStatus.task.total
+                        ? ` ${cacheStatus.task.done ?? 0}/${cacheStatus.task.total}`
+                        : ""}
+                      {cacheStatus.task.total
+                        ? ` (${Math.min(
+                            100,
+                            Math.round(((cacheStatus.task.done ?? 0) / cacheStatus.task.total) * 100),
+                          )}%)`
+                        : ""}
+                      {cacheStatus.task.current_seq ? ` 当前:${cacheStatus.task.current_seq}` : ""}
+                      {cacheStatus.task.type === "auto" ? " 模式:自动" : ""}
+                      {cacheStatus.task.type === "rebuild"
+                        ? ` 覆盖:${cacheStatus.task.force ? "是" : "否"}`
+                        : ""}
+                    </span>
+                  ) : null}
+                  {cacheStatus?.paused ? <span className="text-yellow-400">已暂停</span> : null}
+                </div>
+                {cacheStatus?.task?.total ? (
+                  <div className="mt-2">
+                    <div className="h-1.5 rounded-full bg-muted/40 overflow-hidden">
+                      <div
+                        className="h-full bg-primary/80 transition-all"
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            Math.round(((cacheStatus.task.done ?? 0) / cacheStatus.task.total) * 100),
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                ) : null}
+                {cacheStatus?.task?.type && ["delete", "rebuild"].includes(cacheStatus.task.type) ? (
+                  <div className="text-[11px] text-muted-foreground">
+                    {cacheStatus.task.type === "delete" ? "删除" : "重建"}{" "}
+                    {cacheStatus.task.current_seq ? cacheStatus.task.current_seq : "-"} 中
+                  </div>
+                ) : null}
+              </div>
             </div>
-            <div className="text-[12px] text-muted-foreground">
-              {cacheStatus ? (
-                <span className="text-foreground font-medium">{cacheStatus.message}</span>
-              ) : (
-                "状态获取中..."
-              )}
+            <div className="border border-border rounded-sm p-3 bg-card/70 flex items-center justify-between gap-3">
+              <div className="text-xs font-semibold flex items-center gap-2">
+                <Wrench className="w-4 h-4 text-primary" />
+                缓存操作
+              </div>
+              <div className="flex items-center gap-2 text-[11px]">
+                <button
+                  onClick={() => setIsDeleteOpen(true)}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-sm border border-border hover:bg-muted/60"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  缓存删除
+                </button>
+                <button
+                  onClick={() => setIsRebuildOpen(true)}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-sm border border-border hover:bg-muted/60"
+                >
+                  <RotateCw className="w-3 h-3" />
+                  缓存重建
+                </button>
+                <button
+                  onClick={() => setIsMigrateOpen(true)}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-sm border border-border hover:bg-muted/60"
+                >
+                  <FolderSync className="w-3 h-3" />
+                  缓存迁移
+                </button>
+                <button
+                  onClick={handleOpenSettings}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-sm border border-primary/40 text-primary hover:bg-primary hover:text-primary-foreground"
+                >
+                  <Settings className="w-3 h-3" />
+                  缓存设置
+                </button>
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-              <span>状态：{cacheStatus?.state || "ready"}</span>
-              {cacheStatus?.seq_no ? <span>流水号：{cacheStatus.seq_no}</span> : null}
-              {cacheStatus?.surface ? <span>表面：{cacheStatus.surface}</span> : null}
-            </div>
-          </div>
-          <div className="border border-border rounded-sm p-3 bg-card/70 flex items-center justify-between gap-3">
-            <div className="text-xs font-semibold flex items-center gap-2">
-              <Wrench className="w-4 h-4 text-primary" />
-              缓存操作
-            </div>
-            <div className="flex items-center gap-2 text-[11px]">
-              <button
-                onClick={() => setIsDeleteOpen(true)}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-sm border border-border hover:bg-muted/60"
-              >
-                <Trash2 className="w-3 h-3" />
-                缓存删除
-              </button>
-              <button
-                onClick={() => setIsRebuildOpen(true)}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-sm border border-border hover:bg-muted/60"
-              >
-                <RotateCw className="w-3 h-3" />
-                缓存重建
-              </button>
-              <button
-                onClick={() => setIsMigrateOpen(true)}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-sm border border-border hover:bg-muted/60"
-              >
-                <FolderSync className="w-3 h-3" />
-                缓存迁移
-              </button>
-              <button
-                onClick={handleOpenSettings}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-sm border border-primary/40 text-primary hover:bg-primary hover:text-primary-foreground"
-              >
-                <Settings className="w-3 h-3" />
-                缓存设置
-              </button>
+            <div className="border border-border rounded-sm p-3 bg-card/70">
+              <div className="text-xs font-semibold text-muted-foreground mb-2">基础数据信息</div>
+              <div className="grid gap-1 text-[11px] text-muted-foreground">
+                {cacheStatus?.cache_root_top ? <div>上表存储位置：{cacheStatus.cache_root_top}</div> : null}
+                {cacheStatus?.cache_root_bottom ? <div>下表存储位置：{cacheStatus.cache_root_bottom}</div> : null}
+                <div>单表面工作线程数量：{cacheStatus?.worker_per_surface ?? 1}</div>
+              </div>
             </div>
           </div>
         </div>
         <div className="flex-1 border border-border rounded-sm overflow-hidden flex flex-col">
-          <div className="grid grid-cols-[0.8fr_1.1fr_1fr_1.4fr_1.2fr_1.3fr] gap-2 px-3 py-2 text-[10px] uppercase tracking-widest text-muted-foreground border-b border-border bg-muted/40">
-            <span>流水号</span>
-            <span>板号</span>
-            <span>缓存状态</span>
-            <span>磁盘缓存级别</span>
-            <span>更新时间</span>
-            <span className="text-right">操作</span>
-          </div>
-          <div className="flex-1 overflow-auto">
-            {items.map((item) => {
-              const status = STATUS_META[item.status];
-              const top = item.surfaces.find((s) => s.surface === "top");
-              const bottom = item.surfaces.find((s) => s.surface === "bottom");
-              const lastUpdate = [top?.updated_at, bottom?.updated_at]
-                .filter(Boolean)
-                .sort()
-                .pop();
-              return (
-                <div
-                  key={item.seq_no}
-                  className="grid grid-cols-[0.8fr_1.1fr_1fr_1.4fr_1.2fr_1.3fr] gap-2 px-3 py-2 text-[12px] border-b border-border/50 hover:bg-muted/30"
-                >
-                  <span className="font-mono font-semibold">{item.seq_no}</span>
-                  <span className="font-mono">{item.steel_no || "--"}</span>
-                  <div className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${status.color}`} />
-                    <span>{status.label}</span>
-                  </div>
-                  <div className="text-[11px] text-muted-foreground">
-                    上表: {top?.tile_max_level ?? "--"}{" "}
-                    {top?.tile_size ? `(${top.tile_size}px)` : ""}
-                    <span className="mx-1">/</span>
-                    下表: {bottom?.tile_max_level ?? "--"}{" "}
-                    {bottom?.tile_size ? `(${bottom.tile_size}px)` : ""}
-                  </div>
-                  <span className="text-[11px] text-muted-foreground">{formatTime(lastUpdate)}</span>
-                  <div className="flex items-center justify-end gap-2">
-                    <button
-                      onClick={() => setScanTarget(item)}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-sm border border-border text-[11px] hover:bg-muted/60"
-                    >
-                      更新状态
-                    </button>
-                    <button
-                      onClick={() => setPrecacheTarget(item)}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-sm border border-primary/40 text-primary text-[11px] hover:bg-primary hover:text-primary-foreground"
-                    >
-                      <HardDrive className="w-3 h-3" />
-                      磁盘缓存
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-            {items.length === 0 && (
+          <div className="flex-1 overflow-auto p-3">
+            {items.length === 0 ? (
               <div className="px-3 py-8 text-center text-xs text-muted-foreground">
                 暂无钢板缓存记录
+              </div>
+            ) : (
+              <div className="grid grid-cols-10 gap-3">
+                {items.map((item) => {
+                  const top = resolveSurface(item, "top");
+                  const bottom = resolveSurface(item, "bottom");
+                  const topState = resolveCellState(item, "top");
+                  const bottomState = resolveCellState(item, "bottom");
+                  return (
+                    <button
+                      key={item.seq_no}
+                      onClick={() => setPrecacheTarget(item)}
+                      className="group border border-border/60 bg-card/70 rounded-md px-3 py-2 text-left shadow-[0_6px_14px_rgba(15,23,42,0.08)] hover:shadow-[0_10px_20px_rgba(15,23,42,0.16)] transition-shadow"
+                      title="点击触发磁盘缓存"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-mono text-xs font-semibold text-foreground">
+                            {item.seq_no}
+                          </span>
+                          <span className="text-[10px] text-foreground/80 truncate">
+                            {item.steel_no || "--"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <span className={`w-2 h-2 rounded-full ${STATUS_COLORS[topState]}`} title="上表面" />
+                          <span className={`w-2 h-2 rounded-full ${STATUS_COLORS[bottomState]}`} title="下表面" />
+                        </div>
+                      </div>
+                      <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
+                        <span className="font-mono text-foreground">{top?.tile_max_level ?? "--"}</span>
+                        <span className="text-muted-foreground/60">/</span>
+                        <span className="font-mono text-foreground">{bottom?.tile_max_level ?? "--"}</span>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
         </div>
-        <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-          <span>
-            总计 {total} 条 / 当前 {page} / {totalPages}
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-              disabled={page <= 1}
-              className="px-3 py-1 rounded-sm border border-border hover:bg-muted/60 disabled:opacity-50"
-            >
-              上一页
-            </button>
-            <button
-              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-              disabled={page >= totalPages}
-              className="px-3 py-1 rounded-sm border border-border hover:bg-muted/60 disabled:opacity-50"
-            >
-              下一页
-            </button>
+        <div className="mt-3 border border-border rounded-sm bg-card/70 flex flex-col overflow-hidden">
+          <div className="px-3 py-2 text-[11px] font-semibold text-muted-foreground border-b border-border/60">
+            缓存过程日志
+          </div>
+          <div
+            ref={logRef}
+            className="h-36 overflow-auto px-3 py-2 font-mono text-[11px] text-foreground/80 bg-[#0b0f14]"
+          >
+            {cacheLogs.length === 0 ? (
+              <div className="text-muted-foreground">暂无日志</div>
+            ) : (
+              cacheLogs.map((item, idx) => (
+                <div key={`cache-log-${idx}`} className="py-1 border-b border-white/5">
+                  <span className="text-[#8b949e]">
+                    [{item.id}] {formatTime(item.time)} - {item.message}
+                  </span>
+                    <span className="ml-2 text-[#7aa2f7]">
+                      {item.data?.seq_no ? `流水号:${item.data.seq_no}` : ""}
+                      {item.data?.steel_no ? ` 板号:${item.data.steel_no}` : ""}
+                      {item.data?.surfaces?.length ? ` 表面:${item.data.surfaces.join("/")}` : ""}
+                      {item.data?.view ? ` ${item.data.view}` : ""}
+                      {item.data?.precache_levels !== undefined ? ` L${item.data.precache_levels}` : ""}
+                      {item.data?.defect_cache_enabled !== undefined
+                        ? ` 缺陷:${item.data.defect_cache_enabled ? "是" : "否"}`
+                        : ""}
+                      {item.data?.defect_cache_expand ? ` 扩展:${item.data.defect_cache_expand}` : ""}
+                      {item.data?.cache_dirs
+                        ? ` 目录:${Object.entries(item.data.cache_dirs)
+                            .map(([key, value]) => `${key}:${value}`)
+                            .join(" ")}`
+                        : item.data?.cache_dir
+                          ? ` 目录:${item.data.cache_dir}`
+                          : ""}
+                    </span>
+                  </div>
+                ))
+              )}
           </div>
         </div>
       </div>
-
-      <Dialog open={Boolean(scanTarget)} onOpenChange={(open) => !open && setScanTarget(null)}>
-        <DialogContent className="max-w-[520px] bg-card/95 backdrop-blur-xl border-border">
-          <DialogHeader>
-            <DialogTitle className="text-base">缓存状态更新</DialogTitle>
-            <DialogDescription className="text-xs text-muted-foreground">
-              重新扫描磁盘缓存数据并更新 CacheRecord 表。
-            </DialogDescription>
-          </DialogHeader>
-          <div className="text-xs text-muted-foreground">
-            目标流水号：<span className="font-mono text-foreground">{scanTarget?.seq_no}</span>
-          </div>
-          <div className="flex items-center justify-end gap-2 mt-3">
-            <button
-              onClick={() => setScanTarget(null)}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-sm border border-border text-[11px] text-muted-foreground hover:text-foreground"
-            >
-              取消
-            </button>
-            <button
-              onClick={handleScan}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-sm border border-primary/40 text-primary hover:bg-primary hover:text-primary-foreground text-[11px]"
-            >
-              确认
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={Boolean(precacheTarget)} onOpenChange={(open) => !open && setPrecacheTarget(null)}>
         <DialogContent className="max-w-[560px] bg-card/95 backdrop-blur-xl border-border">
