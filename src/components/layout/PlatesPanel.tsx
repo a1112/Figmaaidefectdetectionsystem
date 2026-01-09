@@ -13,6 +13,7 @@ import type {
   FilterCriteria,
 } from "../SearchDialog";
 import { getLevelText } from "../../utils/steelPlates";
+import { useNewItemKeys } from "../../hooks/useNewItems";
 
 interface PlatesPanelProps {
   filteredSteelPlates: SteelPlate[];
@@ -44,6 +45,10 @@ export const PlatesPanel: React.FC<PlatesPanelProps> = ({
   setIsDiagnosticDialogOpen,
 }) => {
   const navigate = useNavigate();
+  const newPlateKeys = useNewItemKeys(
+    filteredSteelPlates,
+    (plate) => plate.serialNumber,
+  );
   return (
     <div className="h-full flex flex-col bg-background">
       {/* 手机模式：顶部搜索栏 */}
@@ -198,7 +203,7 @@ export const PlatesPanel: React.FC<PlatesPanelProps> = ({
                   selectedPlateId === plate.serialNumber
                     ? "border-primary shadow-lg shadow-primary/20"
                     : "border-border hover:border-primary/50"
-                }`}
+                } ${newPlateKeys.has(String(plate.serialNumber)) ? "list-enter" : ""}`}
               >
                 {/* 头部：流水号和等级 */}
                 <div className="flex items-center justify-between mb-3">

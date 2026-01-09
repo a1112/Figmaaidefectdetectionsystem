@@ -61,6 +61,7 @@ import {
   type SurfaceLayout,
 } from "../../utils/imageOrientation";
 import type { ImageOrientation } from "../../types/app.types";
+import { useNewItemKeys } from "../../hooks/useNewItems";
 
 // Separate Clock component to prevent full page re-renders every second
 const DEFAULT_DEFECT_TYPES = [
@@ -489,6 +490,7 @@ export default function TraditionalMode() {
       selectedDefectTypes.includes(defect.type),
     );
   }, [plateDefects, selectedDefectTypes]);
+  const newDefectKeys = useNewItemKeys(visibleDefects, (defect) => defect.id);
   const distributionDefects = useMemo(() => {
     if (surfaceFilter === "all") return visibleDefects;
     return visibleDefects.filter((defect) => defect.surface === surfaceFilter);
@@ -3236,7 +3238,9 @@ export default function TraditionalMode() {
                               })
                             }
                             onMouseLeave={() => setHoveredDefect(null)}
-                            className="aspect-square bg-[#161b22] border border-[#30363d] relative group cursor-pointer overflow-hidden"
+                              className={`aspect-square bg-[#161b22] border border-[#30363d] relative group cursor-pointer overflow-hidden ${
+                                newDefectKeys.has(String(defect.id)) ? "list-enter" : ""
+                              }`}
                           >
                             <img 
                               src={defectImageUrl}
@@ -3427,9 +3431,9 @@ export default function TraditionalMode() {
                               })
                             }
                             onMouseLeave={() => setHoveredDefect(null)}
-                            className={`p-2 bg-[#0d1117] border rounded-sm transition-colors cursor-pointer group ${
-                              selectedDefectId === defect.id ? 'border-[#58a6ff] bg-[#58a6ff]/5' : 'border-[#30363d] hover:border-[#58a6ff]/50'
-                            }`}
+                              className={`p-2 bg-[#0d1117] border rounded-sm transition-colors cursor-pointer group ${
+                                selectedDefectId === defect.id ? 'border-[#58a6ff] bg-[#58a6ff]/5' : 'border-[#30363d] hover:border-[#58a6ff]/50'
+                              } ${newDefectKeys.has(String(defect.id)) ? "list-enter" : ""}`}
                           >
                             <div className="flex justify-between items-start mb-1">
                               <div className="flex items-center gap-1">

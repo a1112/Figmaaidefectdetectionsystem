@@ -16,6 +16,7 @@ import {
   stopTestModel,
   updateTestModelConfig,
 } from "../api/testModel";
+import { getLineConfig } from "../api/admin";
 import {
   Dialog,
   DialogContent,
@@ -56,6 +57,8 @@ export default function TestModelPage() {
   const [autoScroll, setAutoScroll] = useState(true);
   const logRef = useRef<HTMLDivElement | null>(null);
   const logCursorRef = useRef(0);
+  const [lineOptions, setLineOptions] = useState<Array<{ key: string; name?: string }>>([]);
+  const [viewOptions, setViewOptions] = useState<string[]>([]);
   const logTimerRef = useRef<number | null>(null);
 
   const loadStatus = async () => {
@@ -92,6 +95,20 @@ export default function TestModelPage() {
   useEffect(() => {
     void loadStatus();
     void loadConfig();
+    getLineConfig()
+      .then((payload) => {
+        const lines = (payload.lines || []).map((line: any) => ({
+          key: String(line.key || line.name || ""),
+          name: line.name,
+        })).filter((item) => item.key);
+        setLineOptions(lines);
+        const views = payload.views ? Object.keys(payload.views) : [];
+        setViewOptions(views.length ? views : ["2D", "small"]);
+      })
+      .catch(() => {
+        setLineOptions([]);
+        setViewOptions(["2D", "small"]);
+      });
   }, []);
 
   useEffect(() => {
@@ -261,6 +278,45 @@ export default function TestModelPage() {
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <label className="flex flex-col gap-1">
+                <span className="text-muted-foreground">产线</span>
+                <select
+                  value={config.line_key ?? ""}
+                  onChange={(e) => patchConfig({ line_key: e.target.value || null })}
+                  className="h-8 rounded-sm border border-border bg-background px-2 text-xs"
+                >
+                  <option value="">默认</option>
+                  {lineOptions.map((line) => (
+                    <option key={line.key} value={line.key}>
+                      {line.name || line.key}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="flex flex-col gap-1">
+                <span className="text-muted-foreground text-xs">生成视图</span>
+                <div className="flex items-center gap-2 text-[11px] text-muted-foreground h-8">
+                  {viewOptions.map((view) => {
+                    const selected = Array.isArray(config.views) ? config.views : [];
+                    const checked = selected.includes(view);
+                    return (
+                      <label key={view} className="flex items-center gap-1">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            const next = checked
+                              ? selected.filter((item: string) => item !== view)
+                              : [...selected, view];
+                            patchConfig({ views: next.length ? next : ["2D"] });
+                          }}
+                        />
+                        {view}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+              <label className="flex flex-col gap-1">
                 <span className="text-muted-foreground">记录间隔(秒)</span>
                 <input
                   type="number"
@@ -339,26 +395,10 @@ export default function TestModelPage() {
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  checked={Boolean(config.auto_add_images)}
-                  onChange={(e) => patchConfig({ auto_add_images: e.target.checked })}
+                  checked={Boolean(config.generate_defects)}
+                  onChange={(e) => patchConfig({ generate_defects: e.target.checked })}
                 />
-                自动增加图像
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={Boolean(config.auto_add_defects)}
-                  onChange={(e) => patchConfig({ auto_add_defects: e.target.checked })}
-                />
-                自动增加缺陷
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={Boolean(config.generate_small_view)}
-                  onChange={(e) => patchConfig({ generate_small_view: e.target.checked })}
-                />
-                生成 small 图像
+                生成缺陷数据
               </label>
             </div>
             <div className="flex items-center justify-between text-[11px] text-muted-foreground">
@@ -563,24 +603,29 @@ export default function TestModelPage() {
                       {item.data?.seq_no ? `流水号: ${item.data.seq_no} ` : ""}
                       {item.data?.steel_id ? `板号: ${item.data.steel_id} ` : ""}
                       {item.data?.views?.length ? `视图: ${item.data.views.join(", ")} ` : ""}
-                      {item.data?.surfaces?.length
-                        ? `表面: ${item.data.surfaces
-                            .map((surface: any) => {
-                              if (typeof surface === "string") return surface;
-                              return `${surface.surface}:${surface.files}`;
-                            })
-                            .join(" ")} `
-                        : ""}
+                        {item.data?.surfaces?.length
+                          ? `表面: ${item.data.surfaces
+                              .map((surface: any) => {
+                                if (typeof surface === "string") return surface;
+                                const label = surface.surface ?? surface.name;
+                                if (!label) return "";
+                                const count = surface.files ?? surface.count;
+                                return count !== undefined ? `${label}:${count}` : String(label);
+                              })
+                              .filter(Boolean)
+                              .join(" ")} `
+                          : ""}
                       {item.data?.image_interval_ms !== undefined
                         ? `单张间隔: ${item.data.image_interval_ms}ms `
                         : ""}
                       {item.data?.elapsed_seconds !== undefined
                         ? `耗时: ${item.data.elapsed_seconds}s `
                         : ""}
-                      {item.data?.defect_count !== undefined ? `缺陷: ${item.data.defect_count} ` : ""}
-                      {Number.isFinite(item.data?.img_index_max)
-                        ? `图像索引范围: 1-${item.data.img_index_max} `
-                        : ""}
+                        {item.data?.defect_count !== undefined ? `缺陷: ${item.data.defect_count} ` : ""}
+                        {Number.isFinite(item.data?.image_index) ? `图像索引: ${item.data.image_index} ` : ""}
+                        {Number.isFinite(item.data?.img_index_max)
+                          ? `图像索引范围: ${item.data.img_index_min ?? 1}-${item.data.img_index_max} `
+                          : ""}
                       {item.data?.samples?.length ? `样本: ${item.data.samples[0]}` : ""}
                       {item.data?.error ? `错误: ${item.data.error}` : ""}
                     </div>

@@ -1,5 +1,6 @@
 import { AlertTriangle, Circle, Target } from "lucide-react";
 import type { Defect } from "../types/app.types";
+import { useNewItemKeys } from "../hooks/useNewItems";
 
 interface DefectListProps {
   defects: Defect[];
@@ -22,6 +23,7 @@ export function DefectList({
   onDefectHover,
   onDefectHoverEnd,
 }: DefectListProps) {
+  const newDefectKeys = useNewItemKeys(defects, (defect) => defect.id);
   const getSeverityColor = (severity: string) => {
     switch (severity) {
       case "high":
@@ -152,7 +154,7 @@ export function DefectList({
                 isSelected
                   ? "border-primary bg-primary/10"
                   : "border-border"
-              }`}
+              } ${newDefectKeys.has(String(defect.id)) ? "list-enter" : ""}`}
             >
               <span className="text-muted-foreground font-mono w-8">
                 #{index + 1}

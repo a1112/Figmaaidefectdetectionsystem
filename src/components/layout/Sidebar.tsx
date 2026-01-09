@@ -2,6 +2,7 @@ import { Search, Filter, RotateCcw } from 'lucide-react';
 import type { SteelPlate } from '../../types/app.types';
 import type { SearchCriteria, FilterCriteria } from '../SearchDialog';
 import { getLevelText } from '../../utils/steelPlates';
+import { useNewItemKeys } from '../../hooks/useNewItems';
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -37,6 +38,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   filterButtonRef
 }) => {
   if (isCollapsed) return null;
+  const newPlateKeys = useNewItemKeys(
+    filteredSteelPlates,
+    (plate) => plate.serialNumber,
+  );
 
   const currentPlate = filteredSteelPlates.find(p => p.serialNumber === selectedPlateId) || 
                        filteredSteelPlates[0] || 
@@ -196,7 +201,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               selectedPlateId === plate.serialNumber 
                 ? 'bg-primary/20 border-primary shadow-lg shadow-primary/20' 
                 : 'bg-card/50 border-border/50 hover:bg-accent/30 hover:border-border'
-            }`}
+            } ${newPlateKeys.has(String(plate.serialNumber)) ? "list-enter" : ""}`}
           >
             <div className="flex items-center justify-between gap-1 mb-0.5">
               <span className="text-[9px] font-mono text-muted-foreground">

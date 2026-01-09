@@ -100,3 +100,25 @@
     }
   }
 }
+
+@layer utilities {
+  @keyframes list-enter {
+    0% {
+      opacity: 0;
+      transform: translateY(6px);
+      box-shadow: 0 0 0 1px hsl(var(--primary) / 0.2);
+      background-color: hsl(var(--primary) / 0.08);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+      box-shadow: none;
+      background-color: transparent;
+    }
+  }
+
+  .list-enter {
+    animation: list-enter 420ms ease-out;
+    will-change: transform, opacity;
+  }
+}

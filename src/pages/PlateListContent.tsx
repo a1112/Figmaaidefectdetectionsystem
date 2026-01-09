@@ -1,6 +1,7 @@
 import { Database } from "lucide-react";
 import type { SteelPlate } from "../types/app.types";
 import { getLevelText } from "../utils/steelPlates";
+import { useNewItemKeys } from "../hooks/useNewItems";
 
 interface PlateListContentProps {
   filteredSteelPlates: SteelPlate[];
@@ -17,6 +18,10 @@ export function PlateListContent({
   isMobileDevice,
   onClearFilters,
 }: PlateListContentProps) {
+  const newPlateKeys = useNewItemKeys(
+    filteredSteelPlates,
+    (plate) => plate.serialNumber,
+  );
   const totalQualified = filteredSteelPlates.filter(
     (plate) => plate.level === "A",
   ).length;
@@ -99,7 +104,7 @@ export function PlateListContent({
                 selectedPlateId === plate.serialNumber
                   ? "border-primary shadow-lg shadow-primary/20"
                   : "border-border hover:border-primary/50"
-              }`}
+              } ${newPlateKeys.has(String(plate.serialNumber)) ? "list-enter" : ""}`}
             >
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-mono text-muted-foreground">
