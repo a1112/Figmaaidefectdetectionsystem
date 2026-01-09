@@ -7,6 +7,7 @@ import {
   addTestImages,
   addTestImageOne,
   clearTestDatabase,
+  clearTestModelLogs,
   deleteTestImages,
   getTestModelConfig,
   getTestModelLogs,
@@ -39,6 +40,7 @@ export default function TestModelPage() {
   const [currentSeq, setCurrentSeq] = useState<number | null>(null);
   const [currentSteel, setCurrentSteel] = useState<string | null>(null);
   const [remainingRecords, setRemainingRecords] = useState<number | null>(null);
+  const [currentIndex, setCurrentIndex] = useState<number | null>(null);
   const [steelCount, setSteelCount] = useState<number | null>(null);
   const [defectCount, setDefectCount] = useState<number | null>(null);
   const [maxSeq, setMaxSeq] = useState<number | null>(null);
@@ -54,6 +56,7 @@ export default function TestModelPage() {
   const [autoScroll, setAutoScroll] = useState(true);
   const logRef = useRef<HTMLDivElement | null>(null);
   const logCursorRef = useRef(0);
+  const logTimerRef = useRef<number | null>(null);
 
   const loadStatus = async () => {
     try {
@@ -63,6 +66,7 @@ export default function TestModelPage() {
       setCurrentSeq(status.current_seq ?? null);
       setCurrentSteel(status.current_steel_id ?? null);
       setRemainingRecords(status.remaining_records ?? null);
+      setCurrentIndex(status.current_image_index ?? null);
       setSteelCount(status.steel_count ?? null);
       setDefectCount(status.defect_count ?? null);
       setMaxSeq(status.max_seq ?? null);
@@ -116,6 +120,7 @@ export default function TestModelPage() {
     };
     void loadLogs();
     const timer = window.setInterval(loadLogs, 2000);
+    logTimerRef.current = timer;
     return () => window.clearInterval(timer);
   }, []);
 
@@ -308,15 +313,6 @@ export default function TestModelPage() {
                 />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-muted-foreground">缺陷数量</span>
-                <input
-                  type="number"
-                  value={config.defect_per_record ?? 5}
-                  onChange={(e) => patchConfig({ defect_per_record: numberOr(e.target.value, 5) })}
-                  className="h-8 rounded-sm border border-border bg-background px-2 text-xs"
-                />
-              </label>
-              <label className="flex flex-col gap-1">
                 <span className="text-muted-foreground">缺陷间隔(秒)</span>
                 <input
                   type="number"
@@ -368,6 +364,7 @@ export default function TestModelPage() {
             <div className="flex items-center justify-between text-[11px] text-muted-foreground">
               <span>当前流水号：{currentSeq ?? "--"}</span>
               <span>板号：{currentSteel ?? "--"}</span>
+              <span>当前索引：{currentIndex ?? "--"}</span>
               <span>剩余记录：{remainingRecords ?? "持续"}</span>
             </div>
               <div className="flex items-center gap-2">
@@ -405,15 +402,10 @@ export default function TestModelPage() {
                   className="h-8 rounded-sm border border-border bg-background px-2 text-xs"
                 />
               </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-muted-foreground">缺陷数量</span>
-                <input
-                  type="number"
-                  value={config.defect_per_record ?? 5}
-                  onChange={(e) => patchConfig({ defect_per_record: numberOr(e.target.value, 5) })}
-                  className="h-8 rounded-sm border border-border bg-background px-2 text-xs"
-                />
-              </label>
+              <div className="flex flex-col gap-1 text-[11px] text-muted-foreground">
+                <span>缺陷数量由间隔设置控制</span>
+                <span>手动生成会随机 0~N 条</span>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -437,7 +429,7 @@ export default function TestModelPage() {
               </button>
               <button
                 onClick={async () => {
-                  await addTestDefects(undefined, config.defect_per_record);
+                  await addTestDefects();
                   toast.success("已生成缺陷");
                 }}
                 className="inline-flex items-center gap-1 px-2 py-1 rounded-sm border border-border text-xs"
@@ -512,14 +504,45 @@ export default function TestModelPage() {
           <div className="border border-border rounded-sm p-3 bg-card/70 flex flex-col gap-3 col-span-2">
             <div className="flex items-center justify-between text-xs font-semibold">
               <span>日志记录</span>
-              <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                <input
-                  type="checkbox"
-                  checked={autoScroll}
-                  onChange={(e) => setAutoScroll(e.target.checked)}
-                />
-                自动滚动
-              </label>
+              <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                <button
+                  onClick={async () => {
+                    logCursorRef.current = 0;
+                    setLogCursor(0);
+                    try {
+                      const resp = await getTestModelLogs(200, 0);
+                      setLogs(resp.items || []);
+                      logCursorRef.current = resp.cursor || 0;
+                      setLogCursor(logCursorRef.current);
+                    } catch {
+                      setLogs([]);
+                    }
+                  }}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-sm border border-border text-[11px]"
+                >
+                  刷新日志
+                </button>
+                <button
+                  onClick={async () => {
+                    await clearTestModelLogs();
+                    logCursorRef.current = 0;
+                    setLogCursor(0);
+                    setLogs([]);
+                    toast.success("日志已清空");
+                  }}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-sm border border-destructive/40 text-destructive text-[11px]"
+                >
+                  清空日志
+                </button>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={autoScroll}
+                    onChange={(e) => setAutoScroll(e.target.checked)}
+                  />
+                  自动滚动
+                </label>
+              </div>
             </div>
             <div
               ref={logRef}
@@ -542,11 +565,22 @@ export default function TestModelPage() {
                       {item.data?.views?.length ? `视图: ${item.data.views.join(", ")} ` : ""}
                       {item.data?.surfaces?.length
                         ? `表面: ${item.data.surfaces
-                            .map((surface: any) => `${surface.surface}:${surface.files}`)
+                            .map((surface: any) => {
+                              if (typeof surface === "string") return surface;
+                              return `${surface.surface}:${surface.files}`;
+                            })
                             .join(" ")} `
                         : ""}
+                      {item.data?.image_interval_ms !== undefined
+                        ? `单张间隔: ${item.data.image_interval_ms}ms `
+                        : ""}
+                      {item.data?.elapsed_seconds !== undefined
+                        ? `耗时: ${item.data.elapsed_seconds}s `
+                        : ""}
                       {item.data?.defect_count !== undefined ? `缺陷: ${item.data.defect_count} ` : ""}
-                      {item.data?.img_index !== undefined ? `图像索引: ${item.data.img_index} ` : ""}
+                      {Number.isFinite(item.data?.img_index_max)
+                        ? `图像索引范围: 1-${item.data.img_index_max} `
+                        : ""}
                       {item.data?.samples?.length ? `样本: ${item.data.samples[0]}` : ""}
                       {item.data?.error ? `错误: ${item.data.error}` : ""}
                     </div>

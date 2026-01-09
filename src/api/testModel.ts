@@ -128,3 +128,11 @@ export async function getTestModelLogs(
   }
   return (await response.json()) as { items: any[]; cursor: number };
 }
+
+export async function clearTestModelLogs(): Promise<void> {
+  const url = `${getBaseUrl()}/logs/clear`;
+  const response = await fetch(url, { method: "POST" });
+  if (!response.ok) {
+    throw new Error(`Failed to clear logs: ${response.status}`);
+  }
+}

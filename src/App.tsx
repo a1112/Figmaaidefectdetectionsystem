@@ -7,6 +7,7 @@ import DownloadPage from "./pages/Download";
 import ReportsRoute from "./pages/Reports";
 import CacheDebug from "./pages/CacheDebug";
 import TestModelPage from "./pages/TestModel";
+import StatusCenterPage from "./pages/StatusCenter";
 import { toast } from "sonner@2.0.3";
 import { ThemeProvider } from "./components/ThemeContext";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -63,6 +64,7 @@ export default function App() {
             <Route path="/reports" element={<ReportsRoute />} />
             <Route path="/cache" element={<CacheDebug />} />
             <Route path="/test_model" element={<TestModelPage />} />
+            <Route path="/status" element={<StatusCenterPage />} />
           </Routes>
         </Router>
       </ThemeProvider>

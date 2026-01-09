@@ -37,6 +37,7 @@ import {
   DropdownMenuLabel,
 } from "../../components/ui/dropdown-menu";
 import { getTestModelStatus } from "../../api/testModel";
+import { getConfigStatusSimple } from "../../api/status";
 import {
   Avatar,
   AvatarFallback,
@@ -157,6 +158,12 @@ export default function TraditionalMode() {
   const [showMainMenu, setShowMainMenu] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [testModelEnabled, setTestModelEnabled] = useState(false);
+  const [simpleStatus, setSimpleStatus] = useState<{
+    state?: string | null;
+    message?: string | null;
+    service?: string | null;
+    data?: Record<string, any>;
+  } | null>(null);
   const [isDiagnosticOpen, setIsDiagnosticOpen] = useState(false);
   const isElectron = typeof window !== "undefined" && !!window.electronWindow;
   const isTauri =
@@ -279,17 +286,55 @@ export default function TraditionalMode() {
 
   useEffect(() => {
     let mounted = true;
-    getTestModelStatus()
-      .then((status) => {
+    const loadTestModel = async () => {
+      try {
+        const status = await getTestModelStatus();
         if (mounted) setTestModelEnabled(Boolean(status.enabled));
-      })
-      .catch(() => {
+      } catch {
         if (mounted) setTestModelEnabled(false);
-      });
+      }
+    };
+    void loadTestModel();
     return () => {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadSimple = async () => {
+      try {
+        const kind = env.getApiProfile() === "small" ? "small" : "2D";
+        const status = await getConfigStatusSimple(currentLineKey || env.getLineName(), kind);
+        if (mounted) setSimpleStatus(status);
+      } catch {
+        if (mounted) setSimpleStatus(null);
+      }
+    };
+    void loadSimple();
+    const timer = window.setInterval(loadSimple, 2000);
+    return () => {
+      mounted = false;
+      window.clearInterval(timer);
+    };
+  }, [currentLineKey]);
+
+  const systemStatusLabel = (() => {
+    if (!simpleStatus) return "系统就绪";
+    const state = (simpleStatus.state || "").toLowerCase();
+    if (state === "error") {
+      return simpleStatus.message || "系统异常";
+    }
+    if (simpleStatus.service === "image_generate" && state === "running") {
+      const seq = simpleStatus.data?.seq_no;
+      const index = simpleStatus.data?.image_index;
+      if (seq !== undefined && index !== undefined) {
+        return `图像生成中：${seq}-${index}`;
+      }
+      return simpleStatus.message || "图像生成中";
+    }
+    return simpleStatus.message || "系统就绪";
+  })();
 
   const loadPlatesWithCriteria = useCallback(
     async (criteria: SearchCriteria, limit: number, forceSearch: boolean) => {
@@ -1808,7 +1853,7 @@ export default function TraditionalMode() {
                 </div>
                 <div className="flex items-center gap-2 px-2 py-0.5 rounded bg-[#238636]/20 text-[#3fb950] border border-[#238636]/30">
                   <div className="w-1.5 h-1.5 rounded-full bg-[#3fb950] animate-pulse" />
-                  <span className="font-mono">系统就绪</span>
+                    <span className="font-mono">{systemStatusLabel}</span>
                 </div>
               </div>
               <div className="flex items-center gap-3 text-[#8b949e]">
@@ -1854,17 +1899,24 @@ export default function TraditionalMode() {
                       工具
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator className="bg-[#30363d]" />
-                    <DropdownMenuItem
-                      onClick={() => navigate("/cache")}
-                      className="cursor-pointer focus:bg-[#21262d] focus:text-[#f0f6fc] text-xs flex items-center gap-2"
-                    >
-                      <Database className="w-3.5 h-3.5" />
-                      缓存调试
-                    </DropdownMenuItem>
-                    {testModelEnabled && (
                       <DropdownMenuItem
-                        onClick={() => navigate("/test_model")}
+                        onClick={() => navigate("/cache")}
                         className="cursor-pointer focus:bg-[#21262d] focus:text-[#f0f6fc] text-xs flex items-center gap-2"
+                      >
+                        <Database className="w-3.5 h-3.5" />
+                        缓存调试
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => navigate("/status")}
+                        className="cursor-pointer focus:bg-[#21262d] focus:text-[#f0f6fc] text-xs flex items-center gap-2"
+                      >
+                        <Activity className="w-3.5 h-3.5" />
+                        状态
+                      </DropdownMenuItem>
+                      {testModelEnabled && (
+                        <DropdownMenuItem
+                          onClick={() => navigate("/test_model")}
+                          className="cursor-pointer focus:bg-[#21262d] focus:text-[#f0f6fc] text-xs flex items-center gap-2"
                       >
                         <FlaskConical className="w-3.5 h-3.5" />
                         模拟运行测试

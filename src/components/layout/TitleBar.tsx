@@ -46,6 +46,8 @@ import type { ApiNode } from "../../api/types";
 import { useNavigate } from "react-router-dom";
 import type { AuthUser } from "../../api/admin";
 import { getTestModelStatus } from "../../api/testModel";
+import { getConfigStatusSimple } from "../../api/status";
+import { env } from "../../config/env";
 
 interface TitleBarProps {
   activeTab: ActiveTab;
@@ -174,6 +176,12 @@ export const TitleBar: React.FC<TitleBarProps> = ({
       }
     });
   const [testModelEnabled, setTestModelEnabled] = useState(false);
+  const [simpleStatus, setSimpleStatus] = useState<{
+    state?: string | null;
+    message?: string | null;
+    service?: string | null;
+    data?: Record<string, any>;
+  } | null>(null);
   const navigate = useNavigate();
   const saveUser = (user: AuthUser | null) => {
     if (!user) {
@@ -201,17 +209,57 @@ export const TitleBar: React.FC<TitleBarProps> = ({
 
   useEffect(() => {
     let mounted = true;
-    getTestModelStatus()
-      .then((status) => {
+    const loadStatus = async () => {
+      try {
+        const status = await getTestModelStatus();
         if (mounted) setTestModelEnabled(Boolean(status.enabled));
-      })
-      .catch(() => {
+      } catch {
         if (mounted) setTestModelEnabled(false);
-      });
+      }
+    };
+    void loadStatus();
     return () => {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadSimple = async () => {
+      try {
+        const kind = env.getApiProfile() === "small" ? "small" : "2D";
+        const status = await getConfigStatusSimple(lineKey || env.getLineName(), kind);
+        if (!mounted) return;
+        setSimpleStatus(status);
+      } catch {
+        if (!mounted) return;
+        setSimpleStatus(null);
+      }
+    };
+    void loadSimple();
+    const timer = window.setInterval(loadSimple, 2000);
+    return () => {
+      mounted = false;
+      window.clearInterval(timer);
+    };
+  }, [lineKey]);
+
+  const statusLabel = (() => {
+    if (!simpleStatus) return "系统就绪";
+    const state = (simpleStatus.state || "").toLowerCase();
+    if (state === "error") {
+      return simpleStatus.message || "系统异常";
+    }
+    if (simpleStatus.service === "image_generate" && state === "running") {
+      const seq = simpleStatus.data?.seq_no;
+      const index = simpleStatus.data?.image_index;
+      if (seq !== undefined && index !== undefined) {
+        return `图像生成中：${seq}-${index}`;
+      }
+      return simpleStatus.message || "图像生成中";
+    }
+    return simpleStatus.message || "系统就绪";
+  })();
 
   const handlePrevPlate = () => {
     if (filteredSteelPlates.length === 0) return;
@@ -380,7 +428,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
         )}
         <div className="flex items-center gap-1 px-3 py-1 bg-background/50 border border-border rounded text-xs text-muted-foreground">
           <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-          READY
+          {statusLabel}
         </div>
 
         {/* 表面切换 - 缺陷和图像界面都显示 */}
@@ -483,6 +531,13 @@ export const TitleBar: React.FC<TitleBarProps> = ({
               >
                 <Database className="w-3.5 h-3.5" />
                 缓存调试
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => navigate("/status")}
+                className="cursor-pointer focus:bg-accent focus:text-accent-foreground text-xs flex items-center gap-2"
+              >
+                <Activity className="w-3.5 h-3.5" />
+                状态
               </DropdownMenuItem>
               {testModelEnabled && (
                 <DropdownMenuItem
