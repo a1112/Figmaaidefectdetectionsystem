@@ -119,6 +119,13 @@ export interface SystemInfoPayload {
     network_tx_bytes_per_sec: number | null;
     notes?: string[];
   };
+  service_resources: {
+    cpu_percent: number | null;
+    memory_percent: number | null;
+    memory_rss_bytes: number | null;
+    memory_vms_bytes: number | null;
+    notes?: string[];
+  };
   disks?: SystemDiskUsage[];
   network_interfaces?: NetworkInterfaceMetrics[];
 }
@@ -144,6 +151,7 @@ export interface NetworkInterfaceMetrics {
 export interface SystemMetricsPayload {
   timestamp: string;
   resources: SystemInfoPayload["resources"];
+  service_resources: SystemInfoPayload["service_resources"];
   disks: SystemDiskUsage[];
   network_interfaces: NetworkInterfaceMetrics[];
 }
@@ -867,6 +875,13 @@ export async function getSystemInfo(): Promise<SystemInfoPayload> {
         memory_used_bytes: 9.9 * 1024 * 1024 * 1024,
         network_rx_bytes_per_sec: 1200,
         network_tx_bytes_per_sec: 800,
+        notes: [],
+      },
+      service_resources: {
+        cpu_percent: 8.4,
+        memory_percent: 4.6,
+        memory_rss_bytes: 0.9 * 1024 * 1024 * 1024,
+        memory_vms_bytes: 1.2 * 1024 * 1024 * 1024,
         notes: [],
       },
       disks: [

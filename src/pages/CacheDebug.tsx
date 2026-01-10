@@ -364,8 +364,8 @@ export default function CacheDebug() {
         </div>
       </div>
 
-      <div className="flex-1 p-4 overflow-hidden">
-        <div className="mb-3">
+      <div className="flex-1 p-4 overflow-hidden flex flex-col gap-3">
+        <div className="shrink-0">
           <div className="grid gap-3 lg:grid-cols-3">
             <div className="border border-border rounded-sm p-3 bg-card/70">
               <div className="flex flex-col gap-2">
@@ -395,8 +395,16 @@ export default function CacheDebug() {
                   )}
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                  {cacheStatus?.line_key ? (
+                    <span>
+                      实例：{cacheStatus.line_key}
+                      {cacheStatus.line_kind ? `/${cacheStatus.line_kind}` : ""}
+                      {cacheStatus.pid ? ` PID:${cacheStatus.pid}` : ""}
+                    </span>
+                  ) : null}
                   {cacheStatus?.seq_no ? <span>流水号：{cacheStatus.seq_no}</span> : null}
                   {cacheStatus?.surface ? <span>表面：{cacheStatus.surface}</span> : null}
+                  {cacheStatus?.view ? <span>视图：{cacheStatus.view}</span> : null}
                   {cacheStatus?.task ? (
                     <span>
                       任务：{TASK_LABELS[cacheStatus.task.type || ""] || "未知"}
@@ -533,7 +541,7 @@ export default function CacheDebug() {
             )}
           </div>
         </div>
-        <div className="mt-3 border border-border rounded-sm bg-card/70 flex flex-col overflow-hidden">
+        <div className="border border-border rounded-sm bg-card/70 flex flex-col overflow-hidden shrink-0">
           <div className="px-3 py-2 text-[11px] font-semibold text-muted-foreground border-b border-border/60">
             缓存过程日志
           </div>

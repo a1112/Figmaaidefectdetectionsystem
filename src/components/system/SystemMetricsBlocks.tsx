@@ -6,6 +6,8 @@ import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
 } from "../ui/chart";
 import { cn } from "../ui/utils";
 import type { NetworkInterfaceMetrics, SystemDiskUsage, SystemMetricsPayload } from "../../api/admin";
@@ -112,7 +114,8 @@ export const ServerResourcesPanel = ({
           <div className="space-y-3">
             <ChartContainer
               config={{
-                cpu: { label: "CPU", color: "hsl(var(--chart-1))" },
+                cpu: { label: "系统 CPU", color: "hsl(var(--chart-1))" },
+                serviceCpu: { label: "服务 CPU", color: "hsl(var(--chart-3))" },
               }}
               className="h-40 w-full"
             >
@@ -128,6 +131,15 @@ export const ServerResourcesPanel = ({
                   fillOpacity={0.2}
                   strokeWidth={2}
                 />
+                <Area
+                  type="monotone"
+                  dataKey="serviceCpu"
+                  stroke="var(--color-serviceCpu)"
+                  fill="var(--color-serviceCpu)"
+                  fillOpacity={0.12}
+                  strokeWidth={2}
+                />
+                <ChartLegend content={<ChartLegendContent />} />
               </RechartsAreaChart>
             </ChartContainer>
             <div className="bg-background/50 border border-border/30 p-2 text-xs">
@@ -167,7 +179,8 @@ export const ServerResourcesPanel = ({
           <div className="space-y-3">
             <ChartContainer
               config={{
-                memory: { label: "Memory", color: "hsl(var(--chart-2))" },
+                memory: { label: "系统内存", color: "hsl(var(--chart-2))" },
+                serviceMemory: { label: "服务内存", color: "hsl(var(--chart-4))" },
               }}
               className="h-40 w-full"
             >
@@ -183,6 +196,15 @@ export const ServerResourcesPanel = ({
                   fillOpacity={0.2}
                   strokeWidth={2}
                 />
+                <Area
+                  type="monotone"
+                  dataKey="serviceMemory"
+                  stroke="var(--color-serviceMemory)"
+                  fill="var(--color-serviceMemory)"
+                  fillOpacity={0.12}
+                  strokeWidth={2}
+                />
+                <ChartLegend content={<ChartLegendContent />} />
               </RechartsAreaChart>
             </ChartContainer>
             <div className="bg-background/50 border border-border/30 p-2 text-xs">

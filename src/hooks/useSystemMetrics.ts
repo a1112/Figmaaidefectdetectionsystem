@@ -10,6 +10,8 @@ export type ResourceSample = {
   timestamp: string;
   cpu: number | null;
   memory: number | null;
+  serviceCpu: number | null;
+  serviceMemory: number | null;
 };
 
 type UseSystemMetricsOptions = {
@@ -25,6 +27,8 @@ const buildSample = (payload: SystemMetricsPayload): ResourceSample => ({
   timestamp: payload.timestamp,
   cpu: payload.resources.cpu_percent,
   memory: payload.resources.memory_percent,
+  serviceCpu: payload.service_resources?.cpu_percent ?? null,
+  serviceMemory: payload.service_resources?.memory_percent ?? null,
 });
 
 const createMockPayload = (prev?: SystemMetricsPayload): SystemMetricsPayload => {
@@ -38,6 +42,16 @@ const createMockPayload = (prev?: SystemMetricsPayload): SystemMetricsPayload =>
     35,
     90,
   );
+  const serviceCpu = clamp(
+    (prev?.service_resources?.cpu_percent ?? 12) + (Math.random() - 0.5) * 6,
+    2,
+    60,
+  );
+  const serviceMemory = clamp(
+    (prev?.service_resources?.memory_percent ?? 6) + (Math.random() - 0.5) * 3,
+    1,
+    40,
+  );
   const timestamp = new Date().toISOString();
   return {
     timestamp,
@@ -48,6 +62,17 @@ const createMockPayload = (prev?: SystemMetricsPayload): SystemMetricsPayload =>
       memory_used_bytes: Math.round((memory / 100) * 16 * 1024 * 1024 * 1024),
       network_rx_bytes_per_sec: 2.2 * 1024 * 1024,
       network_tx_bytes_per_sec: 1.7 * 1024 * 1024,
+      notes: [],
+    },
+    service_resources: {
+      cpu_percent: serviceCpu,
+      memory_percent: serviceMemory,
+      memory_rss_bytes: Math.round(
+        (serviceMemory / 100) * 16 * 1024 * 1024 * 1024,
+      ),
+      memory_vms_bytes: Math.round(
+        (serviceMemory / 100) * 20 * 1024 * 1024 * 1024,
+      ),
       notes: [],
     },
     disks: [
@@ -133,6 +158,7 @@ export const useSystemMetrics = (options: UseSystemMetricsOptions = {}) => {
           const payload: SystemMetricsPayload = {
             timestamp: new Date().toISOString(),
             resources: info.resources,
+            service_resources: info.service_resources,
             disks: info.disks,
             network_interfaces: info.network_interfaces,
           };

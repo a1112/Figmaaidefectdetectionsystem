@@ -37,6 +37,10 @@ export type CacheStatus = {
   seq_no?: number | null;
   surface?: string | null;
   view?: string | null;
+  line_key?: string | null;
+  line_name?: string | null;
+  line_kind?: string | null;
+  pid?: number | null;
   cache_root_top?: string | null;
   cache_root_bottom?: string | null;
   worker_per_surface?: number | null;
@@ -159,6 +163,10 @@ export async function getCacheStatus(): Promise<CacheStatus> {
       seq_no: null,
       surface: null,
       view: "2D",
+      line_key: "line-a",
+      line_name: "Line-A",
+      line_kind: "default",
+      pid: 12345,
       cache_root_top: "\\\\127.0.0.1\\imgsrc1",
       cache_root_bottom: "\\\\127.0.0.1\\imgsrc2",
       worker_per_surface: 1,
