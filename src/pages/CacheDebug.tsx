@@ -47,26 +47,34 @@ const STATUS_COLORS: Record<string, string> = {
   none: "bg-muted-foreground/60",
 };
 
-const CACHE_FIELDS: Array<{
+const MEMORY_CACHE_FIELDS: Array<{
   key: string;
   label: string;
   hint?: string;
   type?: "number" | "boolean";
 }> = [
-  { key: "max_frames", label: "帧缓存上限", hint: "-1 表示全部", type: "number" },
-  { key: "max_tiles", label: "瓦片缓存上限", hint: "-1 表示全部", type: "number" },
-  { key: "max_mosaics", label: "拼图缓存上限", hint: "-1 表示全部", type: "number" },
-  { key: "max_defect_crops", label: "缺陷裁剪缓存上限", hint: "-1 表示全部", type: "number" },
-  { key: "ttl_seconds", label: "缓存有效期(秒)", type: "number" },
-  { key: "defect_cache_enabled", label: "缺陷裁剪缓存", type: "boolean" },
-  { key: "defect_cache_expand", label: "缺陷扩展像素", type: "number" },
-  { key: "disk_cache_enabled", label: "磁盘缓存", type: "boolean" },
-  { key: "disk_cache_max_records", label: "磁盘缓存记录上限", type: "number" },
-  { key: "disk_cache_scan_interval_seconds", label: "磁盘扫描间隔(秒)", type: "number" },
-  { key: "disk_cache_cleanup_interval_seconds", label: "磁盘清理间隔(秒)", type: "number" },
-  { key: "disk_precache_enabled", label: "磁盘预热", type: "boolean" },
-  { key: "disk_precache_levels", label: "预热层级", type: "number" },
-  { key: "disk_precache_workers", label: "缓存线程数", type: "number" },
+  { key: "max_frames", label: "?????", hint: "-1 ????", type: "number" },
+  { key: "max_tiles", label: "??????", hint: "-1 ????", type: "number" },
+  { key: "max_mosaics", label: "??????", hint: "-1 ????", type: "number" },
+  { key: "max_defect_crops", label: "????????", hint: "-1 ????", type: "number" },
+  { key: "ttl_seconds", label: "??????(?)", type: "number" },
+];
+
+const DISK_CACHE_FIELDS: Array<{
+  key: string;
+  label: string;
+  hint?: string;
+  type?: "number" | "boolean";
+}> = [
+  { key: "defect_cache_enabled", label: "??????", type: "boolean" },
+  { key: "defect_cache_expand", label: "??????", type: "number" },
+  { key: "disk_cache_enabled", label: "????", type: "boolean" },
+  { key: "disk_cache_max_records", label: "????????", type: "number" },
+  { key: "disk_cache_scan_interval_seconds", label: "??????(?)", type: "number" },
+  { key: "disk_cache_cleanup_interval_seconds", label: "??????(?)", type: "number" },
+  { key: "disk_precache_enabled", label: "????", type: "boolean" },
+  { key: "disk_precache_levels", label: "????", type: "number" },
+  { key: "disk_precache_workers", label: "?????", type: "number" },
 ];
 
 const TASK_LABELS: Record<string, string> = {
@@ -297,7 +305,7 @@ export default function CacheDebug() {
   const handleSaveSettings = async () => {
     if (!cacheSettings) return;
     try {
-      const next = await updateCacheSettings(cacheSettings.cache || {});
+      const next = await updateCacheSettings(cacheSettings);
       setCacheSettings(next);
       toast.success("缓存设置已更新");
       setIsSettingsOpen(false);
@@ -860,8 +868,39 @@ export default function CacheDebug() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-3 text-xs">
-            {CACHE_FIELDS.map((field) => {
-              const value = cacheSettings?.cache?.[field.key];
+            <div className="col-span-2 text-[11px] text-muted-foreground">????</div>
+            {MEMORY_CACHE_FIELDS.map((field) => {
+              const value = cacheSettings?.memory_cache?.[field.key];
+              return (
+                <label key={field.key} className="flex flex-col gap-1">
+                  <span className="text-muted-foreground">
+                    {field.label}
+                    {field.hint ? <span className="ml-1 opacity-70">{field.hint}</span> : null}
+                  </span>
+                  <input
+                    type="number"
+                    value={value ?? ""}
+                    onChange={(e) =>
+                      setCacheSettings((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              memory_cache: {
+                                ...prev.memory_cache,
+                                [field.key]: Number(e.target.value),
+                              },
+                            }
+                          : prev,
+                      )
+                    }
+                    className="h-8 rounded-sm border border-border bg-background px-2 text-xs"
+                  />
+                </label>
+              );
+            })}
+            <div className="col-span-2 text-[11px] text-muted-foreground mt-2">????</div>
+            {DISK_CACHE_FIELDS.map((field) => {
+              const value = cacheSettings?.disk_cache?.[field.key];
               return (
                 <label key={field.key} className="flex flex-col gap-1">
                   <span className="text-muted-foreground">
@@ -876,8 +915,8 @@ export default function CacheDebug() {
                           prev
                             ? {
                                 ...prev,
-                                cache: {
-                                  ...prev.cache,
+                                disk_cache: {
+                                  ...prev.disk_cache,
                                   [field.key]: e.target.value === "true",
                                 },
                               }
@@ -886,8 +925,8 @@ export default function CacheDebug() {
                       }
                       className="h-8 rounded-sm border border-border bg-background px-2 text-xs"
                     >
-                      <option value="true">启用</option>
-                      <option value="false">禁用</option>
+                      <option value="true">??</option>
+                      <option value="false">??</option>
                     </select>
                   ) : (
                     <input
@@ -898,8 +937,8 @@ export default function CacheDebug() {
                           prev
                             ? {
                                 ...prev,
-                                cache: {
-                                  ...prev.cache,
+                                disk_cache: {
+                                  ...prev.disk_cache,
                                   [field.key]: Number(e.target.value),
                                 },
                               }

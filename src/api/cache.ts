@@ -41,8 +41,6 @@ export type CacheStatus = {
   line_name?: string | null;
   line_kind?: string | null;
   pid?: number | null;
-  cache_root_top?: string | null;
-  cache_root_bottom?: string | null;
   worker_per_surface?: number | null;
   paused?: boolean;
   task?: {
@@ -55,7 +53,8 @@ export type CacheStatus = {
 };
 
 export type CacheSettingsResponse = {
-  cache: Record<string, any>;
+  memory_cache: Record<string, any>;
+  disk_cache: Record<string, any>;
 };
 
 const mockItems: CacheRecordItem[] = Array.from({ length: 12 }).map((_, idx) => {
@@ -167,8 +166,6 @@ export async function getCacheStatus(): Promise<CacheStatus> {
       line_name: "Line-A",
       line_kind: "default",
       pid: 12345,
-      cache_root_top: "\\\\127.0.0.1\\imgsrc1",
-      cache_root_bottom: "\\\\127.0.0.1\\imgsrc2",
       worker_per_surface: 1,
       paused: false,
       task: null,
@@ -233,12 +230,14 @@ export async function getCacheLogs(
 export async function getCacheSettings(): Promise<CacheSettingsResponse> {
   if (env.isDevelopment()) {
     return {
-      cache: {
+      memory_cache: {
         max_frames: 64,
         max_tiles: 256,
         max_mosaics: 8,
         max_defect_crops: 256,
         ttl_seconds: 120,
+      },
+      disk_cache: {
         defect_cache_enabled: true,
         defect_cache_expand: 100,
         disk_cache_enabled: true,
@@ -260,7 +259,7 @@ export async function getCacheSettings(): Promise<CacheSettingsResponse> {
   return (await response.json()) as CacheSettingsResponse;
 }
 
-export async function updateCacheSettings(payload: Record<string, any>): Promise<CacheSettingsResponse> {
+export async function updateCacheSettings(payload: CacheSettingsResponse): Promise<CacheSettingsResponse> {
   if (env.isDevelopment()) {
     return getCacheSettings();
   }
@@ -268,7 +267,7 @@ export async function updateCacheSettings(payload: Record<string, any>): Promise
   const response = await fetch(url, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ cache: payload }),
+    body: JSON.stringify(payload),
   });
   if (!response.ok) {
     const data = await response.json().catch(() => null);

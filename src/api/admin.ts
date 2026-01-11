@@ -211,7 +211,12 @@ export interface CacheLineConfig {
   ip?: string;
   port?: number | null;
   overrides?: { images?: Record<string, any> };
-  views?: { view: string; images: Record<string, any> }[];
+  views?: {
+    view: string;
+    memory_cache?: Record<string, any>;
+    disk_cache?: Record<string, any>;
+    images?: Record<string, any>;
+  }[];
 }
 
 export interface CacheConfig {
@@ -221,7 +226,8 @@ export interface CacheConfig {
   map_path?: string;
   server_path?: string;
   templates: {
-    default?: Record<string, any>;
+    memory_cache?: Record<string, any>;
+    disk_cache?: Record<string, any>;
   };
   defaults: {
     images?: Record<string, any>;
@@ -232,12 +238,14 @@ export interface CacheConfig {
 }
 
 export interface CacheTemplateUpdatePayload {
-  default?: Record<string, any>;
+  memory_cache?: Record<string, any>;
+  disk_cache?: Record<string, any>;
 }
 
 export interface CacheLineUpdatePayload {
   key: string;
-  images?: Record<string, any>;
+  memory_cache?: Record<string, any>;
+  disk_cache?: Record<string, any>;
 }
 
 export interface CacheConfigUpdatePayload {
@@ -249,7 +257,8 @@ export interface TemplateConfigPayload {
   server: {
     database?: Record<string, any>;
     images?: Record<string, any>;
-    cache?: Record<string, any>;
+    memory_cache?: Record<string, any>;
+    disk_cache?: Record<string, any>;
   };
   defect_class: Record<string, any>;
 }
@@ -258,7 +267,8 @@ export interface TemplateConfigUpdatePayload {
   server?: {
     database?: Record<string, any>;
     images?: Record<string, any>;
-    cache?: Record<string, any>;
+    memory_cache?: Record<string, any>;
+    disk_cache?: Record<string, any>;
   };
   defect_class?: Record<string, any>;
 }
@@ -267,7 +277,8 @@ export interface LineViewOverridePayload {
   view: string;
   database?: Record<string, any>;
   images?: Record<string, any>;
-  cache?: Record<string, any>;
+  memory_cache?: Record<string, any>;
+  disk_cache?: Record<string, any>;
 }
 
 export interface LineSettingsPayload {
@@ -1041,7 +1052,14 @@ export async function getCacheConfig(): Promise<CacheConfig> {
       map_path: "configs/current/map.json",
       server_path: "configs/current/server.json",
       templates: {
-        default: {
+        memory_cache: {
+          max_frames: -1,
+          max_tiles: -1,
+          max_mosaics: 8,
+          max_defect_crops: 256,
+          ttl_seconds: 300,
+        },
+        disk_cache: {
           disk_cache_enabled: true,
           disk_cache_max_records: 20000,
           defect_cache_enabled: true,
@@ -1074,10 +1092,19 @@ export async function getCacheConfig(): Promise<CacheConfig> {
           views: [
             {
               view: "2D",
-              images: {
+              memory_cache: {
+                max_frames: -1,
+                max_tiles: -1,
+                max_mosaics: 8,
+                max_defect_crops: 256,
+                ttl_seconds: 300,
+              },
+              disk_cache: {
                 disk_cache_enabled: true,
                 defect_cache_enabled: true,
                 defect_cache_expand: 100,
+              },
+              images: {
                 frame_width: 16384,
                 frame_height: 1024,
                 pixel_scale: 1.0,
@@ -1085,10 +1112,19 @@ export async function getCacheConfig(): Promise<CacheConfig> {
             },
             {
               view: "small",
-              images: {
+              memory_cache: {
+                max_frames: -1,
+                max_tiles: -1,
+                max_mosaics: 8,
+                max_defect_crops: 256,
+                ttl_seconds: 300,
+              },
+              disk_cache: {
                 disk_cache_enabled: true,
                 defect_cache_enabled: true,
                 defect_cache_expand: 100,
+              },
+              images: {
                 frame_width: 8192,
                 frame_height: 512,
                 pixel_scale: 0.5,
@@ -1148,7 +1184,7 @@ export async function updateCacheConfig(payload: CacheConfigUpdatePayload): Prom
 export async function getTemplateConfig(): Promise<TemplateConfigPayload> {
   if (env.isDevelopment()) {
     return {
-      server: { database: {}, images: {}, cache: {} },
+      server: { database: {}, images: {}, memory_cache: {}, disk_cache: {} },
       defect_class: {},
     };
   }
