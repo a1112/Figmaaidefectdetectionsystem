@@ -110,6 +110,7 @@ export default function CacheDebug() {
   const [cacheLogs, setCacheLogs] = useState<any[]>([]);
   const cacheLogCursorRef = useRef(0);
   const logRef = useRef<HTMLDivElement | null>(null);
+  const [logAutoRefresh, setLogAutoRefresh] = useState(true);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isRebuildOpen, setIsRebuildOpen] = useState(false);
   const [isMigrateOpen, setIsMigrateOpen] = useState(false);
@@ -174,6 +175,9 @@ export default function CacheDebug() {
   }, []);
 
   useEffect(() => {
+    if (!logAutoRefresh) {
+      return;
+    }
     let timer: number | null = null;
     const loadLogs = async () => {
       try {
@@ -195,7 +199,7 @@ export default function CacheDebug() {
     return () => {
       if (timer) window.clearInterval(timer);
     };
-  }, []);
+  }, [logAutoRefresh]);
 
   useEffect(() => {
     if (!logRef.current) return;
@@ -395,16 +399,8 @@ export default function CacheDebug() {
                   )}
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                  {cacheStatus?.line_key ? (
-                    <span>
-                      实例：{cacheStatus.line_key}
-                      {cacheStatus.line_kind ? `/${cacheStatus.line_kind}` : ""}
-                      {cacheStatus.pid ? ` PID:${cacheStatus.pid}` : ""}
-                    </span>
-                  ) : null}
                   {cacheStatus?.seq_no ? <span>流水号：{cacheStatus.seq_no}</span> : null}
                   {cacheStatus?.surface ? <span>表面：{cacheStatus.surface}</span> : null}
-                  {cacheStatus?.view ? <span>视图：{cacheStatus.view}</span> : null}
                   {cacheStatus?.task ? (
                     <span>
                       任务：{TASK_LABELS[cacheStatus.task.type || ""] || "未知"}
@@ -488,8 +484,6 @@ export default function CacheDebug() {
             <div className="border border-border rounded-sm p-3 bg-card/70">
               <div className="text-xs font-semibold text-muted-foreground mb-2">基础数据信息</div>
               <div className="grid gap-1 text-[11px] text-muted-foreground">
-                {cacheStatus?.cache_root_top ? <div>上表存储位置：{cacheStatus.cache_root_top}</div> : null}
-                {cacheStatus?.cache_root_bottom ? <div>下表存储位置：{cacheStatus.cache_root_bottom}</div> : null}
                 <div>单表面工作线程数量：{cacheStatus?.worker_per_surface ?? 1}</div>
               </div>
             </div>
@@ -542,8 +536,17 @@ export default function CacheDebug() {
           </div>
         </div>
         <div className="border border-border rounded-sm bg-card/70 flex flex-col overflow-hidden shrink-0">
-          <div className="px-3 py-2 text-[11px] font-semibold text-muted-foreground border-b border-border/60">
-            缓存过程日志
+          <div className="px-3 py-2 text-[11px] font-semibold text-muted-foreground border-b border-border/60 flex items-center justify-between">
+            <span>缓存过程日志</span>
+            <label className="inline-flex items-center gap-2 text-[10px] font-normal text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={logAutoRefresh}
+                onChange={(event) => setLogAutoRefresh(event.target.checked)}
+                className="h-3 w-3 rounded border border-border"
+              />
+              保持最新
+            </label>
           </div>
           <div
             ref={logRef}
@@ -561,7 +564,6 @@ export default function CacheDebug() {
                       {item.data?.seq_no ? `流水号:${item.data.seq_no}` : ""}
                       {item.data?.steel_no ? ` 板号:${item.data.steel_no}` : ""}
                       {item.data?.surfaces?.length ? ` 表面:${item.data.surfaces.join("/")}` : ""}
-                      {item.data?.view ? ` ${item.data.view}` : ""}
                       {item.data?.precache_levels !== undefined ? ` L${item.data.precache_levels}` : ""}
                       {item.data?.defect_cache_enabled !== undefined
                         ? ` 缺陷:${item.data.defect_cache_enabled ? "是" : "否"}`
