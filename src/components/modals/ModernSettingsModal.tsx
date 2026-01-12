@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 import type { ImageOrientation } from "../types/app.types";
 import { useTheme, themePresets } from "../ThemeContext";
+import type { ApiNode } from "../../api/types";
+import { InfoPanel } from "../InfoPanel";
 
 interface ModernSettingsModalProps {
   isOpen: boolean;
@@ -30,6 +32,9 @@ interface ModernSettingsModalProps {
   setShowDistributionImages: (show: boolean) => void;
   showTileBorders: boolean;
   setShowTileBorders: (show: boolean) => void;
+  lineKey?: string;
+  apiNodes?: ApiNode[];
+  companyName?: string;
 }
 
 export function ModernSettingsModal({
@@ -41,6 +46,9 @@ export function ModernSettingsModal({
   setShowDistributionImages,
   showTileBorders,
   setShowTileBorders,
+  lineKey,
+  apiNodes,
+  companyName,
 }: ModernSettingsModalProps) {
   const { currentTheme, applyTheme } = useTheme();
   const [activeSubTab, setActiveSubTab] = React.useState<"ui" | "theme" | "shortcuts" | "about">("ui");
@@ -88,7 +96,7 @@ export function ModernSettingsModal({
               }`}
             >
               <Info className="w-3.5 h-3.5" />
-              关于系统
+              系统信息
             </button>
           </div>
 
@@ -312,21 +320,19 @@ export function ModernSettingsModal({
                 <DialogHeader className="p-6 pb-4">
                   <DialogTitle className="flex items-center gap-2 text-lg">
                     <Info className="w-5 h-5 text-primary" />
-                    关于系统
+                    系统信息
                   </DialogTitle>
                   <DialogDescription className="text-xs">
-                    STEEL-EYE PRO 钢板缺陷检测系统。
+                    服务信息、API 参数与公司权益说明
                   </DialogDescription>
                 </DialogHeader>
-                <div className="flex-1 p-6 pt-0 flex flex-col items-center justify-center text-center space-y-2">
-                  <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-2">
-                    <Layers className="w-8 h-8 text-primary" />
-                  </div>
-                  <div className="text-sm font-bold">STEEL-EYE PRO</div>
-                  <div className="text-[10px] text-muted-foreground font-mono">v2.0.1 (Stable Build)</div>
-                  <div className="text-[10px] text-muted-foreground mt-4 max-w-[200px]">
-                    © 2026 Industrial Inspection Systems Ltd. All rights reserved.
-                  </div>
+                <div className="flex-1 overflow-y-auto p-6 pt-0">
+                  <InfoPanel
+                    variant="modern"
+                    lineKey={lineKey}
+                    apiNodes={apiNodes}
+                    companyName={companyName}
+                  />
                 </div>
               </>
             )}

@@ -381,6 +381,8 @@ export function DefectDistributionChart({
     };
   };
 
+  const orientation: ImageOrientation = _imageOrientation ?? "horizontal";
+
   const renderPlate = (
     surf: Surface,
     containerHeight: number,
@@ -404,8 +406,6 @@ export function DefectDistributionChart({
     const frameCount = meta?.frame_count || 1;
 
     const tileImages: JSX.Element[] = [];
-    const orientation: ImageOrientation = "horizontal";
-
     if (
       showDistributionImages &&
       meta &&
@@ -486,23 +486,14 @@ export function DefectDistributionChart({
               continue;
             }
 
-            const tileX =
-              orientation === "horizontal"
-                ? requestInfo.tileY
-                : requestInfo.tileX;
-            const tileY =
-              orientation === "horizontal"
-                ? requestInfo.tileX
-                : requestInfo.tileY;
-
             const url = getTileImageUrl({
               surface: surf,
               seqNo: seqNo as number,
               level,
-              tileX,
-              tileY,
+              tileX: requestInfo.tileX,
+              tileY: requestInfo.tileY,
               tileSize,
-              view: "horizontal",
+              view: orientation,
             });
 
             const localX = x - surfaceLayout.offsetX;

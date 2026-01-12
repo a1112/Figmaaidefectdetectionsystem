@@ -435,7 +435,7 @@ export default function TraditionalMode() {
   const [isDefectListOpen, setIsDefectListOpen] = useState(true);
   const [isImmersiveMode, setIsImmersiveMode] = useState(false);
   const [isMapMode, setIsMapMode] = useState(false);
-  const [companyName, setCompanyName] = useState("数据测试平台");
+  const [companyName, setCompanyName] = useState("北京科技大学设计研究院有限公司");
   const [mapViewport, setMapViewport] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const [mapCursor, setMapCursor] = useState("grab");
   const [topCursor, setTopCursor] = useState("grab");
@@ -495,6 +495,19 @@ export default function TraditionalMode() {
     if (surfaceFilter === "all") return visibleDefects;
     return visibleDefects.filter((defect) => defect.surface === surfaceFilter);
   }, [visibleDefects, surfaceFilter]);
+  const topDistributionDefects = useMemo(() => {
+    if (surfaceFilter === "all") {
+      return visibleDefects.filter((defect) => defect.surface === "top");
+    }
+    return distributionDefects;
+  }, [visibleDefects, distributionDefects, surfaceFilter]);
+  const bottomDistributionDefects = useMemo(() => {
+    if (surfaceFilter === "all") {
+      return visibleDefects.filter((defect) => defect.surface === "bottom");
+    }
+    return surfaceFilter === "bottom" ? distributionDefects : [];
+  }, [visibleDefects, distributionDefects, surfaceFilter]);
+
 
   const analysisOrientation: ImageOrientation = "vertical";
   const analysisTopMeta = useMemo(
@@ -1926,7 +1939,11 @@ export default function TraditionalMode() {
                     )}
                   </DropdownMenuContent>
                 </DropdownMenu>
-                <button onClick={() => setIsSettingsOpen(true)} className="text-[#8b949e] hover:text-white transition-colors" title="系统设置">
+                <button
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="text-[#8b949e] hover:text-white transition-colors"
+                  title="系统设置"
+                >
                   <Settings className="w-4 h-4" />
                 </button>
                 <DropdownMenu>
@@ -2076,6 +2093,9 @@ export default function TraditionalMode() {
         setIsImageFit={setIsImageFit}
         refreshLimit={refreshLimit}
         setRefreshLimit={setRefreshLimit}
+        lineKey={currentLineKey}
+        apiNodes={apiNodes}
+        companyName={companyName}
       />
 
       <SystemDiagnosticDialog
@@ -2719,7 +2739,7 @@ export default function TraditionalMode() {
                  <div className="w-full h-px bg-[#30363d]/20 absolute top-[75%]" />
                  
                  {/* Real Defect points mapping */}
-                  {distributionDefects.map((defect, index) => {
+                  {topDistributionDefects.map((defect, index) => {
                    const plateLength = selectedPlate?.dimensions.length || 8000;
                    const plateWidth = selectedPlate?.dimensions.width || 2000;
                    const xMm = defect.xMm ?? defect.x;
@@ -3611,6 +3631,52 @@ export default function TraditionalMode() {
                    }}
                  />
                )}
+              <div className="w-full h-full relative flex justify-center">
+                <div className="w-[80%] h-full bg-[#161b22] relative border-x border-[#30363d]">
+                  <div className="w-px h-full bg-[#30363d]/50 absolute left-1/2 -translate-x-1/2" />
+                  <div className="w-full h-px bg-[#30363d]/20 absolute top-[25%]" />
+                  <div className="w-full h-px bg-[#30363d]/20 absolute top-[50%]" />
+                  <div className="w-full h-px bg-[#30363d]/20 absolute top-[75%]" />
+
+                  {bottomDistributionDefects.map((defect, index) => {
+                    const plateLength = selectedPlate?.dimensions.length || 8000;
+                    const plateWidth = selectedPlate?.dimensions.width || 2000;
+                    const xMm = defect.xMm ?? defect.x;
+                    const yMm = defect.yMm ?? defect.y;
+
+                    const topPos = (yMm / plateLength) * 100;
+                    const leftPos = (xMm / plateWidth) * 100;
+                    const keySuffix = `${defect.id ?? index}-${defect.surface ?? "unknown"}`;
+
+                    return (
+                      <div
+                        key={`dist-dot-bottom-${keySuffix}`}
+                        onMouseEnter={(e) =>
+                          setHoveredDefect({
+                            defect,
+                            screenX: e.clientX,
+                            screenY: e.clientY,
+                          })
+                        }
+                        onMouseMove={(e) =>
+                          setHoveredDefect({
+                            defect,
+                            screenX: e.clientX,
+                            screenY: e.clientY,
+                          })
+                        }
+                        onMouseLeave={() => setHoveredDefect(null)}
+                        className="absolute w-2 h-2 rounded-full border border-white/30 -translate-x-1/2 -translate-y-1/2 z-10 bg-[#f85149]"
+                        style={{
+                          top: `${Math.max(0, Math.min(100, topPos))}%`,
+                          left: `${Math.max(0, Math.min(100, leftPos))}%`,
+                          boxShadow: "0 0 6px rgba(248,81,73,0.6)",
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
               <div className="w-px h-full bg-[#30363d] absolute" />
               <div className="absolute right-0 top-1/2 -rotate-90 origin-right text-[10px] text-[#8b949e] tracking-widest whitespace-nowrap translate-x-12">
                 传动侧分布

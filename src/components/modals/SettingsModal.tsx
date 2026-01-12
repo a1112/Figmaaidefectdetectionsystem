@@ -5,10 +5,12 @@ import {
   Maximize2, Minimize2, ZoomIn, ZoomOut, RefreshCcw, Clock,
   Layout, BarChart3, AlertCircle, FileText, ChevronDown,
   LogOut, Box, Terminal, Home, Calendar, LayoutGrid,
-  Keyboard, MousePointer2, X
+  Keyboard, MousePointer2, X, Info
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner@2.0.3";
+import type { ApiNode } from "../../api/types";
+import { InfoPanel } from "../InfoPanel";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -19,6 +21,9 @@ interface SettingsModalProps {
   setIsImageFit: (val: boolean) => void;
   refreshLimit: number;
   setRefreshLimit: (val: number) => void;
+  lineKey?: string;
+  apiNodes?: ApiNode[];
+  companyName?: string;
 }
 
 export function SettingsModal({
@@ -30,8 +35,11 @@ export function SettingsModal({
   setIsImageFit,
   refreshLimit,
   setRefreshLimit,
+  lineKey,
+  apiNodes,
+  companyName,
 }: SettingsModalProps) {
-  const [activeSettingsTab, setActiveSettingsTab] = useState<"display" | "keyboard">("display");
+  const [activeSettingsTab, setActiveSettingsTab] = useState<"display" | "keyboard" | "info">("display");
 
   return (
     <AnimatePresence>
@@ -74,6 +82,12 @@ export function SettingsModal({
                   className={`w-full px-4 py-3 text-left text-[11px] font-bold transition-all border-l-2 flex items-center gap-2 ${activeSettingsTab === 'keyboard' ? 'text-[#58a6ff] border-[#58a6ff] bg-[#58a6ff]/5' : 'text-[#8b949e] border-transparent hover:text-[#c9d1d9]'}`}
                 >
                   <Keyboard className="w-3.5 h-3.5" /> 快捷指令
+                </button>
+                <button 
+                  onClick={() => setActiveSettingsTab("info")}
+                  className={`w-full px-4 py-3 text-left text-[11px] font-bold transition-all border-l-2 flex items-center gap-2 ${activeSettingsTab === 'info' ? 'text-[#58a6ff] border-[#58a6ff] bg-[#58a6ff]/5' : 'text-[#8b949e] border-transparent hover:text-[#c9d1d9]'}`}
+                >
+                  <Info className="w-3.5 h-3.5" /> 系统信息
                 </button>
               </div>
 
@@ -132,7 +146,7 @@ export function SettingsModal({
                       </div>
                     </div>
                   </>
-                ) : (
+                ) : activeSettingsTab === "keyboard" ? (
                   <div className="space-y-4">
                     <div className="p-3 bg-[#0d1117] border border-[#30363d] rounded-sm">
                       <div className="text-[10px] text-[#8b949e] font-bold mb-3 uppercase flex items-center gap-2">
@@ -169,6 +183,13 @@ export function SettingsModal({
                       * 快捷键在主视图聚焦时自动生效，可大幅提升复核判定效率。
                     </p>
                   </div>
+                ) : (
+                  <InfoPanel
+                    variant="traditional"
+                    lineKey={lineKey}
+                    apiNodes={apiNodes}
+                    companyName={companyName}
+                  />
                 )}
               </div>
             </div>

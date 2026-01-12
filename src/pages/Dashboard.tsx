@@ -1132,6 +1132,8 @@ export function Dashboard() {
         setShowDistributionImages={setShowDistributionImages}
         showTileBorders={showTileBorders}
         setShowTileBorders={setShowTileBorders}
+        lineKey={activeLineKey}
+        apiNodes={apiNodes}
       />
       <Toaster />
       {hoveredDefect && (
