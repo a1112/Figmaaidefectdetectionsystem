@@ -1,5 +1,48 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import {
+  createDefectAnnotationsBulk,
+  deleteDefectAnnotation,
+  getDefectAnnotations,
+  updateDefectAnnotation,
+} from '../../api/client';
+import type { DefectAnnotationCreate } from '../../api/types';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
 import { clamp, getVisibleTiles, Size, Point, Tile } from './utils';
+
+type AnnotationSurface = "top" | "bottom";
+
+type AnnotationRect = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+type AnnotationMeta = {
+  surface: AnnotationSurface;
+  view: string;
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+};
+
+type DefectClassOption = {
+  id: number;
+  name: string;
+  color?: string;
+};
+
+type ClassPickerTarget = {
+  type: "default" | "new" | "edit";
+  markId?: string;
+};
 
 interface LargeImageViewerProps {
   imageWidth: number;
@@ -114,6 +157,14 @@ interface LargeImageViewerProps {
     screenY: number;
     scale: number;
   }) => boolean | void;
+  annotationContext?: {
+    lineKey: string;
+    seqNo: number;
+    view: string;
+    user?: string | null;
+  } | null;
+  resolveAnnotationMeta?: (rect: AnnotationRect) => AnnotationMeta | null;
+  defectClasses?: DefectClassOption[];
 }
 
 export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
@@ -142,6 +193,9 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
   onPointerMove,
   onPointerLeave,
   onPointerDown,
+  annotationContext,
+  resolveAnnotationMeta,
+  defectClasses = [],
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   // 双 canvas：底层保留上一轮内容，顶层用于当前绘制（便于后续扩展双 LOD 图层）
@@ -152,9 +206,50 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
   const transform = useRef({ x: 0, y: 0, scale: 1 });
   const isDragging = useRef(false);
   const lastMousePosition = useRef<Point>({ x: 0, y: 0 });
+  const zoomAnimRef = useRef<number | null>(null);
+  const drawingRef = useRef<{
+    mode: "measure" | "mark";
+    start: Point;
+    end: Point;
+  } | null>(null);
+  const editActionRef = useRef<{
+    type: "move" | "resize";
+    markId: string;
+    start: Point;
+    origin: AnnotationRect;
+    handle?: "nw" | "ne" | "sw" | "se";
+  } | null>(null);
   
   // Container size state
   const [containerSize, setContainerSize] = useState<Size>({ width: 0, height: 0 });
+  const [drawMode, setDrawMode] = useState<"none" | "view" | "measure" | "mark">("none");
+  const [showScrollbars, setShowScrollbars] = useState(false);
+  const [showMeasureData, setShowMeasureData] = useState(true);
+  const [showMarkData, setShowMarkData] = useState(true);
+  const [showSubmittedMarks, setShowSubmittedMarks] = useState(true);
+  const [showDraftMarks, setShowDraftMarks] = useState(true);
+  const [autoSubmitMarks, setAutoSubmitMarks] = useState(false);
+  const [defaultClass, setDefaultClass] = useState<DefectClassOption | null>(null);
+  const [measureRects, setMeasureRects] = useState<AnnotationRect[]>([]);
+  const [markRects, setMarkRects] = useState<
+    (AnnotationRect & {
+      id: string;
+      status: "draft" | "submitted";
+      classId?: number;
+      className?: string;
+      mark?: string;
+      surface?: AnnotationSurface;
+      view?: string;
+      serverId?: number;
+    })[]
+  >([]);
+  const [selectedMarkId, setSelectedMarkId] = useState<string | null>(null);
+  const [classPickerOpen, setClassPickerOpen] = useState(false);
+  const [classPickerTarget, setClassPickerTarget] = useState<ClassPickerTarget | null>(null);
+  const [markEditorOpen, setMarkEditorOpen] = useState(false);
+  const [markEditorTargetId, setMarkEditorTargetId] = useState<string | null>(null);
+  const [pendingMarkRect, setPendingMarkRect] = useState<AnnotationRect | null>(null);
+  const [pendingMarkLabel, setPendingMarkLabel] = useState("");
   
   // Force render for UI overlays (like zoom level text)
   const [, setTick] = useState(0);
@@ -188,6 +283,203 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
     },
     [imageWidth, tileSize, maxLevelProp],
   );
+
+  const getDrawRect = (current: { start: Point; end: Point }) => {
+    const x = Math.min(current.start.x, current.end.x);
+    const y = Math.min(current.start.y, current.end.y);
+    const width = Math.abs(current.start.x - current.end.x);
+    const height = Math.abs(current.start.y - current.end.y);
+    return { x, y, width, height };
+  };
+
+  const drawRects = (
+    ctx: CanvasRenderingContext2D,
+    scale: number,
+    rects: { x: number; y: number; width: number; height: number }[],
+    stroke: string,
+  ) => {
+    ctx.save();
+    ctx.lineWidth = 2 / scale;
+    ctx.strokeStyle = stroke;
+    rects.forEach((rect) => {
+      ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
+    });
+    ctx.restore();
+  };
+
+  const drawActiveRect = (
+    ctx: CanvasRenderingContext2D,
+    scale: number,
+    rect: { x: number; y: number; width: number; height: number },
+    stroke: string,
+  ) => {
+    ctx.save();
+    ctx.lineWidth = 2 / scale;
+    ctx.strokeStyle = stroke;
+    ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
+    ctx.fillStyle = stroke;
+    ctx.translate(rect.x + 6 / scale, rect.y + 14 / scale);
+    const textScale = 1 / scale;
+    ctx.scale(textScale, textScale);
+    ctx.font = '12px sans-serif';
+    ctx.fillText(`${Math.round(rect.width)} × ${Math.round(rect.height)}`, 0, 0);
+    ctx.restore();
+  };
+
+  const findMarkAtPoint = useCallback((worldX: number, worldY: number) => {
+    for (let i = markRects.length - 1; i >= 0; i -= 1) {
+      const rect = markRects[i];
+      if (
+        worldX >= rect.x &&
+        worldX <= rect.x + rect.width &&
+        worldY >= rect.y &&
+        worldY <= rect.y + rect.height
+      ) {
+        return rect;
+      }
+    }
+    return null;
+  }, [markRects]);
+
+  const getResizeHandle = useCallback(
+    (
+      rect: AnnotationRect,
+      worldX: number,
+      worldY: number,
+      scale: number,
+    ) => {
+      const threshold = 8 / Math.max(scale, 1e-3);
+      const left = rect.x;
+      const right = rect.x + rect.width;
+      const top = rect.y;
+      const bottom = rect.y + rect.height;
+      const nearLeft = Math.abs(worldX - left) <= threshold;
+      const nearRight = Math.abs(worldX - right) <= threshold;
+      const nearTop = Math.abs(worldY - top) <= threshold;
+      const nearBottom = Math.abs(worldY - bottom) <= threshold;
+      if (nearLeft && nearTop) return "nw";
+      if (nearRight && nearTop) return "ne";
+      if (nearLeft && nearBottom) return "sw";
+      if (nearRight && nearBottom) return "se";
+      return null;
+    },
+    [],
+  );
+
+  const buildAnnotationPayload = useCallback(
+    (
+      rect: AnnotationRect,
+      classOption: DefectClassOption | null,
+      markLabel?: string | null,
+    ): DefectAnnotationCreate | null => {
+      if (!annotationContext) return null;
+      const meta = resolveAnnotationMeta?.(rect);
+      const left = Math.round(rect.x);
+      const top = Math.round(rect.y);
+      const right = Math.round(rect.x + rect.width);
+      const bottom = Math.round(rect.y + rect.height);
+      return {
+        line_key: annotationContext.lineKey,
+        seq_no: annotationContext.seqNo,
+        surface: meta?.surface ?? "top",
+        view: meta?.view ?? annotationContext.view,
+        user: annotationContext.user ?? null,
+        method: "manual",
+        bbox: { left, top, right, bottom },
+        class_id: classOption?.id ?? null,
+        class_name: classOption?.name ?? null,
+        mark: markLabel ?? null,
+        export_payload: null,
+        extra: null,
+      };
+    },
+    [annotationContext, resolveAnnotationMeta],
+  );
+
+  const buildAnnotationUpdatePayload = useCallback(
+    (rect: AnnotationRect, classOption: DefectClassOption | null, markLabel?: string | null) => {
+      const left = Math.round(rect.x);
+      const top = Math.round(rect.y);
+      const right = Math.round(rect.x + rect.width);
+      const bottom = Math.round(rect.y + rect.height);
+      return {
+        method: "manual",
+        bbox: { left, top, right, bottom },
+        class_id: classOption?.id ?? null,
+        class_name: classOption?.name ?? null,
+        mark: markLabel ?? null,
+      };
+    },
+    [],
+  );
+
+  const submitDraftMarks = useCallback(
+    async (drafts: typeof markRects) => {
+      if (!annotationContext || drafts.length === 0) return;
+      try {
+        const payload = drafts
+          .map((item) => {
+            const classOption =
+              item.classId != null
+                ? { id: item.classId, name: item.className ?? "" }
+                : null;
+            return buildAnnotationPayload(item, classOption, item.mark);
+          })
+          .filter((item): item is DefectAnnotationCreate => Boolean(item));
+        if (payload.length === 0) return;
+        const res = await createDefectAnnotationsBulk(payload);
+        setMarkRects((prev) => {
+          const submitted = res.items.map((item, index) => ({
+            id: `${item.id}-${index}`,
+            x: item.bbox.left,
+            y: item.bbox.top,
+            width: item.bbox.right - item.bbox.left,
+            height: item.bbox.bottom - item.bbox.top,
+            status: "submitted" as const,
+            classId: item.class_id ?? undefined,
+            className: item.class_name ?? undefined,
+            mark: item.mark ?? undefined,
+            surface: item.surface,
+            view: item.view,
+            serverId: item.id,
+          }));
+          const remaining = prev.filter((item) => item.status !== "draft");
+          return [...remaining, ...submitted];
+        });
+        setSelectedMarkId(null);
+      } catch (error) {
+        console.warn("Failed to submit annotations:", error);
+      }
+    },
+    [annotationContext, buildAnnotationPayload],
+  );
+
+  const syncSubmittedMark = useCallback(
+    async (mark: (typeof markRects)[number]) => {
+      if (!mark.serverId) return;
+      const payload = buildAnnotationUpdatePayload(
+        mark,
+        mark.classId != null
+          ? { id: mark.classId, name: mark.className ?? "" }
+          : null,
+        mark.mark,
+      );
+      try {
+        await updateDefectAnnotation(mark.serverId, payload);
+      } catch (error) {
+        console.warn("Failed to update annotation:", error);
+      }
+    },
+    [buildAnnotationUpdatePayload],
+  );
+
+  const removeSubmittedMark = useCallback(async (markId: number) => {
+    try {
+      await deleteDefectAnnotation(markId);
+    } catch (error) {
+      console.warn("Failed to delete annotation:", error);
+    }
+  }, []);
 
   const clampTransform = useCallback(
     (next: { x: number; y: number; scale: number }) => {
@@ -406,6 +698,28 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
       renderOverlay(ctx, scale);
     }
 
+    if (drawMode !== "none") {
+      if (showMeasureData) {
+        drawRects(ctx, scale, measureRects, '#22d3ee');
+      }
+      if (showMarkData) {
+        const visibleMarks = markRects.filter((item) => {
+          if (item.status === "submitted") return showSubmittedMarks;
+          return showDraftMarks;
+        });
+        drawRects(ctx, scale, visibleMarks, '#fb923c');
+        const selected = visibleMarks.find((item) => item.id === selectedMarkId);
+        if (selected) {
+          drawActiveRect(ctx, scale, selected, '#fbbf24');
+        }
+      }
+      if (drawingRef.current) {
+        const rect = getDrawRect(drawingRef.current);
+        const color = drawingRef.current.mode === "measure" ? '#22d3ee' : '#fb923c';
+        drawActiveRect(ctx, scale, rect, color);
+      }
+    }
+
     ctx.restore();
   }, [
     computePreferredLevel,
@@ -421,6 +735,14 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
     prefetchMargin,
     renderOverlay,
     renderTile,
+    drawMode,
+    showMeasureData,
+    showMarkData,
+    showSubmittedMarks,
+    showDraftMarks,
+    measureRects,
+    markRects,
+    selectedMarkId,
     tileSize,
   ]);
 
@@ -496,6 +818,53 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
     transform.current = clampTransform({ x: newX, y: newY, scale: nextScale });
     setTick(t => t + 1);
   }, [forcedScale, containerSize, clampTransform]);
+
+  useEffect(() => {
+    if (!annotationContext) {
+      return;
+    }
+    let cancelled = false;
+    const loadAnnotations = async () => {
+      try {
+        const res = await getDefectAnnotations({
+          lineKey: annotationContext.lineKey,
+          seqNo: annotationContext.seqNo,
+          view: annotationContext.view,
+        });
+        if (cancelled) return;
+        const submitted = res.items.map((item) => ({
+          id: `server-${item.id}`,
+          x: item.bbox.left,
+          y: item.bbox.top,
+          width: item.bbox.right - item.bbox.left,
+          height: item.bbox.bottom - item.bbox.top,
+          status: "submitted" as const,
+          classId: item.class_id ?? undefined,
+          className: item.class_name ?? undefined,
+          mark: item.mark ?? undefined,
+          surface: item.surface,
+          view: item.view,
+          serverId: item.id,
+        }));
+        setMarkRects((prev) => {
+          const drafts = prev.filter((item) => item.status === "draft");
+          return [...drafts, ...submitted];
+        });
+      } catch (error) {
+        console.warn("Failed to load annotations:", error);
+      }
+    };
+    loadAnnotations();
+    return () => {
+      cancelled = true;
+    };
+  }, [annotationContext]);
+
+  useEffect(() => {
+    if (selectedMarkId && !markRects.some((item) => item.id === selectedMarkId)) {
+      setSelectedMarkId(null);
+    }
+  }, [selectedMarkId, markRects]);
 
   // Center Target - keep scale, only pan to a point
   useEffect(() => {
@@ -616,7 +985,179 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
     };
   }, []);
 
+  const addDraftMark = useCallback(
+    (
+      rect: AnnotationRect,
+      classOption: DefectClassOption | null,
+      markLabel?: string | null,
+    ) => {
+      const meta = resolveAnnotationMeta?.(rect);
+      const newMark = {
+        id: `draft-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+        status: "draft" as const,
+        classId: classOption?.id,
+        className: classOption?.name,
+        mark: markLabel ?? undefined,
+        surface: meta?.surface,
+        view: meta?.view,
+      };
+      setMarkRects((prev) => [...prev, newMark]);
+      setSelectedMarkId(newMark.id);
+      return newMark;
+    },
+    [resolveAnnotationMeta],
+  );
+
+  const finalizeDrawing = useCallback(() => {
+    if (!drawingRef.current) return;
+    const rect = getDrawRect(drawingRef.current);
+    if (rect.width >= 2 && rect.height >= 2) {
+      if (drawingRef.current.mode === "measure") {
+        setMeasureRects((prev) => [...prev, rect]);
+      } else {
+        if (defaultClass) {
+          const mark = addDraftMark(rect, defaultClass);
+          if (autoSubmitMarks) {
+            submitDraftMarks([mark]);
+          }
+        } else {
+          setPendingMarkRect(rect);
+          setClassPickerTarget({ type: "new" });
+          setClassPickerOpen(true);
+        }
+      }
+    }
+    drawingRef.current = null;
+    setTick(t => t + 1);
+  }, [getDrawRect, defaultClass, addDraftMark, autoSubmitMarks, submitDraftMarks]);
+
+  const clearMeasure = useCallback(() => {
+    setMeasureRects([]);
+    if (drawingRef.current?.mode === "measure") {
+      drawingRef.current = null;
+    }
+    setTick(t => t + 1);
+  }, []);
+
+  const exitEditMode = useCallback(() => {
+    setDrawMode("none");
+    setMeasureRects([]);
+    setMarkRects((prev) => prev.filter((item) => item.status === "submitted"));
+    drawingRef.current = null;
+    setTick(t => t + 1);
+  }, []);
+
+  const updateMarkById = useCallback(
+    (
+      markId: string,
+      updates: Partial<(typeof markRects)[number]>,
+    ) => {
+      setMarkRects((prev) =>
+        prev.map((item) =>
+          item.id === markId ? { ...item, ...updates } : item,
+        ),
+      );
+    },
+    [],
+  );
+
+  const handleClassPick = useCallback(
+    (option: DefectClassOption) => {
+      if (!classPickerTarget) {
+        setClassPickerOpen(false);
+        return;
+      }
+      if (classPickerTarget.type === "default") {
+        setDefaultClass(option);
+      } else if (classPickerTarget.type === "new") {
+        if (pendingMarkRect) {
+          const mark = addDraftMark(pendingMarkRect, option);
+          if (autoSubmitMarks) {
+            submitDraftMarks([mark]);
+          }
+        }
+      } else if (classPickerTarget.type === "edit" && classPickerTarget.markId) {
+        updateMarkById(classPickerTarget.markId, {
+          classId: option.id,
+          className: option.name,
+        });
+        const selected = markRects.find((item) => item.id === classPickerTarget.markId);
+        if (selected?.status === "submitted") {
+          syncSubmittedMark({ ...selected, classId: option.id, className: option.name });
+        }
+      }
+      setPendingMarkRect(null);
+      setClassPickerTarget(null);
+      setClassPickerOpen(false);
+    },
+    [
+      classPickerTarget,
+      pendingMarkRect,
+      addDraftMark,
+      autoSubmitMarks,
+      submitDraftMarks,
+      updateMarkById,
+      markRects,
+      syncSubmittedMark,
+    ],
+  );
+
+  const handleMarkSave = useCallback(() => {
+    if (!markEditorTargetId) {
+      setMarkEditorOpen(false);
+      return;
+    }
+    updateMarkById(markEditorTargetId, { mark: pendingMarkLabel });
+    const selected = markRects.find((item) => item.id === markEditorTargetId);
+    if (selected?.status === "submitted") {
+      syncSubmittedMark({ ...selected, mark: pendingMarkLabel });
+    }
+    setMarkEditorTargetId(null);
+    setMarkEditorOpen(false);
+  }, [markEditorTargetId, pendingMarkLabel, updateMarkById, markRects, syncSubmittedMark]);
+
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button === 2 && drawMode !== "none") {
+      isDragging.current = true;
+      lastMousePosition.current = { x: e.clientX, y: e.clientY };
+      return;
+    }
+
+    if (e.button === 0 && drawMode === "mark") {
+      const info = resolvePointerInfo(e.clientX, e.clientY);
+      if (!info) return;
+      const hit = findMarkAtPoint(info.worldX, info.worldY);
+      if (hit) {
+        setSelectedMarkId(hit.id);
+        const handle = getResizeHandle(hit, info.worldX, info.worldY, info.scale);
+        editActionRef.current = {
+          type: handle ? "resize" : "move",
+          markId: hit.id,
+          start: { x: info.worldX, y: info.worldY },
+          origin: { x: hit.x, y: hit.y, width: hit.width, height: hit.height },
+          handle: handle ?? undefined,
+        };
+        return;
+      }
+      setSelectedMarkId(null);
+    }
+
+    if (e.button === 0 && (drawMode === "measure" || drawMode === "mark")) {
+      const info = resolvePointerInfo(e.clientX, e.clientY);
+      if (!info) return;
+      drawingRef.current = {
+        mode: drawMode,
+        start: { x: info.worldX, y: info.worldY },
+        end: { x: info.worldX, y: info.worldY },
+      };
+      setTick(t => t + 1);
+      return;
+    }
+
     const info = resolvePointerInfo(e.clientX, e.clientY);
     if (info && onPointerDown) {
       const handled = onPointerDown(info);
@@ -626,9 +1167,109 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
     }
     isDragging.current = true;
     lastMousePosition.current = { x: e.clientX, y: e.clientY };
-  }, [onPointerDown, resolvePointerInfo]);
+  }, [onPointerDown, resolvePointerInfo, drawMode, findMarkAtPoint, getResizeHandle]);
+
+  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+    if (e.ctrlKey) {
+      setDrawMode("view");
+      return;
+    }
+    if (lockScale) {
+      return;
+    }
+    const info = resolvePointerInfo(e.clientX, e.clientY);
+    if (!info) return;
+    const current = transform.current;
+    const currentLevel = computePreferredLevel(current.scale);
+    const { minScale, maxScale } = getConstraints();
+    const targetScale = currentLevel >= 2 ? maxScale : minScale;
+
+    const targetX = info.screenX - info.worldX * targetScale;
+    const targetY = info.screenY - info.worldY * targetScale;
+
+    if (zoomAnimRef.current !== null) {
+      cancelAnimationFrame(zoomAnimRef.current);
+      zoomAnimRef.current = null;
+    }
+
+    const start = { ...transform.current };
+    const duration = 500;
+    const startAt = performance.now();
+    const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+
+    const animate = (now: number) => {
+      const t = Math.min(1, (now - startAt) / duration);
+      const eased = easeOutCubic(t);
+      const next = {
+        scale: start.scale + (targetScale - start.scale) * eased,
+        x: start.x + (targetX - start.x) * eased,
+        y: start.y + (targetY - start.y) * eased,
+      };
+      transform.current = clampTransform(next);
+      setTick(v => v + 1);
+      if (t < 1) {
+        zoomAnimRef.current = requestAnimationFrame(animate);
+      } else {
+        zoomAnimRef.current = null;
+      }
+    };
+
+    zoomAnimRef.current = requestAnimationFrame(animate);
+  }, [lockScale, resolvePointerInfo, computePreferredLevel, getConstraints, clampTransform]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (drawingRef.current) {
+      const info = resolvePointerInfo(e.clientX, e.clientY);
+      if (info) {
+        drawingRef.current = {
+          ...drawingRef.current,
+          end: { x: info.worldX, y: info.worldY },
+        };
+        setTick(t => t + 1);
+      }
+      return;
+    }
+    if (editActionRef.current) {
+      const info = resolvePointerInfo(e.clientX, e.clientY);
+      if (!info) return;
+      const action = editActionRef.current;
+      const dx = info.worldX - action.start.x;
+      const dy = info.worldY - action.start.y;
+      let next = { ...action.origin };
+      if (action.type === "move") {
+        next = {
+          x: action.origin.x + dx,
+          y: action.origin.y + dy,
+          width: action.origin.width,
+          height: action.origin.height,
+        };
+      } else if (action.handle) {
+        let left = action.origin.x;
+        let right = action.origin.x + action.origin.width;
+        let top = action.origin.y;
+        let bottom = action.origin.y + action.origin.height;
+        if (action.handle.includes("w")) left += dx;
+        if (action.handle.includes("e")) right += dx;
+        if (action.handle.includes("n")) top += dy;
+        if (action.handle.includes("s")) bottom += dy;
+        const minSize = 2;
+        if (right - left < minSize) right = left + minSize;
+        if (bottom - top < minSize) bottom = top + minSize;
+        next = {
+          x: Math.min(left, right),
+          y: Math.min(top, bottom),
+          width: Math.abs(right - left),
+          height: Math.abs(bottom - top),
+        };
+      }
+      setMarkRects((prev) =>
+        prev.map((item) =>
+          item.id === action.markId ? { ...item, ...next } : item,
+        ),
+      );
+      setTick(t => t + 1);
+      return;
+    }
     if (!isDragging.current) return;
     const dx = e.clientX - lastMousePosition.current.x;
     const dy = e.clientY - lastMousePosition.current.y;
@@ -639,7 +1280,7 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
       x: current.x + dx,
       y: current.y + dy,
     });
-  }, [clampTransform]);
+  }, [clampTransform, resolvePointerInfo]);
 
   const handleHoverMove = useCallback(
     (e: React.MouseEvent) => {
@@ -653,8 +1294,16 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
   );
 
   const handleMouseUp = useCallback(() => {
+    finalizeDrawing();
+    if (editActionRef.current) {
+      const mark = markRects.find((item) => item.id === editActionRef.current?.markId);
+      if (mark && mark.status === "submitted") {
+        syncSubmittedMark(mark);
+      }
+      editActionRef.current = null;
+    }
     isDragging.current = false;
-  }, []);
+  }, [finalizeDrawing, markRects, syncSubmittedMark]);
 
   const lastTouchDistance = useRef<number | null>(null);
   const lastTouchCenter = useRef<Point | null>(null);
@@ -672,6 +1321,16 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (e.touches.length === 1) {
+      const info = resolvePointerInfo(e.touches[0].clientX, e.touches[0].clientY);
+      if (info && (drawMode === "measure" || drawMode === "mark")) {
+        drawingRef.current = {
+          mode: drawMode,
+          start: { x: info.worldX, y: info.worldY },
+          end: { x: info.worldX, y: info.worldY },
+        };
+        setTick(t => t + 1);
+        return;
+      }
       isDragging.current = true;
       lastMousePosition.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     } else if (e.touches.length === 2) {
@@ -683,9 +1342,20 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
         lastTouchCenter.current = { x: center.x - rect.left, y: center.y - rect.top };
       }
     }
-  }, []);
+  }, [drawMode, resolvePointerInfo]);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (drawingRef.current && e.touches.length === 1) {
+      const info = resolvePointerInfo(e.touches[0].clientX, e.touches[0].clientY);
+      if (info) {
+        drawingRef.current = {
+          ...drawingRef.current,
+          end: { x: info.worldX, y: info.worldY },
+        };
+        setTick(t => t + 1);
+      }
+      return;
+    }
     if (e.touches.length === 1 && isDragging.current) {
       const dx = e.touches[0].clientX - lastMousePosition.current.x;
       const dy = e.touches[0].clientY - lastMousePosition.current.y;
@@ -723,13 +1393,14 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
 
       setTick(t => t + 1);
     }
-  }, [getConstraints, clampTransform]);
+  }, [getConstraints, clampTransform, resolvePointerInfo]);
 
   const handleTouchEnd = useCallback(() => {
+    finalizeDrawing();
     isDragging.current = false;
     lastTouchDistance.current = null;
     lastTouchCenter.current = null;
-  }, []);
+  }, [finalizeDrawing]);
 
   // Focus Target - 自动聚焦到指定区域
   useEffect(() => {
@@ -769,7 +1440,7 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
   return (
     <div
       ref={containerRef}
-      className={`relative overflow-hidden w-full h-full bg-muted transition-colors duration-300 ${className ?? ''}`}
+      className={`relative w-full h-full bg-muted transition-colors duration-300 ${showScrollbars ? "overflow-auto" : "overflow-hidden"} ${className ?? ''}`}
     >
       <canvas
         ref={backCanvasRef}
@@ -780,6 +1451,8 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
         className={`absolute inset-0 block touch-none ${cursor ? "" : "cursor-move"}`}
         style={cursor ? { cursor } : undefined}
         onMouseDown={handleMouseDown}
+        onDoubleClick={handleDoubleClick}
+        onContextMenu={(e) => e.preventDefault()}
         onMouseMove={(e) => {
           handleMouseMove(e);
           handleHoverMove(e);
@@ -799,6 +1472,264 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
         }}
         onTouchEnd={handleTouchEnd}
       />
+      {drawMode === "none" && (
+        <div className="absolute bottom-3 right-3 z-20">
+          <button
+            className="px-3 py-1.5 rounded-sm border bg-black/40 border-white/10 text-white/80 hover:text-white"
+            onClick={() => setDrawMode("view")}
+          >
+            编辑
+          </button>
+        </div>
+      )}
+      {drawMode !== "none" && (
+        <div className="absolute bottom-3 left-3 z-20 flex flex-col gap-0 text-[11px]">
+          <label className="flex items-center gap-2 px-3 py-1.5 rounded-sm border bg-black/40 border-white/10 text-white/80">
+            <input
+              type="checkbox"
+              className="accent-white"
+              checked={showScrollbars}
+              onChange={(e) => setShowScrollbars(e.target.checked)}
+            />
+            滚动条
+          </label>
+          <label className="flex items-center gap-2 px-3 py-1.5 rounded-sm border bg-black/40 border-white/10 text-white/80">
+            <input
+              type="checkbox"
+              className="accent-white"
+              checked={showMeasureData}
+              onChange={(e) => setShowMeasureData(e.target.checked)}
+            />
+            检测数据
+          </label>
+          <label className="flex items-center gap-2 px-3 py-1.5 rounded-sm border bg-black/40 border-white/10 text-white/80">
+            <input
+              type="checkbox"
+              className="accent-white"
+              checked={showMarkData}
+              onChange={(e) => setShowMarkData(e.target.checked)}
+            />
+            标注数据
+          </label>
+          {drawMode === "mark" && (
+            <>
+              <label className="flex items-center gap-2 px-3 py-1.5 rounded-sm border bg-black/40 border-white/10 text-white/80">
+                <input
+                  type="checkbox"
+                  className="accent-white"
+                  checked={showSubmittedMarks}
+                  onChange={(e) => setShowSubmittedMarks(e.target.checked)}
+                />
+                已提交
+              </label>
+              <label className="flex items-center gap-2 px-3 py-1.5 rounded-sm border bg-black/40 border-white/10 text-white/80">
+                <input
+                  type="checkbox"
+                  className="accent-white"
+                  checked={showDraftMarks}
+                  onChange={(e) => setShowDraftMarks(e.target.checked)}
+                />
+                未提交
+              </label>
+              <label className="flex items-center gap-2 px-3 py-1.5 rounded-sm border bg-black/40 border-white/10 text-white/80">
+                <input
+                  type="checkbox"
+                  className="accent-white"
+                  checked={autoSubmitMarks}
+                  onChange={(e) => setAutoSubmitMarks(e.target.checked)}
+                />
+                自动提交
+              </label>
+            </>
+          )}
+        </div>
+      )}
+      {drawMode !== "none" && (
+        <div className="absolute bottom-3 right-3 z-20 flex flex-wrap items-center gap-2 text-[11px]">
+          {measureRects.length > 0 && (
+            <button
+              className="px-3 py-1.5 rounded-sm border bg-black/40 border-white/10 text-white/70"
+              onClick={clearMeasure}
+            >
+              清空测量
+            </button>
+          )}
+          <button
+            className={`px-3 py-1.5 rounded-sm border ${drawMode === "view" ? "bg-white/10 border-white/30 text-white" : "bg-black/40 border-white/10 text-white/70"}`}
+            onClick={() => setDrawMode("view")}
+          >
+            查看
+          </button>
+          <button
+            className={`px-3 py-1.5 rounded-sm border ${drawMode === "measure" ? "bg-cyan-500/20 border-cyan-400 text-cyan-200" : "bg-black/40 border-white/10 text-white/70"}`}
+            onClick={() => setDrawMode("measure")}
+          >
+            测量
+          </button>
+          <button
+            className={`px-3 py-1.5 rounded-sm border ${drawMode === "mark" ? "bg-orange-500/20 border-orange-400 text-orange-200" : "bg-black/40 border-white/10 text-white/70"}`}
+            onClick={() => setDrawMode("mark")}
+          >
+            标注
+          </button>
+          {drawMode === "mark" && (
+            <>
+              <button
+                className="px-3 py-1.5 rounded-sm border bg-black/40 border-white/10 text-white/70"
+                onClick={() => {
+                  setClassPickerTarget({ type: "default" });
+                  setClassPickerOpen(true);
+                }}
+              >
+                默认类别: {defaultClass?.name ?? "未设置"}
+              </button>
+              {defaultClass && (
+                <button
+                  className="px-3 py-1.5 rounded-sm border bg-black/40 border-white/10 text-white/70"
+                  onClick={() => setDefaultClass(null)}
+                >
+                  清除默认
+                </button>
+              )}
+              <button
+                className="px-3 py-1.5 rounded-sm border bg-black/40 border-white/10 text-white/70"
+                onClick={() => submitDraftMarks(markRects.filter((item) => item.status === "draft"))}
+              >
+                全部提交
+              </button>
+              <button
+                className="px-3 py-1.5 rounded-sm border bg-black/40 border-white/10 text-white/70"
+                onClick={() =>
+                  setMarkRects((prev) => prev.filter((item) => item.status === "submitted"))
+                }
+              >
+                清除未提交
+              </button>
+              {selectedMarkId && (
+                <>
+                  <button
+                    className="px-3 py-1.5 rounded-sm border bg-black/40 border-white/10 text-white/70"
+                    onClick={() => {
+                      setClassPickerTarget({ type: "edit", markId: selectedMarkId });
+                      setClassPickerOpen(true);
+                    }}
+                  >
+                    更改类别
+                  </button>
+                  <button
+                    className="px-3 py-1.5 rounded-sm border bg-black/40 border-white/10 text-white/70"
+                    onClick={() => {
+                      const selected = markRects.find((item) => item.id === selectedMarkId);
+                      setPendingMarkLabel(selected?.mark ?? "");
+                      setMarkEditorTargetId(selectedMarkId);
+                      setMarkEditorOpen(true);
+                    }}
+                  >
+                    更改标记
+                  </button>
+                  <button
+                    className="px-3 py-1.5 rounded-sm border bg-black/40 border-white/10 text-white/70"
+                    onClick={() => {
+                      const selected = markRects.find((item) => item.id === selectedMarkId);
+                      if (selected?.status === "submitted" && selected.serverId) {
+                        removeSubmittedMark(selected.serverId);
+                      }
+                      setMarkRects((prev) => prev.filter((item) => item.id !== selectedMarkId));
+                      setSelectedMarkId(null);
+                    }}
+                  >
+                    删除
+                  </button>
+                </>
+              )}
+            </>
+          )}
+          <button
+            className="px-3 py-1.5 rounded-sm border bg-red-500/20 border-red-400 text-red-200"
+            onClick={exitEditMode}
+          >
+            退出
+          </button>
+        </div>
+      )}
+      <Dialog
+        open={classPickerOpen}
+        onOpenChange={(open) => {
+          setClassPickerOpen(open);
+          if (!open) {
+            setPendingMarkRect(null);
+            setClassPickerTarget(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-[720px] bg-[#0b1220]/90 backdrop-blur-xl border border-white/10 text-white">
+          <DialogHeader>
+            <DialogTitle className="text-base">选择缺陷类别</DialogTitle>
+            <DialogDescription className="text-xs text-white/60">
+              选择用于标注的缺陷类型
+            </DialogDescription>
+          </DialogHeader>
+          {defectClasses.length === 0 ? (
+            <div className="text-xs text-white/60">暂无缺陷类别</div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+              {defectClasses.map((item) => (
+                <button
+                  key={item.id}
+                  className="px-3 py-2 rounded-md border border-white/10 bg-white/5 hover:bg-white/10 text-xs text-left"
+                  onClick={() => handleClassPick(item)}
+                >
+                  <span
+                    className="inline-block w-2 h-2 rounded-full mr-2"
+                    style={{ backgroundColor: item.color ?? "#f97316" }}
+                  />
+                  {item.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={markEditorOpen}
+        onOpenChange={(open) => {
+          setMarkEditorOpen(open);
+          if (!open) {
+            setMarkEditorTargetId(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-[420px] bg-[#0b1220]/90 backdrop-blur-xl border border-white/10 text-white">
+          <DialogHeader>
+            <DialogTitle className="text-base">修改标记</DialogTitle>
+            <DialogDescription className="text-xs text-white/60">
+              为当前标注输入说明或标签
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <input
+              className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none"
+              value={pendingMarkLabel}
+              onChange={(e) => setPendingMarkLabel(e.target.value)}
+              placeholder="输入标记"
+            />
+            <div className="flex items-center justify-end gap-2">
+              <button
+                className="px-3 py-1.5 rounded-sm border bg-black/40 border-white/10 text-white/70 text-xs"
+                onClick={() => setMarkEditorOpen(false)}
+              >
+                取消
+              </button>
+              <button
+                className="px-3 py-1.5 rounded-sm border bg-blue-500/20 border-blue-400 text-blue-100 text-xs"
+                onClick={handleMarkSave}
+              >
+                保存
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
