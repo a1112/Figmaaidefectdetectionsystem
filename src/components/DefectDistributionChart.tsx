@@ -1,19 +1,8 @@
-import React, { useMemo, useRef, useEffect, useState } from "react";
-import type {
-  Defect,
-  ImageOrientation,
-} from "../types/app.types";
-import type {
-  SurfaceImageInfo,
-  Surface,
-} from "../api/types";
-import { getTileImageUrl } from "../api/client";
+﻿import { useMemo } from "react";
+import type { MouseEvent } from "react";
+import type { Defect, ImageOrientation } from "../types/app.types";
+import type { SurfaceImageInfo, Surface } from "../api/types";
 import type { ViewportInfo } from "./DefectImageView";
-import type { Tile } from "./LargeImageViewer/utils";
-import {
-  buildOrientationLayout,
-  computeTileRequestInfo,
-} from "../utils/imageOrientation";
 
 interface DefectDistributionChartProps {
   defects: Defect[];
@@ -39,7 +28,6 @@ interface DefectDistributionChartProps {
 
 const MAX_DEFECTS_TO_DRAW = 1000;
 
-// 模拟示例数据（用于没有真实数据时的占位展示）
 const SAMPLE_DEFECTS: Defect[] = [
   {
     id: "sample-1",
@@ -98,6 +86,8 @@ const SAMPLE_DEFECTS: Defect[] = [
   },
 ];
 
+const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+
 export function DefectDistributionChart({
   defects,
   surface,
@@ -107,35 +97,16 @@ export function DefectDistributionChart({
   onDefectSelect,
   onDefectHover,
   onDefectHoverEnd,
-  seqNo,
-  defaultTileSize,
-  maxTileLevel,
   viewportInfo,
   viewportSurface,
-  imageOrientation: _imageOrientation,
-  onViewportCenterChange,
+  imageOrientation,
   showDistributionImages = true,
   showTileBorders = false,
+  onViewportCenterChange,
 }: DefectDistributionChartProps) {
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case "high":
-        return "bg-red-500";
-      case "medium":
-        return "bg-yellow-500";
-      case "low":
-        return "bg-green-500";
-      default:
-        return "bg-muted-foreground";
-    }
-  };
-
   const getDefectBorderColor = (type: string) => {
     if (defectColors && defectColors[type] && typeof defectColors[type].border === "string") {
-      // 从Tailwind类名中提取颜色
-      const colorMatch = defectColors[type].border.match(
-        /border-(\w+)-(\d+)/,
-      );
+      const colorMatch = defectColors[type].border.match(/border-(\w+)-(\d+)/);
       if (colorMatch) {
         return `border-${colorMatch[1]}-${colorMatch[2]}`;
       }
@@ -143,669 +114,308 @@ export function DefectDistributionChart({
     return "border-primary";
   };
 
-  const getDefectTextColor = (type: string) => {
-    if (defectColors && defectColors[type] && typeof defectColors[type].text === "string") {
-      return defectColors[type].text;
+  const getSeverityRing = (severity: Defect["severity"]) => {
+    switch (severity) {
+      case "high":
+        return "ring-red-400/50";
+      case "medium":
+        return "ring-amber-400/50";
+      default:
+        return "ring-emerald-400/40";
     }
-    return "text-primary";
   };
 
-  // 钢板缩略显示尺寸
-  // 横向布局：宽度 = 高度 × 单图比例 × 图像数量
-  const plateHeight = 120; // 固定高度
-
-  const getDistributionTileLevel = (): number => {
-    const preferred = 6; // L6 - Optimize for single-row layout
-    const normalizedPreferred = Math.max(0, Math.floor(preferred));
-    const cap =
-      typeof maxTileLevel === "number" && Number.isFinite(maxTileLevel)
-        ? Math.max(0, Math.floor(maxTileLevel))
-        : normalizedPreferred;
-    return Math.min(cap, normalizedPreferred);
-  };
+  const findMetaForSurface = (surf: "top" | "bottom") =>
+    surfaceImageInfo?.find((info) => info.surface === surf);
 
   const hasMeta =
     !!surfaceImageInfo &&
     surfaceImageInfo.length > 0 &&
     defects.some((d) => typeof d.imageIndex === "number");
 
-  // 开发/无真实数据时才使用示例数据：存在 surfaceImageInfo 说明是后端真实数据场景
   const showSampleData = defects.length === 0 && !hasMeta;
 
-  // Use useMemo to prevent creating new array reference on every render
-  const displayDefects = useMemo(() => 
-    showSampleData ? SAMPLE_DEFECTS : defects,
-    [showSampleData, defects]
-  );
-  
-  // Use useMemo to prevent filteredDefects from creating new array reference on every render
-  const filteredDefects = useMemo(() => 
-    displayDefects.filter(
-      (d) => surface === "all" || d.surface === surface,
-    ),
-    [displayDefects, surface]
+  const displayDefects = useMemo(
+    () => (showSampleData ? SAMPLE_DEFECTS : defects),
+    [showSampleData, defects],
   );
 
-  // 在缺陷数过多时限制绘制数量，避免阻塞渲染。
+  const filteredDefects = useMemo(
+    () =>
+      displayDefects.filter(
+        (d) => surface === "all" || d.surface === surface,
+      ),
+    [displayDefects, surface],
+  );
+
   const visibleDefects = useMemo(() => {
     if (filteredDefects.length <= MAX_DEFECTS_TO_DRAW) {
       return filteredDefects;
     }
-    // 仅在超过上限时启用：简单取前 MAX_DEFECTS_TO_DRAW 个，
-    // 后续如需按视图窗口动态裁剪，可在这里加入视图相关逻辑。
     return filteredDefects.slice(0, MAX_DEFECTS_TO_DRAW);
   }, [filteredDefects]);
 
-  const findMetaForSurface = (
-    surf: "top" | "bottom",
-  ): SurfaceImageInfo | undefined =>
-    surfaceImageInfo?.find((info) => info.surface === surf);
-  
-  // 容器引用，用于获取宽度
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState<number>(0);
-
-  // 监听容器宽度变化
-  useEffect(() => {
-    if (!containerRef.current) return;
-    
-    const updateWidth = () => {
-      if (containerRef.current) {
-        setContainerWidth(containerRef.current.offsetWidth);
-      }
-    };
-    
-    updateWidth();
-    window.addEventListener('resize', updateWidth);
-    return () => window.removeEventListener('resize', updateWidth);
-  }, []);
-  
-  // 计算横向布局的宽度
-  const calculatePlateWidth = (meta: SurfaceImageInfo | undefined): number => {
-    if (!meta) return 360; // 默认宽度
-    const frameCount = meta.frame_count || 1;
-    const imageWidth = meta.image_width || 1;
-    const imageHeight = meta.image_height || 1;
-    
-    // 正确的映射关系：
-    // 原图：宽度 imageWidth × 总长度 (imageHeight × frameCount)
-    // 显示旋转90度：原图宽度 → 显示高度，原图长度 → 显示宽度
-    // plateHeight / plateWidth = imageWidth / (imageHeight × frameCount)
-    // plateWidth = plateHeight × (imageHeight × frameCount) / imageWidth
-    const totalLength = imageHeight * frameCount;
-    return plateHeight * totalLength / imageWidth;
-  };
-
-  // 计算最终显示高度和宽度（包括拉伸逻辑）
-  const calculateFinalDimensions = useMemo(() => {
-    const topMeta = findMetaForSurface("top");
-    const bottomMeta = findMetaForSurface("bottom");
-    
-    const topWidth = calculatePlateWidth(topMeta);
-    const bottomWidth = calculatePlateWidth(bottomMeta);
-    
-    // 默认总高度为 plateHeight * 2（适配双表面显示）
-    let finalHeight = plateHeight * 2;
-    let finalTopWidth = topWidth;
-    let finalBottomWidth = bottomWidth;
-    let scale = 1; // 统一的缩放比例
-    
-    // 注意：surface === "all" 时显示两个表面，每个占 finalHeight/2
-    // surface !== "all" 时显示单个表面，占 finalHeight 全部
-    // 因此两种情况下 finalHeight 都应该是 plateHeight * 2
-    
-    // 如果宽度不足容器宽度的75%，进行拉伸
-    if (containerWidth > 0) {
-      const targetWidth = containerWidth * 0.75;
-      
-      if (surface === "all") {
-        // 两个表面都显示：使用较长的那个来计算统一缩放比例
-        const maxWidth = Math.max(topWidth, bottomWidth);
-        if (maxWidth < targetWidth) {
-          scale = targetWidth / maxWidth;
-          // 两个表面都应用相同的缩放比例
-          finalTopWidth = topWidth * scale;
-          finalBottomWidth = bottomWidth * scale;
-        }
-      } else {
-        // 单表面显示：只拉伸当前表面
-        const currentWidth = surface === "top" ? topWidth : bottomWidth;
-        if (currentWidth < targetWidth) {
-          scale = targetWidth / currentWidth;
-          if (surface === "top") {
-            finalTopWidth = topWidth * scale;
-          } else {
-            finalBottomWidth = bottomWidth * scale;
-          }
-        }
-      }
-    }
-    
-    return {
-      height: finalHeight,
-      topWidth: finalTopWidth,
-      bottomWidth: finalBottomWidth,
-      scale, // 统一的缩放比例
-    };
-  }, [surface, containerWidth, surfaceImageInfo]);
-
-  const computeDisplayRect = (
+  const computeVerticalRect = (
     defect: Defect,
     meta: SurfaceImageInfo | undefined,
-    perSurfaceHeight: number,
-    plateWidth: number,
   ) => {
     if (!meta || typeof defect.imageIndex !== "number") {
-      // 无元数据时退回到“单帧 400x300” 的近似映射
-      const displayX = (defect.x / 400) * plateWidth;
-      const displayY = (defect.y / 300) * perSurfaceHeight;
-      const displayWidth = (defect.width / 400) * plateWidth;
-      const displayHeight =
-        (defect.height / 300) * perSurfaceHeight;
-      return {
-        x: displayX,
-        y: displayY,
-        w: displayWidth,
-        h: displayHeight,
-      };
+      const x = clamp01(defect.x / 400);
+      const y = clamp01(defect.y / 300);
+      const w = Math.max(0.01, clamp01(defect.width / 400));
+      const h = Math.max(0.01, clamp01(defect.height / 300));
+      return { x, y, w, h };
     }
 
     const frameCount = meta.frame_count || 1;
     const imageWidth = meta.image_width || 1;
     const imageHeight = meta.image_height || 1;
-
-    // 数据库存储：沿长度方向按帧逐个向“下”堆叠
-    const rawIndex =
-      typeof defect.imageIndex === "number"
-        ? defect.imageIndex
-        : 0;
-    // 防止索引越界（兼容 0/1-based）
-    const frameIndex = Math.min(
-      Math.max(rawIndex, 0),
-      frameCount - 1,
-    );
-
+    const rawIndex = typeof defect.imageIndex === "number" ? defect.imageIndex : 0;
+    const frameIndex = Math.min(Math.max(rawIndex, 0), frameCount - 1);
     const totalLength = frameCount * imageHeight;
 
-    // 这里使用“帧索引 + 单帧内坐标”来近似 topInSrcImg / bottomInSrcImg
     const y1Global = frameIndex * imageHeight + defect.y;
-    const y2Global =
-      frameIndex * imageHeight + defect.y + defect.height;
-
+    const y2Global = frameIndex * imageHeight + defect.y + defect.height;
     const x1 = defect.x;
     const x2 = defect.x + defect.width;
 
-    const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
-
-    // 长度方向：0~1 映射到钢板缩略图宽度，从左往右
-    let lengthStart =
-      totalLength > 0 ? y1Global / totalLength : 0;
-    let lengthEnd =
-      totalLength > 0 ? y2Global / totalLength : 0;
+    let lengthStart = totalLength > 0 ? y1Global / totalLength : 0;
+    let lengthEnd = totalLength > 0 ? y2Global / totalLength : 0;
     lengthStart = clamp01(lengthStart);
     lengthEnd = clamp01(lengthEnd);
     if (lengthEnd < lengthStart) {
-      const tmp = lengthStart;
+      const temp = lengthStart;
       lengthStart = lengthEnd;
-      lengthEnd = tmp;
+      lengthEnd = temp;
     }
 
-    // 宽度方向：0~1 映射到钢板缩略图高度，从下往上（0 点在左下角）
     let widthStart = imageWidth > 0 ? x1 / imageWidth : 0;
     let widthEnd = imageWidth > 0 ? x2 / imageWidth : 0;
     widthStart = clamp01(widthStart);
     widthEnd = clamp01(widthEnd);
     if (widthEnd < widthStart) {
-      const tmp = widthStart;
+      const temp = widthStart;
       widthStart = widthEnd;
-      widthEnd = tmp;
+      widthEnd = temp;
     }
 
-    const lengthWidth = Math.max(
-      lengthEnd - lengthStart,
-      0.002,
-    );
-    const widthHeight = Math.max(widthEnd - widthStart, 0.002);
+    const x = widthStart;
+    const y = lengthStart;
+    const w = Math.max(0.002, widthEnd - widthStart);
+    const h = Math.max(0.002, lengthEnd - lengthStart);
 
-    const displayX = lengthStart * plateWidth;
-    const displayWidth = lengthWidth * plateWidth;
-    // 0 点在左下角：把 0 映射到 bottom
-    const displayY = (1 - widthEnd) * perSurfaceHeight;
-    const displayHeight = widthHeight * perSurfaceHeight;
-
-    return {
-      x: displayX,
-      y: displayY,
-      w: displayWidth,
-      h: displayHeight,
-    };
+    return { x, y, w, h };
   };
 
-  const renderPlate = (
+  const computeViewportRect = (
+    meta: SurfaceImageInfo | undefined,
     surf: Surface,
-    containerHeight: number,
   ) => {
-    const perSurfaceHeight = containerHeight;
-    const title =
-      surf === "top"
-        ? "TOP SURFACE"
-        : surf === "bottom"
-          ? "BOTTOM SURFACE"
-          : "SURFACE";
-    const meta = findMetaForSurface(surf);
-    const plateDefects = visibleDefects.filter(
-      (d) => d.surface === surf,
-    );
-    
-    // 使用计算后的宽度（包括拉伸）
-    const plateWidth = surf === "top" 
-      ? calculateFinalDimensions.topWidth 
-      : calculateFinalDimensions.bottomWidth;
-    const frameCount = meta?.frame_count || 1;
-
-    const tileImages: JSX.Element[] = [];
-    const orientation: ImageOrientation = "horizontal";
-
-    if (
-      showDistributionImages &&
-      meta &&
-      typeof (seqNo as number | undefined) === "number"
-    ) {
-      const level = getDistributionTileLevel();
-      const layout = buildOrientationLayout({
-        orientation,
-        surfaceFilter: surf,
-        topMeta: surf === "top" ? meta : undefined,
-        bottomMeta: surf === "bottom" ? meta : undefined,
-        surfaceGap: 0,
-      });
-      const surfaceLayout = layout.surfaces.find(
-        (s) => s.surface === surf,
-      );
-
-      // Calculate tileSize based on layout to ensure single row if possible
-      let tileSize = Math.max(
-        defaultTileSize ?? 0,
-        meta.image_height ?? 0,
-        512,
-      );
-
-      if (surfaceLayout) {
-        const factor = Math.pow(2, level);
-        // Ensure virtualTileSize >= worldHeight to use 1 tile height
-        const minRequired = Math.ceil(surfaceLayout.worldHeight / factor);
-        if (minRequired > tileSize) {
-          tileSize = minRequired;
-        }
-      }
-
-      if (!surfaceLayout) {
-        // no layout available; skip tile rendering
-      } else {
-        const virtualTileSize = tileSize * Math.pow(2, level);
-        const tilesX = Math.max(
-          1,
-          Math.ceil(surfaceLayout.worldWidth / virtualTileSize),
-        );
-        const tilesY = Math.max(
-          1,
-          Math.ceil(surfaceLayout.worldHeight / virtualTileSize),
-        );
-
-        for (let row = 0; row < tilesY; row += 1) {
-          for (let col = 0; col < tilesX; col += 1) {
-            const x = surfaceLayout.offsetX + col * virtualTileSize;
-            const y = surfaceLayout.offsetY + row * virtualTileSize;
-            const width =
-              col === tilesX - 1
-                ? surfaceLayout.worldWidth - col * virtualTileSize
-                : virtualTileSize;
-            const height =
-              row === tilesY - 1
-                ? surfaceLayout.worldHeight - row * virtualTileSize
-                : virtualTileSize;
-
-            const tile: Tile = {
-              level,
-              row,
-              col,
-              x,
-              y,
-              width,
-              height,
-            };
-
-            const requestInfo = computeTileRequestInfo({
-              surface: surfaceLayout,
-              tile,
-              orientation,
-              virtualTileSize,
-              tileSize,
-            });
-            if (!requestInfo) {
-              continue;
-            }
-
-            const tileX =
-              orientation === "horizontal"
-                ? requestInfo.tileY
-                : requestInfo.tileX;
-            const tileY =
-              orientation === "horizontal"
-                ? requestInfo.tileX
-                : requestInfo.tileY;
-
-            const url = getTileImageUrl({
-              surface: surf,
-              seqNo: seqNo as number,
-              level,
-              tileX,
-              tileY,
-              tileSize,
-              view: "horizontal",
-            });
-
-            const localX = x - surfaceLayout.offsetX;
-            const localY = y - surfaceLayout.offsetY;
-            const left =
-              (localX / surfaceLayout.worldWidth) * plateWidth;
-            const top =
-              (localY / surfaceLayout.worldHeight) * perSurfaceHeight;
-            const displayWidth =
-              (width / surfaceLayout.worldWidth) * plateWidth;
-            const displayHeight =
-              (height / surfaceLayout.worldHeight) *
-              perSurfaceHeight;
-
-            tileImages.push(
-              <img
-                key={`tile-${surf}-L${level}-${tileSize}-${col}-${row}`}
-                src={url}
-                alt="mosaic-tile"
-                className="absolute select-none"
-                draggable={false}
-                loading="lazy"
-                decoding="async"
-                onDragStart={(e) => e.preventDefault()}
-                style={{
-                  left,
-                  top,
-                  width: displayWidth,
-                  height: displayHeight,
-                  objectFit: "fill",
-                  border: showTileBorders ? "1px solid rgba(255,255,255,0.3)" : "none",
-                }}
-              />,
-            );
-          }
-        }
-      }
+    if (!meta || !viewportInfo || !viewportSurface || viewportSurface !== surf) {
+      return null;
     }
 
-    const viewportBox = (() => {
-      if (
-        !meta ||
-        !viewportInfo ||
-        !viewportSurface ||
-        viewportSurface !== surf
-      ) {
-        return null;
+    const mosaicWidth = meta.image_width ?? 0;
+    const mosaicHeight = (meta.frame_count ?? 0) * (meta.image_height ?? 0);
+    if (mosaicWidth <= 0 || mosaicHeight <= 0) {
+      return null;
+    }
+
+    const mosaicRect =
+      imageOrientation === "horizontal"
+        ? {
+            x: viewportInfo.y,
+            y: viewportInfo.x,
+            width: viewportInfo.height,
+            height: viewportInfo.width,
+          }
+        : {
+            x: viewportInfo.x,
+            y: viewportInfo.y,
+            width: viewportInfo.width,
+            height: viewportInfo.height,
+          };
+
+    const lengthStart = clamp01(mosaicRect.y / mosaicHeight);
+    const lengthEnd = clamp01((mosaicRect.y + mosaicRect.height) / mosaicHeight);
+    const widthStart = clamp01(mosaicRect.x / mosaicWidth);
+    const widthEnd = clamp01((mosaicRect.x + mosaicRect.width) / mosaicWidth);
+
+    const x = Math.min(widthStart, widthEnd);
+    const y = Math.min(lengthStart, lengthEnd);
+    const w = Math.max(0.002, Math.abs(widthEnd - widthStart));
+    const h = Math.max(0.002, Math.abs(lengthEnd - lengthStart));
+
+    return { x, y, w, h };
+  };
+
+  const handlePanelClick = (
+    event: MouseEvent<HTMLDivElement>,
+    meta: SurfaceImageInfo | undefined,
+  ) => {
+    if (!meta || !onViewportCenterChange) {
+      return;
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const relX = clamp01((event.clientX - rect.left) / Math.max(1, rect.width));
+    const relY = clamp01((event.clientY - rect.top) / Math.max(1, rect.height));
+
+    const mosaicWidth = meta.image_width ?? 0;
+    const mosaicHeight = (meta.frame_count ?? 0) * (meta.image_height ?? 0);
+    if (mosaicWidth <= 0 || mosaicHeight <= 0) {
+      return;
+    }
+
+    const mosaicX = relX * mosaicWidth;
+    const mosaicY = relY * mosaicHeight;
+
+    const imageWorldWidth =
+      imageOrientation === "horizontal" ? mosaicHeight : mosaicWidth;
+    const imageWorldHeight =
+      imageOrientation === "horizontal" ? mosaicWidth : mosaicHeight;
+
+    let centerX = imageOrientation === "horizontal" ? mosaicY : mosaicX;
+    let centerY = imageOrientation === "horizontal" ? mosaicX : mosaicY;
+
+    if (viewportInfo) {
+      const halfW = viewportInfo.width / 2;
+      const halfH = viewportInfo.height / 2;
+      if (halfW * 2 <= imageWorldWidth) {
+        centerX = Math.min(imageWorldWidth - halfW, Math.max(halfW, centerX));
+      } else {
+        centerX = imageWorldWidth / 2;
       }
-
-      const mosaicWidth = meta.image_width ?? 0;
-      const mosaicHeight = (meta.frame_count ?? 0) * (meta.image_height ?? 0);
-      if (mosaicWidth <= 0 || mosaicHeight <= 0) {
-        return null;
+      if (halfH * 2 <= imageWorldHeight) {
+        centerY = Math.min(imageWorldHeight - halfH, Math.max(halfH, centerY));
+      } else {
+        centerY = imageWorldHeight / 2;
       }
+    } else {
+      centerX = Math.min(imageWorldWidth, Math.max(0, centerX));
+      centerY = Math.min(imageWorldHeight, Math.max(0, centerY));
+    }
 
-      const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
-      const mosaicRect =
-        orientation === "horizontal"
-          ? {
-              x: viewportInfo.y,
-              y: viewportInfo.x,
-              width: viewportInfo.height,
-              height: viewportInfo.width,
-            }
-          : {
-              x: viewportInfo.x,
-              y: viewportInfo.y,
-              width: viewportInfo.width,
-              height: viewportInfo.height,
-            };
+    onViewportCenterChange({ x: centerX, y: centerY });
+  };
 
-      const lengthStart = clamp01(mosaicRect.y / mosaicHeight);
-      const lengthEnd = clamp01((mosaicRect.y + mosaicRect.height) / mosaicHeight);
-      const widthStart = clamp01(mosaicRect.x / mosaicWidth);
-      const widthEnd = clamp01((mosaicRect.x + mosaicRect.width) / mosaicWidth);
-
-      const displayX = Math.min(lengthStart, lengthEnd) * plateWidth;
-      const displayWidth =
-        Math.max(0.002, Math.abs(lengthEnd - lengthStart)) * plateWidth;
-      const displayY = (1 - Math.max(widthStart, widthEnd)) * perSurfaceHeight;
-      const displayHeight =
-        Math.max(0.002, Math.abs(widthEnd - widthStart)) * perSurfaceHeight;
-
-      return (
-        <div
-          className="absolute border-2 pointer-events-none"
-          style={{
-            left: displayX,
-            top: displayY,
-            width: displayWidth,
-            height: displayHeight,
-            borderColor: "#3b82f6",
-            backgroundColor: "#12000000",
-          }}
-        />
-      );
-    })();
-
-    // 生成刻度尺
-    const renderRuler = (position: "top" | "bottom") => (
-      <div 
-        className="relative w-full h-4 bg-muted/20 border-x-2 border-foreground/60"
-        style={{ width: plateWidth }}
-      >
-        {/* 刻度线和标签 */}
-        {Array.from({ length: frameCount + 1 }).map((_, i) => {
-          const positionPercent = (i / frameCount) * 100;
-          return (
-            <div
-              key={`ruler-${position}-${surf}-${i}`}
-              className="absolute h-full border-l border-muted-foreground/40"
-              style={{ left: `${positionPercent}%` }}
-            >
-              {/* 刻度数字 */}
-              <div className={`absolute text-[9px] text-muted-foreground font-mono ${
-                position === "top" ? "bottom-0" : "top-0"
-              } left-0 transform -translate-x-1/2`}>
-                {i}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
+  const renderPanel = (surf: "top" | "bottom") => {
+    const meta = findMetaForSurface(surf);
+    const frameCount = meta?.frame_count || 1;
+    const panelDefects = visibleDefects.filter((item) => item.surface === surf);
+    const isFiltered = surface !== "all" && surface !== surf;
+    const viewportRect = computeViewportRect(meta, surf);
 
     return (
-      <div key={surf} className="flex flex-col gap-0">
-        {/* 上刻度尺 - 仅在上表面显示 */}
-        {surf === "top" && renderRuler("top")}
-        
+      <div
+        key={surf}
+        className={`flex flex-col rounded-lg border border-border bg-gradient-to-b from-slate-950/50 via-slate-900/40 to-slate-800/20 ${
+          isFiltered ? "opacity-40" : "opacity-100"
+        }`}
+      >
+        <div className="flex items-center justify-between px-3 py-2 border-b border-border/60">
+          <div className="flex items-center gap-2">
+            <div className={`h-2 w-2 rounded-full ${surf === "top" ? "bg-sky-400" : "bg-amber-400"}`} />
+            <span className="text-[11px] font-semibold tracking-[0.2em] text-muted-foreground">
+              {surf === "top" ? "TOP" : "BOTTOM"}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+            <span>{panelDefects.length} 缺陷</span>
+            <span className="text-muted-foreground/60">{frameCount} 帧</span>
+          </div>
+        </div>
+
         <div
-          className="relative border-2 border-foreground/60 bg-muted/5 overflow-hidden"
-          style={{ width: plateWidth, height: perSurfaceHeight }}
-          onDragStart={(e) => e.preventDefault()}
+          className={`relative flex-1 min-h-[190px] overflow-hidden ${
+            showDistributionImages
+              ? "bg-[radial-gradient(circle_at_30%_20%,rgba(56,189,248,0.15),transparent_55%),radial-gradient(circle_at_70%_80%,rgba(251,191,36,0.18),transparent_60%)]"
+              : "bg-muted/20"
+          }`}
           onMouseLeave={() => onDefectHoverEnd?.()}
-          onClick={(e) => {
-            if (
-              !meta ||
-              !onViewportCenterChange ||
-              !viewportSurface ||
-              viewportSurface !== surf
-            ) {
-              return;
+          onClick={(event) => {
+            if (!isFiltered) {
+              handlePanelClick(event, meta);
             }
-
-            const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-            const relX = (e.clientX - rect.left) / Math.max(1, rect.width);
-            const relY = (e.clientY - rect.top) / Math.max(1, rect.height);
-            const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
-
-            const mosaicWidth = meta.image_width ?? 0;
-            const mosaicHeight = (meta.frame_count ?? 0) * (meta.image_height ?? 0);
-            if (mosaicWidth <= 0 || mosaicHeight <= 0) {
-              return;
-            }
-
-            const lengthRatio = clamp01(relX);
-            const widthRatio = clamp01(1 - relY);
-            const mosaicX = widthRatio * mosaicWidth;
-            const mosaicY = lengthRatio * mosaicHeight;
-
-            const imageWorldWidth =
-              orientation === "horizontal" ? mosaicHeight : mosaicWidth;
-            const imageWorldHeight =
-              orientation === "horizontal" ? mosaicWidth : mosaicHeight;
-
-            let centerX =
-              orientation === "horizontal" ? mosaicY : mosaicX;
-            let centerY =
-              orientation === "horizontal" ? mosaicX : mosaicY;
-
-            if (viewportInfo) {
-              const halfW = viewportInfo.width / 2;
-              const halfH = viewportInfo.height / 2;
-              if (halfW * 2 <= imageWorldWidth) {
-                centerX = Math.min(
-                  imageWorldWidth - halfW,
-                  Math.max(halfW, centerX),
-                );
-              } else {
-                centerX = imageWorldWidth / 2;
-              }
-              if (halfH * 2 <= imageWorldHeight) {
-                centerY = Math.min(
-                  imageWorldHeight - halfH,
-                  Math.max(halfH, centerY),
-                );
-              } else {
-                centerY = imageWorldHeight / 2;
-              }
-            } else {
-              centerX = Math.min(imageWorldWidth, Math.max(0, centerX));
-              centerY = Math.min(imageWorldHeight, Math.max(0, centerY));
-            }
-
-            onViewportCenterChange({ x: centerX, y: centerY });
           }}
         >
-          <div className="absolute -top-4 left-0 right-0 text-center text-[10px] text-muted-foreground/50 font-mono">
-            {title}
-          </div>
-
-          {/* 右上角：图像数量标签 */}
-          <div className="absolute -top-4 right-0 text-[10px] text-primary/80 font-mono bg-background/80 px-1.5 py-0.5 rounded">
-            {frameCount} frames
-          </div>
-
-          {/* 瓦片背景 */}
-          {tileImages}
           {showTileBorders && (
-            <div className="absolute inset-0 border-2 border-dashed border-yellow-500/50 pointer-events-none z-10" />
+            <div className="absolute inset-0 border border-dashed border-primary/40 pointer-events-none" />
           )}
 
-          {/* 鸟瞰图视口框 */}
-          {viewportBox}
-
-          {/* 帧刻度线（替换原有网格） */}
-          <div className="absolute inset-0 opacity-20 pointer-events-none">
-            {Array.from({ length: frameCount + 1 }).map((_, i) => {
-              const position = (i / frameCount) * 100;
-              return (
-                <div
-                  key={`frame-${surf}-${i}`}
-                  className="absolute h-full border-l border-muted-foreground"
-                  style={{ left: `${position}%` }}
-                />
-              );
-            })}
-          </div>
-
-          {/* 坐标原点调试点：表示旋转后 (0,0) 期望位置 */}
-          <div
-            className="absolute w-2 h-2 bg-red-500/60 rounded-full"
-            style={{ left: 0, bottom: 0 }}
-            title="Origin debug point (0,0)"
-          />
-
-          {/* 缺陷矩形 */}
-          {plateDefects.map((defect) => {
-            const { x, y, w, h } = computeDisplayRect(
-              defect,
-              hasMeta ? meta : undefined,
-              perSurfaceHeight,
-              plateWidth,
-            );
-            const borderColor = getDefectBorderColor(defect.type);
-            const isSelected = selectedDefectId === defect.id;
-
+          {Array.from({ length: frameCount + 1 }).map((_, index) => {
+            const position = (index / frameCount) * 100;
             return (
               <div
-                key={defect.id}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDefectSelect?.(defect.id);
-                }}
-                onMouseEnter={(e) =>
-                  onDefectHover?.(defect, { screenX: e.clientX, screenY: e.clientY })
-                }
-                onMouseMove={(e) =>
-                  onDefectHover?.(defect, { screenX: e.clientX, screenY: e.clientY })
-                }
-                onMouseLeave={() => onDefectHoverEnd?.()}
-                className={`absolute border-2 ${borderColor} ${showSampleData ? "opacity-40" : "opacity-30"} ${
-                  isSelected
-                    ? "ring-2 ring-offset-2 ring-primary/80 ring-offset-background"
-                    : ""
-                } cursor-pointer`}
-                style={{
-                  left: x,
-                  top: y,
-                  width: Math.max(w, 3),
-                  height: Math.max(h, 3),
-                }}
-                title={`${defect.type} - ${defect.severity} (${Math.round(defect.confidence * 100)}%)`}
+                key={`frame-${surf}-${index}`}
+                className="absolute left-0 right-0 border-t border-white/10"
+                style={{ top: `${position}%` }}
               />
             );
           })}
-        </div>
 
-        {/* 下刻度尺 - 仅在下表面显示 */}
-        {surf === "bottom" && renderRuler("bottom")}
+          {viewportRect && (
+            <div
+              className="absolute border-2 border-sky-400/80 bg-sky-500/10 pointer-events-none"
+              style={{
+                left: `${viewportRect.x * 100}%`,
+                top: `${viewportRect.y * 100}%`,
+                width: `${viewportRect.w * 100}%`,
+                height: `${viewportRect.h * 100}%`,
+              }}
+            />
+          )}
+
+          {panelDefects.map((defect) => {
+            const { x, y, w, h } = computeVerticalRect(defect, meta);
+            const isSelected = selectedDefectId === defect.id;
+            return (
+              <div
+                key={defect.id}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (isFiltered) {
+                    return;
+                  }
+                  onDefectSelect?.(defect.id);
+                }}
+                onMouseEnter={(event) =>
+                  onDefectHover?.(defect, { screenX: event.clientX, screenY: event.clientY })
+                }
+                onMouseMove={(event) =>
+                  onDefectHover?.(defect, { screenX: event.clientX, screenY: event.clientY })
+                }
+                onMouseLeave={() => onDefectHoverEnd?.()}
+                className={`absolute border ${getDefectBorderColor(defect.type)} ${getSeverityRing(defect.severity)} ${
+                  isSelected ? "ring-2" : "ring-1"
+                } cursor-pointer transition-transform duration-150 ${showSampleData ? "opacity-60" : "opacity-80"}`}
+                style={{
+                  left: `${x * 100}%`,
+                  top: `${y * 100}%`,
+                  width: `${w * 100}%`,
+                  height: `${h * 100}%`,
+                  minWidth: "3px",
+                  minHeight: "3px",
+                }}
+              />
+            );
+          })}
+
+          {isFiltered && (
+            <div className="absolute inset-0 flex items-center justify-center text-[10px] text-muted-foreground/70">
+              已过滤
+            </div>
+          )}
+        </div>
       </div>
     );
   };
 
   return (
-    <div className="h-full flex flex-col" ref={containerRef}>
-
-      {/* 横向滚动容器 - 支持横向滚动查看长钢板 */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden">
-        <div className="flex flex-col gap-0 h-full">
-          {surface === "all" ? (
-            <>
-              {renderPlate("top", calculateFinalDimensions.height / 2)}
-              {renderPlate("bottom", calculateFinalDimensions.height / 2)}
-            </>
-          ) : (
-            renderPlate(
-              surface === "top" ? "top" : "bottom",
-              calculateFinalDimensions.height,
-            )
-          )}
-        </div>
+    <div className="h-full w-full px-2 py-2">
+      <div className="grid grid-cols-2 gap-2 h-full">
+        {renderPanel("top")}
+        {renderPanel("bottom")}
       </div>
     </div>
   );
