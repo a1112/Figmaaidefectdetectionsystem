@@ -59,6 +59,7 @@ export default defineConfig({
       open: true,
       host: '0.0.0.0',
       allowedHosts: true,
+
       proxy: {
         '/config': {
           target: 'http://localhost:80',

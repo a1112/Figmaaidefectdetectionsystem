@@ -66,6 +66,12 @@ import { useTheme } from "../components/ThemeContext";
 import { ModernSettingsModal } from "../components/modals/ModernSettingsModal";
 import { DefectHoverTooltip } from "../components/DefectHoverTooltip";
 
+type DefectClassOption = {
+  id: number;
+  name: string;
+  color?: string;
+};
+
 export function Dashboard() {
   const navigate = useNavigate();
   const { currentTheme } = useTheme();
@@ -149,6 +155,7 @@ export function Dashboard() {
     useState<FilterCriteria>({ levels: [] });
   const [availableDefectTypes, setAvailableDefectTypes] =
     useState<string[]>(defectTypes);
+  const [defectClassOptions, setDefectClassOptions] = useState<DefectClassOption[]>([]);
   const [defectAccentMap, setDefectAccentMap] = useState(
     defectAccentColors,
   );
@@ -390,14 +397,22 @@ export function Dashboard() {
           const toHex = (num: number) =>
             num.toString(16).padStart(2, "0");
           const accentMap = { ...defectAccentColors };
+          const classOptions: DefectClassOption[] = [];
           items.forEach((item: any) => {
             const key = item.desc || item.name || item.tag;
             if (!key) return;
             const { red, green, blue } = item.color;
             accentMap[key] =
               `#${toHex(red)}${toHex(green)}${toHex(blue)}`;
+            const classId = Number(item.class ?? item.id ?? item.num ?? item.value ?? 0);
+            classOptions.push({
+              id: Number.isFinite(classId) ? classId : 0,
+              name: key,
+              color: accentMap[key],
+            });
           });
           setDefectAccentMap(accentMap);
+          setDefectClassOptions(classOptions);
         }
 
         const nextDefaultTileSize =
@@ -950,6 +965,8 @@ export function Dashboard() {
                     }
                     defaultTileSize={defaultTileSize}
                     maxTileLevel={maxTileLevel}
+                    lineKey={activeLineKey}
+                    defectClasses={defectClassOptions}
                     onDefectHover={handleDefectHover}
                     onDefectHoverEnd={handleDefectHoverEnd}
                   />
@@ -1132,6 +1149,8 @@ export function Dashboard() {
         setShowDistributionImages={setShowDistributionImages}
         showTileBorders={showTileBorders}
         setShowTileBorders={setShowTileBorders}
+        lineKey={activeLineKey}
+        apiNodes={apiNodes}
       />
       <Toaster />
       {hoveredDefect && (

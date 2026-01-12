@@ -28,6 +28,8 @@ interface ImagesTabProps {
   onPreferredLevelChange: (level: number) => void;
   defaultTileSize: number;
   maxTileLevel: number;
+  lineKey?: string | null;
+  defectClasses?: { id: number; name: string; color?: string }[];
   onDefectHover?: (defect: Defect, position: { screenX: number; screenY: number }) => void;
   onDefectHoverEnd?: () => void;
 }
@@ -44,6 +46,8 @@ export function ImagesTab({
   onPreferredLevelChange,
   defaultTileSize,
   maxTileLevel,
+  lineKey,
+  defectClasses = [],
   onDefectHover,
   onDefectHoverEnd,
 }: ImagesTabProps) {
@@ -59,6 +63,14 @@ export function ImagesTab({
   const plateWidth = selectedPlate?.dimensions.width ?? 0;
   const plateLength = selectedPlate?.dimensions.length ?? 0;
   const distLeft = hoveredDefect ? Math.round(hoveredDefect.x) : null;
+
+  const annotationContext = selectedPlate
+    ? {
+        lineKey: lineKey || "default",
+        seqNo: parseInt(selectedPlate.serialNumber, 10),
+        view: "2D",
+      }
+    : null;
   const distHead = hoveredDefect ? Math.round(hoveredDefect.y) : null;
   const distRight =
     hoveredDefect && plateWidth > 0
@@ -200,6 +212,32 @@ export function ImagesTab({
               }
             }
             return null;
+          };
+          const resolveAnnotationMeta = (rect: {
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+          }) => {
+            const centerX = rect.x + rect.width / 2;
+            const centerY = rect.y + rect.height / 2;
+            const surfaceLayout =
+              layout.surfaces.find(
+                (surface) =>
+                  centerX >= surface.offsetX &&
+                  centerX < surface.offsetX + surface.worldWidth &&
+                  centerY >= surface.offsetY &&
+                  centerY < surface.offsetY + surface.worldHeight,
+              ) ?? null;
+            if (!surfaceLayout) return null;
+            return {
+              surface: surfaceLayout.surface,
+              view: "2D",
+              left: Math.round(rect.x),
+              top: Math.round(rect.y),
+              right: Math.round(rect.x + rect.width),
+              bottom: Math.round(rect.y + rect.height),
+            };
           };
           const renderTile = (
             ctx: CanvasRenderingContext2D,
@@ -358,6 +396,9 @@ export function ImagesTab({
               renderTile={renderTile}
               renderOverlay={renderOverlay}
               panMargin={200}
+              annotationContext={annotationContext}
+              resolveAnnotationMeta={resolveAnnotationMeta}
+              defectClasses={defectClasses}
               cursor={cursor}
               onPointerMove={(info) => {
                 const hit = hitTestDefect(info.worldX, info.worldY);

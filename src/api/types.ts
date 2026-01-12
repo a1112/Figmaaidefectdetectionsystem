@@ -190,6 +190,50 @@ export interface DefectClassesResponse {
 
 export type DefectClassMap = Record<number, DefectClassItem>;
 
+// ==================== 缺陷标注相关类型 ====================
+export interface AnnotationBBox {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+export interface DefectAnnotationItem {
+  id: number;
+  line_key: string;
+  seq_no: number;
+  surface: "top" | "bottom";
+  view: string;
+  user?: string | null;
+  method: string;
+  bbox: AnnotationBBox;
+  class_id?: number | null;
+  class_name?: string | null;
+  mark?: string | null;
+  export_payload?: Record<string, unknown> | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface DefectAnnotationCreate {
+  line_key: string;
+  seq_no: number;
+  surface: "top" | "bottom";
+  view: string;
+  user?: string | null;
+  method: string;
+  bbox: AnnotationBBox;
+  class_id?: number | null;
+  class_name?: string | null;
+  mark?: string | null;
+  export_payload?: Record<string, unknown> | null;
+  extra?: string | null;
+}
+
+export interface DefectAnnotationListResponse {
+  items: DefectAnnotationItem[];
+}
+
 // ==================== 图像相关类型 ====================
 
 /**

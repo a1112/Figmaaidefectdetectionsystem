@@ -15,6 +15,9 @@ import type {
   ApiListResponse,
   ApiNode,
   DefectClassesResponse,
+  DefectAnnotationListResponse,
+  DefectAnnotationCreate,
+  DefectAnnotationItem,
 } from "./types";
 import * as mock from "./mock";
 
@@ -23,6 +26,8 @@ import {
   mapSteelItem as mapSteel,
   mapDefectItem as mapDefect,
 } from "./types";
+
+const mockAnnotations: DefectAnnotationItem[] = [];
 
 export interface SteelSearchParams {
   limit?: number;
@@ -624,4 +629,138 @@ export async function getDefectClasses(): Promise<DefectClassesResponse> {
   }
 
   return response.json() as Promise<DefectClassesResponse>;
+}
+
+export async function getDefectAnnotations(params: {
+  lineKey?: string;
+  seqNo?: number;
+  surface?: "top" | "bottom";
+  view?: string;
+}): Promise<DefectAnnotationListResponse> {
+  if (env.isDevelopment()) {
+    let items = [...mockAnnotations];
+    if (params.lineKey) {
+      items = items.filter((item) => item.line_key === params.lineKey);
+    }
+    if (typeof params.seqNo === "number") {
+      items = items.filter((item) => item.seq_no === params.seqNo);
+    }
+    if (params.surface) {
+      items = items.filter((item) => item.surface === params.surface);
+    }
+    if (params.view) {
+      items = items.filter((item) => item.view === params.view);
+    }
+    return { items };
+  }
+
+  const baseUrl = env.getApiBaseUrl();
+  const url = new URL(`${baseUrl}/annotations`, window.location.origin);
+  if (params.lineKey) url.searchParams.set("line_key", params.lineKey);
+  if (typeof params.seqNo === "number") url.searchParams.set("seq_no", String(params.seqNo));
+  if (params.surface) url.searchParams.set("surface", params.surface);
+  if (params.view) url.searchParams.set("view", params.view);
+
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    throw new Error(
+      `加载缺陷标注失败: ${response.status} ${response.statusText}`,
+    );
+  }
+  return response.json() as Promise<DefectAnnotationListResponse>;
+}
+
+export async function createDefectAnnotationsBulk(
+  payload: DefectAnnotationCreate[],
+): Promise<DefectAnnotationListResponse> {
+  if (env.isDevelopment()) {
+    const now = Date.now();
+    const created = payload.map((item, index) => ({
+      id: now + index,
+      line_key: item.line_key,
+      seq_no: item.seq_no,
+      surface: item.surface,
+      view: item.view,
+      user: item.user ?? null,
+      method: item.method,
+      bbox: item.bbox,
+      class_id: item.class_id ?? null,
+      class_name: item.class_name ?? null,
+      mark: item.mark ?? null,
+      export_payload: item.export_payload ?? null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }));
+    mockAnnotations.push(...created);
+    return { items: created };
+  }
+
+  const baseUrl = env.getApiBaseUrl();
+  const response = await fetch(`${baseUrl}/annotations/bulk`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error(
+      `提交缺陷标注失败: ${response.status} ${response.statusText}`,
+    );
+  }
+  return response.json() as Promise<DefectAnnotationListResponse>;
+}
+
+export async function updateDefectAnnotation(
+  annotationId: number,
+  payload: Partial<DefectAnnotationCreate>,
+): Promise<DefectAnnotationItem> {
+  if (env.isDevelopment()) {
+    const index = mockAnnotations.findIndex((item) => item.id === annotationId);
+    if (index === -1) {
+      throw new Error("Annotation not found");
+    }
+    const existing = mockAnnotations[index];
+    const updated = {
+      ...existing,
+      ...payload,
+      bbox: payload.bbox ?? existing.bbox,
+      updated_at: new Date().toISOString(),
+    } as DefectAnnotationItem;
+    mockAnnotations[index] = updated;
+    return updated;
+  }
+
+  const baseUrl = env.getApiBaseUrl();
+  const response = await fetch(`${baseUrl}/annotations/${annotationId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error(
+      `更新缺陷标注失败: ${response.status} ${response.statusText}`,
+    );
+  }
+  return response.json() as Promise<DefectAnnotationItem>;
+}
+
+export async function deleteDefectAnnotation(
+  annotationId: number,
+): Promise<void> {
+  if (env.isDevelopment()) {
+    const index = mockAnnotations.findIndex((item) => item.id === annotationId);
+    if (index >= 0) {
+      mockAnnotations.splice(index, 1);
+    }
+    return;
+  }
+
+  const baseUrl = env.getApiBaseUrl();
+  const response = await fetch(`${baseUrl}/annotations/${annotationId}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    throw new Error(
+      `删除缺陷标注失败: ${response.status} ${response.statusText}`,
+    );
+  }
 }
