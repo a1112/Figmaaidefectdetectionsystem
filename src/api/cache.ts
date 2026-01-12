@@ -227,6 +227,29 @@ export async function getCacheLogs(
   return (await response.json()) as { items: any[]; cursor: number };
 }
 
+export async function getWarmupLogs(
+  limit: number = 200,
+  cursor: number = 0,
+): Promise<{ items: any[]; cursor: number }> {
+  if (env.isDevelopment()) {
+    const items = Array.from({ length: 5 }).map((_, idx) => ({
+      id: cursor + idx + 1,
+      time: new Date(Date.now() - idx * 1000).toISOString(),
+      level: "info",
+      message: "数据预热",
+      data: { seq_no: 1200 - idx, elapsed_seconds: 0.32 + idx * 0.03 },
+    }));
+    return { items, cursor: items[0]?.id ?? cursor };
+  }
+  const url = buildApiUrl(`/status/data_warmup/log?limit=${limit}&cursor=${cursor}`);
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new Error(data?.detail || `Failed to load warmup logs: ${response.status}`);
+  }
+  return (await response.json()) as { items: any[]; cursor: number };
+}
+
 export async function getCacheSettings(): Promise<CacheSettingsResponse> {
   if (env.isDevelopment()) {
     return {
@@ -246,7 +269,7 @@ export async function getCacheSettings(): Promise<CacheSettingsResponse> {
         disk_cache_cleanup_interval_seconds: 60,
         disk_precache_enabled: true,
         disk_precache_levels: 4,
-        disk_precache_workers: 2,
+        disk_precache_workers: 4,
       },
     };
   }

@@ -30,6 +30,9 @@ export interface UIConfig {
   compactMode: boolean;
   showGridLines: boolean;
   autoRefreshInterval: number;
+  clientCachePrefetchEnabled: boolean;
+  clientCacheTileLimit: number;
+  clientCacheDefectLimit: number;
 }
 
 const defaultConfig: UIConfig = {
@@ -44,6 +47,9 @@ const defaultConfig: UIConfig = {
   compactMode: true,
   showGridLines: true,
   autoRefreshInterval: 30,
+  clientCachePrefetchEnabled: true,
+  clientCacheTileLimit: 200,
+  clientCacheDefectLimit: 500,
 };
 
 export const UISettings: React.FC = () => {
@@ -464,6 +470,59 @@ export const UISettings: React.FC = () => {
               />
               <div className="text-xs text-muted-foreground">
                 设置为0表示禁用自动刷新
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 客户端缓存 */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">客户端缓存</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="clientCachePrefetchEnabled">启用预加载</Label>
+                <div className="text-xs text-muted-foreground">
+                  对已缓存的数据预加载瓦片与缺陷小图
+                </div>
+              </div>
+              <Switch
+                id="clientCachePrefetchEnabled"
+                checked={config.clientCachePrefetchEnabled}
+                onCheckedChange={(checked) =>
+                  handleChange("clientCachePrefetchEnabled", checked)
+                }
+              />
+            </div>
+
+            <Separator />
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="clientCacheTileLimit">瓦片预加载上限</Label>
+                <Input
+                  id="clientCacheTileLimit"
+                  type="number"
+                  value={config.clientCacheTileLimit}
+                  onChange={(e) =>
+                    handleChange("clientCacheTileLimit", Number(e.target.value))
+                  }
+                  disabled={!config.clientCachePrefetchEnabled}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="clientCacheDefectLimit">缺陷小图预加载上限</Label>
+                <Input
+                  id="clientCacheDefectLimit"
+                  type="number"
+                  value={config.clientCacheDefectLimit}
+                  onChange={(e) =>
+                    handleChange("clientCacheDefectLimit", Number(e.target.value))
+                  }
+                  disabled={!config.clientCachePrefetchEnabled}
+                />
               </div>
             </div>
           </CardContent>
