@@ -60,7 +60,7 @@ import {
   convertDefectToWorldRect,
   type SurfaceLayout,
 } from "../../utils/imageOrientation";
-import type { ImageOrientation } from "../../types/app.types";
+import type { ImageOrientation, DistributionScaleMode } from "../../types/app.types";
 import { useNewItemKeys } from "../../hooks/useNewItems";
 
 // Separate Clock component to prevent full page re-renders every second
@@ -227,6 +227,8 @@ export default function TraditionalMode() {
   const [queryTab, setQueryTab] = useState("SN"); // SN, ID, TIME
   const [sidebarTab, setSidebarTab] = useState<'records' | 'defects'>('records');
   const [refreshLimit, setRefreshLimit] = useState(20);
+  const [distributionScaleMode, setDistributionScaleMode] =
+    useState<DistributionScaleMode>("fit");
   
   useEffect(() => {
     if (!isElectron || !window.electronWindow?.isMaximized) return;
@@ -246,6 +248,44 @@ export default function TraditionalMode() {
       active = false;
     };
   }, [isTauri]);
+
+  useEffect(() => {
+    const element = distributionPlateRef.current;
+    if (!element) return;
+    const updateSize = () => {
+      setDistributionPlateSize({
+        width: element.offsetWidth,
+        height: element.offsetHeight,
+      });
+    };
+    updateSize();
+    const resizeObserver = new ResizeObserver(updateSize);
+    resizeObserver.observe(element);
+    window.addEventListener("resize", updateSize);
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateSize);
+    };
+  }, []);
+
+  useEffect(() => {
+    const element = bottomDistributionPlateRef.current;
+    if (!element) return;
+    const updateSize = () => {
+      setBottomDistributionPlateSize({
+        width: element.offsetWidth,
+        height: element.offsetHeight,
+      });
+    };
+    updateSize();
+    const resizeObserver = new ResizeObserver(updateSize);
+    resizeObserver.observe(element);
+    window.addEventListener("resize", updateSize);
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateSize);
+    };
+  }, []);
 
   // Image Analysis State
   const [analysisScrollState, setAnalysisScrollState] = useState({ top: 0, height: 1, clientHeight: 1 });
@@ -445,6 +485,16 @@ export default function TraditionalMode() {
     screenX: number;
     screenY: number;
   } | null>(null);
+  const distributionPlateRef = useRef<HTMLDivElement>(null);
+  const [distributionPlateSize, setDistributionPlateSize] = useState({
+    width: 0,
+    height: 0,
+  });
+  const bottomDistributionPlateRef = useRef<HTMLDivElement>(null);
+  const [bottomDistributionPlateSize, setBottomDistributionPlateSize] = useState({
+    width: 0,
+    height: 0,
+  });
   const [showMapCrop, setShowMapCrop] = useState(false);
   const [defectCropExpand, setDefectCropExpand] = useState(DEFAULT_DEFECT_CROP_EXPAND);
   const defectImageRef = useRef<HTMLImageElement>(null);
@@ -699,11 +749,312 @@ export default function TraditionalMode() {
         return "#22c55e";
     }
   }, []);
+  const defectTypeColorMap = useMemo(
+    () => new Map(defectTypeOptions.map((item) => [item.label, item.color])),
+    [defectTypeOptions],
+  );
+  const resolveDefectColor = useCallback(
+    (defect: DefectItem) =>
+      defectTypeColorMap.get(defect.type) ||
+      analysisSeverityColor(defect.severity) ||
+      "#58a6ff",
+    [defectTypeColorMap, analysisSeverityColor],
+  );
   const analysisSeqNo = useMemo(() => {
     if (!selectedPlate) return null;
     const parsed = parseInt(selectedPlate.serialNumber, 10);
     return Number.isNaN(parsed) ? null : parsed;
   }, [selectedPlate]);
+  const distributionSurface = useMemo<"top" | "bottom" | null>(() => {
+    if (surfaceFilter === "top" || surfaceFilter === "bottom") {
+      return surfaceFilter;
+    }
+    const preferred =
+      surfaceImages.find((info) => info.surface === "top") ??
+      surfaceImages[0];
+    return preferred?.surface ?? null;
+  }, [surfaceFilter, surfaceImages]);
+  const distributionMeta = useMemo(() => {
+    if (!distributionSurface) return null;
+    return (
+      surfaceImages.find(
+        (info) => info.surface === distributionSurface,
+      ) ?? null
+    );
+  }, [distributionSurface, surfaceImages]);
+  const bottomDistributionMeta = useMemo(() => {
+    return surfaceImages.find((info) => info.surface === "bottom") ?? null;
+  }, [surfaceImages]);
+  const distributionDraw = useMemo(() => {
+    if (!distributionMeta) return null;
+    const mosaicWidth = distributionMeta.image_width ?? 0;
+    const mosaicHeight =
+      (distributionMeta.frame_count ?? 0) *
+      (distributionMeta.image_height ?? 0);
+    if (
+      !mosaicWidth ||
+      !mosaicHeight ||
+      distributionPlateSize.width <= 0 ||
+      distributionPlateSize.height <= 0
+    ) {
+      return null;
+    }
+
+    if (distributionScaleMode === "stretch") {
+      return {
+        mosaicWidth,
+        mosaicHeight,
+        drawWidth: distributionPlateSize.width,
+        drawHeight: distributionPlateSize.height,
+        offsetX: 0,
+        offsetY: 0,
+        containerWidth: distributionPlateSize.width,
+        containerHeight: distributionPlateSize.height,
+      };
+    }
+
+    const scale = Math.min(
+      distributionPlateSize.width / mosaicWidth,
+      distributionPlateSize.height / mosaicHeight,
+    );
+    const drawWidth = mosaicWidth * scale;
+    const drawHeight = mosaicHeight * scale;
+    return {
+      mosaicWidth,
+      mosaicHeight,
+      drawWidth,
+      drawHeight,
+      offsetX: (distributionPlateSize.width - drawWidth) / 2,
+      offsetY: (distributionPlateSize.height - drawHeight) / 2,
+      containerWidth: distributionPlateSize.width,
+      containerHeight: distributionPlateSize.height,
+    };
+  }, [distributionMeta, distributionPlateSize, distributionScaleMode]);
+  const bottomDistributionDraw = useMemo(() => {
+    if (!bottomDistributionMeta) return null;
+    const mosaicWidth = bottomDistributionMeta.image_width ?? 0;
+    const mosaicHeight =
+      (bottomDistributionMeta.frame_count ?? 0) *
+      (bottomDistributionMeta.image_height ?? 0);
+    if (
+      !mosaicWidth ||
+      !mosaicHeight ||
+      bottomDistributionPlateSize.width <= 0 ||
+      bottomDistributionPlateSize.height <= 0
+    ) {
+      return null;
+    }
+
+    if (distributionScaleMode === "stretch") {
+      return {
+        mosaicWidth,
+        mosaicHeight,
+        drawWidth: bottomDistributionPlateSize.width,
+        drawHeight: bottomDistributionPlateSize.height,
+        offsetX: 0,
+        offsetY: 0,
+        containerWidth: bottomDistributionPlateSize.width,
+        containerHeight: bottomDistributionPlateSize.height,
+      };
+    }
+
+    const scale = Math.min(
+      bottomDistributionPlateSize.width / mosaicWidth,
+      bottomDistributionPlateSize.height / mosaicHeight,
+    );
+    const drawWidth = mosaicWidth * scale;
+    const drawHeight = mosaicHeight * scale;
+    return {
+      mosaicWidth,
+      mosaicHeight,
+      drawWidth,
+      drawHeight,
+      offsetX: (bottomDistributionPlateSize.width - drawWidth) / 2,
+      offsetY: (bottomDistributionPlateSize.height - drawHeight) / 2,
+      containerWidth: bottomDistributionPlateSize.width,
+      containerHeight: bottomDistributionPlateSize.height,
+    };
+  }, [bottomDistributionMeta, bottomDistributionPlateSize, distributionScaleMode]);
+  const distributionTilePlan = useMemo(() => {
+    if (!distributionMeta || !distributionDraw) return null;
+    const tileSize = Math.max(
+      distributionMeta.image_height ?? 0,
+      512,
+    );
+    const {
+      mosaicWidth,
+      mosaicHeight,
+      drawWidth,
+      drawHeight,
+      offsetX,
+      offsetY,
+      containerWidth,
+      containerHeight,
+    } = distributionDraw;
+    if (!tileSize || !mosaicWidth || !mosaicHeight) return null;
+
+    const scaleX = mosaicWidth / Math.max(1, drawWidth);
+    const scaleY = mosaicHeight / Math.max(1, drawHeight);
+    let level = Math.ceil(Math.log2(Math.max(1, Math.max(scaleX, scaleY))));
+    level = Math.max(0, Math.min(12, level));
+
+    const virtualTileSize = tileSize * Math.pow(2, level);
+    const tilesX = Math.max(
+      1,
+      Math.ceil(mosaicWidth / virtualTileSize),
+    );
+    const tilesY = Math.max(
+      1,
+      Math.ceil(mosaicHeight / virtualTileSize),
+    );
+
+    const tiles: Array<{
+      tileX: number;
+      tileY: number;
+      left: number;
+      top: number;
+      width: number;
+      height: number;
+    }> = [];
+
+    for (let row = 0; row < tilesY; row += 1) {
+      for (let col = 0; col < tilesX; col += 1) {
+        const x = col * virtualTileSize;
+        const y = row * virtualTileSize;
+        const width =
+          col === tilesX - 1
+            ? mosaicWidth - col * virtualTileSize
+            : virtualTileSize;
+        const height =
+          row === tilesY - 1
+            ? mosaicHeight - row * virtualTileSize
+            : virtualTileSize;
+        const leftPx = offsetX + (x / mosaicWidth) * drawWidth;
+        const topPx = offsetY + (y / mosaicHeight) * drawHeight;
+        const widthPx = (width / mosaicWidth) * drawWidth;
+        const heightPx = (height / mosaicHeight) * drawHeight;
+        tiles.push({
+          tileX: col,
+          tileY: row,
+          left: (leftPx / containerWidth) * 100,
+          top: (topPx / containerHeight) * 100,
+          width: (widthPx / containerWidth) * 100,
+          height: (heightPx / containerHeight) * 100,
+        });
+      }
+    }
+
+    return { tileSize, level, tiles };
+  }, [distributionMeta, distributionDraw]);
+  const bottomDistributionTilePlan = useMemo(() => {
+    if (!bottomDistributionMeta || !bottomDistributionDraw) return null;
+    const tileSize = Math.max(
+      bottomDistributionMeta.image_height ?? 0,
+      512,
+    );
+    const {
+      mosaicWidth,
+      mosaicHeight,
+      drawWidth,
+      drawHeight,
+      offsetX,
+      offsetY,
+      containerWidth,
+      containerHeight,
+    } = bottomDistributionDraw;
+    if (!tileSize || !mosaicWidth || !mosaicHeight) return null;
+
+    const scaleX = mosaicWidth / Math.max(1, drawWidth);
+    const scaleY = mosaicHeight / Math.max(1, drawHeight);
+    let level = Math.ceil(Math.log2(Math.max(1, Math.max(scaleX, scaleY))));
+    level = Math.max(0, Math.min(12, level));
+
+    const virtualTileSize = tileSize * Math.pow(2, level);
+    const tilesX = Math.max(
+      1,
+      Math.ceil(mosaicWidth / virtualTileSize),
+    );
+    const tilesY = Math.max(
+      1,
+      Math.ceil(mosaicHeight / virtualTileSize),
+    );
+
+    const tiles: Array<{
+      tileX: number;
+      tileY: number;
+      left: number;
+      top: number;
+      width: number;
+      height: number;
+    }> = [];
+
+    for (let row = 0; row < tilesY; row += 1) {
+      for (let col = 0; col < tilesX; col += 1) {
+        const x = col * virtualTileSize;
+        const y = row * virtualTileSize;
+        const width =
+          col === tilesX - 1
+            ? mosaicWidth - col * virtualTileSize
+            : virtualTileSize;
+        const height =
+          row === tilesY - 1
+            ? mosaicHeight - row * virtualTileSize
+            : virtualTileSize;
+        const leftPx = offsetX + (x / mosaicWidth) * drawWidth;
+        const topPx = offsetY + (y / mosaicHeight) * drawHeight;
+        const widthPx = (width / mosaicWidth) * drawWidth;
+        const heightPx = (height / mosaicHeight) * drawHeight;
+        tiles.push({
+          tileX: col,
+          tileY: row,
+          left: (leftPx / containerWidth) * 100,
+          top: (topPx / containerHeight) * 100,
+          width: (widthPx / containerWidth) * 100,
+          height: (heightPx / containerHeight) * 100,
+        });
+      }
+    }
+
+    return { tileSize, level, tiles };
+  }, [bottomDistributionMeta, bottomDistributionDraw]);
+  const distributionViewportStyle = useMemo(() => {
+    if (!distributionDraw || analysisScrollState.height <= 0) {
+      return {
+        top: `${(analysisScrollState.top / analysisScrollState.height) * 100}%`,
+        height: `${(analysisScrollState.clientHeight / analysisScrollState.height) * 100}%`,
+      };
+    }
+    const topPx =
+      distributionDraw.offsetY +
+      (analysisScrollState.top / analysisScrollState.height) *
+        distributionDraw.drawHeight;
+    const heightPx =
+      (analysisScrollState.clientHeight / analysisScrollState.height) *
+      distributionDraw.drawHeight;
+    return {
+      top: `${(topPx / distributionDraw.containerHeight) * 100}%`,
+      height: `${(heightPx / distributionDraw.containerHeight) * 100}%`,
+    };
+  }, [analysisScrollState, distributionDraw]);
+  const bottomDistributionViewportStyle = useMemo(() => {
+    if (!bottomDistributionDraw || analysisScrollState.height <= 0) {
+      return {
+        top: `${(analysisScrollState.top / analysisScrollState.height) * 100}%`,
+        height: `${(analysisScrollState.clientHeight / analysisScrollState.height) * 100}%`,
+      };
+    }
+    const topPx =
+      bottomDistributionDraw.offsetY +
+      (analysisScrollState.top / analysisScrollState.height) *
+        bottomDistributionDraw.drawHeight;
+    const heightPx =
+      (analysisScrollState.clientHeight / analysisScrollState.height) *
+      bottomDistributionDraw.drawHeight;
+    return {
+      top: `${(topPx / bottomDistributionDraw.containerHeight) * 100}%`,
+      height: `${(heightPx / bottomDistributionDraw.containerHeight) * 100}%`,
+    };
+  }, [analysisScrollState, bottomDistributionDraw]);
 
   const createAnalysisTileRenderer = useCallback(
     (layout: { surfaces: SurfaceLayout[] }, defectRects: typeof topDefectRects, maxLevel: number) =>
@@ -1202,7 +1553,11 @@ export default function TraditionalMode() {
     if (e.buttons !== 1 && e.type !== 'mousedown') return;
     const rect = e.currentTarget.getBoundingClientRect();
     const y = e.clientY - rect.top;
-    const ratio = Math.max(0, Math.min(1, y / rect.height));
+    let ratio = y / rect.height;
+    if (distributionDraw && distributionDraw.drawHeight > 0) {
+      ratio = (y - distributionDraw.offsetY) / distributionDraw.drawHeight;
+    }
+    ratio = Math.max(0, Math.min(1, ratio));
     const targetLayout =
       surfaceFilter === "bottom" ? bottomLayout : topLayout;
     if (targetLayout.worldHeight <= 0) return;
@@ -1226,7 +1581,7 @@ export default function TraditionalMode() {
         y: targetY,
       });
     }
-  }, [surfaceFilter, topLayout, bottomLayout, isAnalysisSyncEnabled]);
+  }, [surfaceFilter, topLayout, bottomLayout, isAnalysisSyncEnabled, distributionDraw]);
 
   const formatTime = useCallback((date: Date) => {
     return date.toLocaleString('zh-CN', { 
@@ -1269,9 +1624,22 @@ export default function TraditionalMode() {
     setIsDraggingPicker(false);
   };
 
-  const handleImageWheel = (e: React.WheelEvent) => {
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    const newScale = Math.min(10, Math.max(0.1, imgScale * delta));
+  const handleImageWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const sensitivity = e.ctrlKey ? 0.004 : 0.002;
+    const factor = Math.exp(-e.deltaY * sensitivity);
+    const newScale = Math.min(10, Math.max(0.1, imgScale * factor));
+    if (newScale === imgScale) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const cursorX = e.clientX - rect.left - centerX;
+    const cursorY = e.clientY - rect.top - centerY;
+    const scaleFactor = newScale / imgScale;
+    setImgOffset({
+      x: imgOffset.x * scaleFactor + cursorX * (1 - scaleFactor),
+      y: imgOffset.y * scaleFactor + cursorY * (1 - scaleFactor),
+    });
     setImgScale(newScale);
   };
 
@@ -1298,6 +1666,25 @@ export default function TraditionalMode() {
     }
     return visibleDefects[0];
   }, [visibleDefects, selectedDefectId]);
+  const currentDefectIndex = useMemo(() => {
+    if (!visibleDefects || visibleDefects.length === 0) return -1;
+    if (selectedDefectId) {
+      const index = visibleDefects.findIndex((d) => d.id === selectedDefectId);
+      if (index >= 0) return index;
+    }
+    return 0;
+  }, [visibleDefects, selectedDefectId]);
+  const selectDefectAt = useCallback(
+    (index: number) => {
+      const next = visibleDefects[index];
+      if (!next) return;
+      setSelectedDefectId(next.id);
+      setActiveNav("缺陷分析");
+      setImgScale(1);
+      setImgOffset({ x: 0, y: 0 });
+    },
+    [visibleDefects],
+  );
 
   const updateDefectImageMetrics = useCallback(() => {
     const img = defectImageRef.current;
@@ -2093,6 +2480,8 @@ export default function TraditionalMode() {
         setIsImageFit={setIsImageFit}
         refreshLimit={refreshLimit}
         setRefreshLimit={setRefreshLimit}
+        distributionScaleMode={distributionScaleMode}
+        setDistributionScaleMode={setDistributionScaleMode}
         lineKey={currentLineKey}
         apiNodes={apiNodes}
         companyName={companyName}
@@ -2712,10 +3101,7 @@ export default function TraditionalMode() {
                {activeNav === "图像分析" && (surfaceFilter === 'all' || surfaceFilter === 'top') && (
                  <div 
                    className="absolute left-0 right-0 border-2 border-[#58a6ff] bg-[#58a6ff]/20 pointer-events-none z-10"
-                   style={{
-                     top: `${(analysisScrollState.top / analysisScrollState.height) * 100}%`,
-                     height: `${(analysisScrollState.clientHeight / analysisScrollState.height) * 100}%`
-                   }}
+                   style={distributionViewportStyle}
                  />
                )}
                {/* Ruler */}
@@ -2731,7 +3117,42 @@ export default function TraditionalMode() {
                onMouseMove={handleDistributionInteraction}
              >
                {/* Plate Visual Representation (Vertical Strip) */}
-               <div className="w-[80%] h-full bg-[#161b22] relative border-x border-[#30363d]">
+               <div ref={distributionPlateRef} className="w-[80%] h-full bg-[#161b22] relative border-x border-[#30363d]">
+                 {distributionTilePlan && distributionSurface && analysisSeqNo != null && (
+                   <div className="absolute inset-0 pointer-events-none">
+                     {distributionTilePlan.tiles.map((tile) => {
+                       const url = getTileImageUrl({
+                         surface: distributionSurface,
+                         seqNo: analysisSeqNo,
+                         level: distributionTilePlan.level,
+                         tileX: tile.tileX,
+                         tileY: tile.tileY,
+                         tileSize: distributionTilePlan.tileSize,
+                         fmt: "JPEG",
+                       });
+                       return (
+                         <img
+                           key={`dist-tile-${distributionSurface}-${analysisSeqNo}-${distributionTilePlan.level}-${tile.tileX}-${tile.tileY}`}
+                           src={url}
+                           alt="distribution-tile"
+                           className="absolute select-none"
+                           draggable={false}
+                           loading="lazy"
+                           decoding="async"
+                           onDragStart={(e) => e.preventDefault()}
+                           style={{
+                             left: `${tile.left}%`,
+                             top: `${tile.top}%`,
+                             width: `${tile.width}%`,
+                             height: `${tile.height}%`,
+                             objectFit: "fill",
+                             opacity: 0.4,
+                           }}
+                         />
+                       );
+                     })}
+                   </div>
+                 )}
                  {/* Grid lines inside plate */}
                  <div className="w-px h-full bg-[#30363d]/50 absolute left-1/2 -translate-x-1/2" />
                  <div className="w-full h-px bg-[#30363d]/20 absolute top-[25%]" />
@@ -2739,20 +3160,36 @@ export default function TraditionalMode() {
                  <div className="w-full h-px bg-[#30363d]/20 absolute top-[75%]" />
                  
                  {/* Real Defect points mapping */}
-                  {topDistributionDefects.map((defect, index) => {
-                   const plateLength = selectedPlate?.dimensions.length || 8000;
-                   const plateWidth = selectedPlate?.dimensions.width || 2000;
-                   const xMm = defect.xMm ?? defect.x;
-                   const yMm = defect.yMm ?? defect.y;
+                 {topDistributionDefects.map((defect, index) => {
+                   const surfaceMeta = surfaceImages.find((info) => info.surface === defect.surface);
+                   const frameHeight = surfaceMeta?.image_height ?? 0;
+                   const frameWidth = surfaceMeta?.image_width ?? 0;
+                   const frameCount = surfaceMeta?.frame_count ?? 0;
+                   const mosaicHeight = frameHeight * frameCount;
+                   const mosaicWidth = frameWidth;
+                   const frameIndex = Math.max(0, defect.imageIndex - 1);
+                   const worldX = defect.x;
+                   const worldY = defect.y + frameIndex * frameHeight;
+
+                   let topPos = mosaicHeight ? (worldY / mosaicHeight) * 100 : 0;
+                   let leftPos = mosaicWidth ? (worldX / mosaicWidth) * 100 : 0;
+                   if (distributionDraw) {
+                     const leftPx =
+                       distributionDraw.offsetX +
+                       (worldX / distributionDraw.mosaicWidth) * distributionDraw.drawWidth;
+                     const topPx =
+                       distributionDraw.offsetY +
+                       (worldY / distributionDraw.mosaicHeight) * distributionDraw.drawHeight;
+                     leftPos = (leftPx / distributionDraw.containerWidth) * 100;
+                     topPos = (topPx / distributionDraw.containerHeight) * 100;
+                   }
                    
-                   // 纵向分布：Y 方向对应长度，X 方向对应宽度
-                   const topPos = (yMm / plateLength) * 100;
-                   const leftPos = (xMm / plateWidth) * 100;
-                   
-                     const keySuffix = `${defect.id ?? index}-${defect.surface ?? "unknown"}`;
-                     return (
-                       <div 
-                        key={`dist-dot-${keySuffix}`}
+                    const keySuffix = `${defect.id ?? index}-${defect.surface ?? "unknown"}`;
+                    const defectColor = resolveDefectColor(defect);
+
+                    return (
+                      <div 
+                       key={`dist-dot-${keySuffix}`}
                         onMouseEnter={(e) =>
                           setHoveredDefect({
                             defect,
@@ -2767,28 +3204,30 @@ export default function TraditionalMode() {
                             screenY: e.clientY,
                           })
                         }
+                        onClick={() => {
+                          setSelectedDefectId(defect.id);
+                          setActiveNav("缺陷分析");
+                          setImgScale(1);
+                          setImgOffset({ x: 0, y: 0 });
+                        }}
                         onMouseLeave={() => setHoveredDefect(null)}
-                        className={`absolute w-2 h-2 rounded-full border border-white/30 -translate-x-1/2 -translate-y-1/2 z-10 ${
-                          defect.surface === 'top' ? 'bg-[#58a6ff]' : 'bg-[#f85149]'
-                        }`}
+                        className="absolute w-2 h-2 rounded-full border border-white/30 -translate-x-1/2 -translate-y-1/2 z-10 cursor-pointer"
                         style={{
                           top: `${Math.max(0, Math.min(100, topPos))}%`,
                           left: `${Math.max(0, Math.min(100, leftPos))}%`,
-                          boxShadow: `0 0 6px ${defect.surface === 'top' ? 'rgba(88,166,255,0.6)' : 'rgba(248,81,73,0.6)'}`
+                          backgroundColor: defectColor,
+                          boxShadow: `0 0 6px ${defectColor}`,
                         }}
                       />
                     );
-                 })}
+                  })}
 
                  {/* Viewport Indicator inside plate */}
                  {analysisScrollState.height > 1 && (
                    <motion.div 
                      className="absolute left-0 w-full border-y-2 border-[#58a6ff] bg-[#58a6ff]/10 backdrop-blur-[1px] pointer-events-none z-20"
                      initial={false}
-                     animate={{
-                       top: `${(analysisScrollState.top / analysisScrollState.height) * 100}%`,
-                       height: `${(analysisScrollState.clientHeight / analysisScrollState.height) * 100}%`
-                     }}
+                     animate={distributionViewportStyle}
                      transition={{ type: "spring", bounce: 0, duration: 0.1 }}
                    />
                  )}
@@ -3040,7 +3479,7 @@ export default function TraditionalMode() {
 
             <div className="flex items-center gap-0.5 ml-2 shrink-0 border-l border-[#30363d] pl-1.5">
               <button 
-                onClick={() => setSelectedPlate(plates[0])}
+                onClick={() => selectDefectAt(0)}
                 className="h-6 px-2 flex items-center gap-1 text-[10px] text-[#8b949e] hover:text-[#58a6ff] hover:bg-[#30363d] rounded transition-colors" title="跳至开头"
               >
                 <RefreshCcw className="w-3 h-3" />
@@ -3048,8 +3487,8 @@ export default function TraditionalMode() {
               </button>
               <button 
                 onClick={() => {
-                  const idx = plates.findIndex(p => p.serialNumber === selectedPlate?.serialNumber);
-                  if (idx > 0) setSelectedPlate(plates[idx - 1]);
+                  if (currentDefectIndex <= 0) return;
+                  selectDefectAt(currentDefectIndex - 1);
                 }}
                 className="h-6 px-2 flex items-center gap-1 text-[10px] text-[#c9d1d9] hover:bg-[#30363d] rounded transition-colors"
               >
@@ -3069,8 +3508,9 @@ export default function TraditionalMode() {
               </button>
               <button 
                 onClick={() => {
-                  const idx = plates.findIndex(p => p.serialNumber === selectedPlate?.serialNumber);
-                  if (idx < plates.length - 1) setSelectedPlate(plates[idx + 1]);
+                  if (currentDefectIndex < 0) return;
+                  const nextIndex = Math.min(visibleDefects.length - 1, currentDefectIndex + 1);
+                  selectDefectAt(nextIndex);
                 }}
                 className="h-6 px-2 flex items-center gap-1 text-[10px] text-[#c9d1d9] hover:bg-[#30363d] rounded transition-colors"
               >
@@ -3374,12 +3814,6 @@ export default function TraditionalMode() {
                         }}
                         onLoad={updateDefectImageMetrics}
                       />
-                      {defectBoxStyle && (
-                        <div
-                          className="absolute border-2 border-[#58a6ff]/80 pointer-events-none"
-                          style={defectBoxStyle}
-                        />
-                      )}
                     </div>
 
                     {/* Scale Indicator Overlay */}
@@ -3625,28 +4059,76 @@ export default function TraditionalMode() {
               {activeNav === "图像分析" && (surfaceFilter === 'all' || surfaceFilter === 'bottom') && (
                  <div 
                    className="absolute left-0 right-0 border-2 border-[#58a6ff] bg-[#58a6ff]/20 pointer-events-none z-10"
-                   style={{
-                     top: `${(analysisScrollState.top / analysisScrollState.height) * 100}%`,
-                     height: `${(analysisScrollState.clientHeight / analysisScrollState.height) * 100}%`
-                   }}
+                   style={bottomDistributionViewportStyle}
                  />
                )}
               <div className="w-full h-full relative flex justify-center">
-                <div className="w-[80%] h-full bg-[#161b22] relative border-x border-[#30363d]">
+                <div ref={bottomDistributionPlateRef} className="w-[80%] h-full bg-[#161b22] relative border-x border-[#30363d]">
+                  {bottomDistributionTilePlan && analysisSeqNo != null && (
+                    <div className="absolute inset-0 pointer-events-none">
+                      {bottomDistributionTilePlan.tiles.map((tile) => {
+                        const url = getTileImageUrl({
+                          surface: "bottom",
+                          seqNo: analysisSeqNo,
+                          level: bottomDistributionTilePlan.level,
+                          tileX: tile.tileX,
+                          tileY: tile.tileY,
+                          tileSize: bottomDistributionTilePlan.tileSize,
+                          fmt: "JPEG",
+                        });
+                        return (
+                          <img
+                            key={`dist-tile-bottom-${analysisSeqNo}-${bottomDistributionTilePlan.level}-${tile.tileX}-${tile.tileY}`}
+                            src={url}
+                            alt="distribution-tile"
+                            className="absolute select-none"
+                            draggable={false}
+                            loading="lazy"
+                            decoding="async"
+                            onDragStart={(e) => e.preventDefault()}
+                            style={{
+                              left: `${tile.left}%`,
+                              top: `${tile.top}%`,
+                              width: `${tile.width}%`,
+                              height: `${tile.height}%`,
+                              objectFit: "fill",
+                              opacity: 0.4,
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
                   <div className="w-px h-full bg-[#30363d]/50 absolute left-1/2 -translate-x-1/2" />
                   <div className="w-full h-px bg-[#30363d]/20 absolute top-[25%]" />
                   <div className="w-full h-px bg-[#30363d]/20 absolute top-[50%]" />
                   <div className="w-full h-px bg-[#30363d]/20 absolute top-[75%]" />
 
                   {bottomDistributionDefects.map((defect, index) => {
-                    const plateLength = selectedPlate?.dimensions.length || 8000;
-                    const plateWidth = selectedPlate?.dimensions.width || 2000;
-                    const xMm = defect.xMm ?? defect.x;
-                    const yMm = defect.yMm ?? defect.y;
+                    const surfaceMeta = surfaceImages.find((info) => info.surface === defect.surface);
+                    const frameHeight = surfaceMeta?.image_height ?? 0;
+                    const frameWidth = surfaceMeta?.image_width ?? 0;
+                    const frameCount = surfaceMeta?.frame_count ?? 0;
+                    const mosaicHeight = frameHeight * frameCount;
+                    const mosaicWidth = frameWidth;
+                    const frameIndex = Math.max(0, defect.imageIndex - 1);
+                    const worldX = defect.x;
+                    const worldY = defect.y + frameIndex * frameHeight;
 
-                    const topPos = (yMm / plateLength) * 100;
-                    const leftPos = (xMm / plateWidth) * 100;
+                    let topPos = mosaicHeight ? (worldY / mosaicHeight) * 100 : 0;
+                    let leftPos = mosaicWidth ? (worldX / mosaicWidth) * 100 : 0;
+                    if (bottomDistributionDraw) {
+                      const leftPx =
+                        bottomDistributionDraw.offsetX +
+                        (worldX / bottomDistributionDraw.mosaicWidth) * bottomDistributionDraw.drawWidth;
+                      const topPx =
+                        bottomDistributionDraw.offsetY +
+                        (worldY / bottomDistributionDraw.mosaicHeight) * bottomDistributionDraw.drawHeight;
+                      leftPos = (leftPx / bottomDistributionDraw.containerWidth) * 100;
+                      topPos = (topPx / bottomDistributionDraw.containerHeight) * 100;
+                    }
                     const keySuffix = `${defect.id ?? index}-${defect.surface ?? "unknown"}`;
+                    const defectColor = resolveDefectColor(defect);
 
                     return (
                       <div
@@ -3665,12 +4147,19 @@ export default function TraditionalMode() {
                             screenY: e.clientY,
                           })
                         }
+                        onClick={() => {
+                          setSelectedDefectId(defect.id);
+                          setActiveNav("缺陷分析");
+                          setImgScale(1);
+                          setImgOffset({ x: 0, y: 0 });
+                        }}
                         onMouseLeave={() => setHoveredDefect(null)}
-                        className="absolute w-2 h-2 rounded-full border border-white/30 -translate-x-1/2 -translate-y-1/2 z-10 bg-[#f85149]"
+                        className="absolute w-2 h-2 rounded-full border border-white/30 -translate-x-1/2 -translate-y-1/2 z-10 cursor-pointer"
                         style={{
                           top: `${Math.max(0, Math.min(100, topPos))}%`,
                           left: `${Math.max(0, Math.min(100, leftPos))}%`,
-                          boxShadow: "0 0 6px rgba(248,81,73,0.6)",
+                          backgroundColor: defectColor,
+                          boxShadow: `0 0 6px ${defectColor}`,
                         }}
                       />
                     );

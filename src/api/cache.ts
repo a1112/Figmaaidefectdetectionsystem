@@ -122,7 +122,10 @@ export async function listCacheRecords(
   return (await response.json()) as CacheRecordsResponse;
 }
 
-export async function scanCacheRecord(seqNo: number): Promise<void> {
+export async function scanCacheRecords(payload: {
+  seq_no?: number;
+  limit?: number;
+}): Promise<void> {
   if (env.isDevelopment()) {
     return;
   }
@@ -130,12 +133,16 @@ export async function scanCacheRecord(seqNo: number): Promise<void> {
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ seq_no: seqNo }),
+    body: JSON.stringify(payload),
   });
   if (!response.ok) {
     const data = await response.json().catch(() => null);
     throw new Error(data?.detail || `Failed to scan cache: ${response.status}`);
   }
+}
+
+export async function scanCacheRecord(seqNo: number): Promise<void> {
+  return scanCacheRecords({ seq_no: seqNo });
 }
 
 export async function precacheRecord(seqNo: number, levels?: number): Promise<void> {

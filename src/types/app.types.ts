@@ -12,6 +12,8 @@ export type ManualConfirmStatus = "unprocessed" | "ignore" | "A" | "B" | "C" | "
 
 export type ImageOrientation = "horizontal" | "vertical";
 
+export type DistributionScaleMode = "fit" | "stretch";
+
 export interface Defect {
   id: string;
   type: string;

@@ -328,7 +328,8 @@ export function getDefectImageUrl(params: {
     search.set("fmt", fmt);
   }
 
-  return `${baseUrl}/images/defect/${defectId}?${search.toString()}`;
+  search.set("defect_id", String(defectId));
+  return `${baseUrl}/images/crop?${search.toString()}`;
 }
 
 /**

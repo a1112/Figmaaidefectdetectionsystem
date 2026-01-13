@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner@2.0.3";
 import { env } from "../config/env";
-import { getUiSettings } from "../api/admin";
+import { getCacheConfig, getTemplateConfig, getUiSettings } from "../api/admin";
 import {
   deleteCacheRecords,
   getCacheSettings,
@@ -25,6 +25,7 @@ import {
   migrateCacheRoots,
   pauseCache,
   precacheRecord,
+  scanCacheRecords,
   rebuildCacheRecords,
   resumeCache,
   updateCacheSettings,
@@ -158,10 +159,18 @@ export default function CacheDebug() {
     avgWidth: 0,
     avgHeight: 0,
   });
+  const [completionNotice, setCompletionNotice] = useState<{ title: string; detail?: string } | null>(null);
+  const [cacheRoots, setCacheRoots] = useState<{ top: string; bottom: string }>({
+    top: "--",
+    bottom: "--",
+  });
   const cacheLogCursorRef = useRef(0);
   const preheatLogCursorRef = useRef(0);
   const logRef = useRef<HTMLDivElement | null>(null);
   const [logAutoRefresh, setLogAutoRefresh] = useState(true);
+  const completionKeyRef = useRef<string | null>(null);
+  const cacheConfigRef = useRef<any>(null);
+  const templateImagesRef = useRef<Record<string, any> | null>(null);
   const clientCacheRecordRef = useRef<
     Map<number, { tiles: Map<string, Map<number, number>>; defectCount: number }>
   >(new Map());
@@ -171,6 +180,10 @@ export default function CacheDebug() {
   const [isRebuildOpen, setIsRebuildOpen] = useState(false);
   const [isMigrateOpen, setIsMigrateOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isSyncOpen, setIsSyncOpen] = useState(false);
+  const [syncMode, setSyncMode] = useState<"recent" | "seq">("recent");
+  const [syncLimit, setSyncLimit] = useState(200);
+  const [syncSeqNo, setSyncSeqNo] = useState<number | "">("");
   const [deleteMode, setDeleteMode] = useState<"all" | "keep_last" | "range">("all");
   const [deleteKeepLast, setDeleteKeepLast] = useState(200);
   const [deleteStart, setDeleteStart] = useState(1);
@@ -215,6 +228,28 @@ export default function CacheDebug() {
     }
   };
 
+  const loadCacheStatus = async () => {
+    try {
+      const status = await getCacheStatus();
+      setCacheStatus(status);
+    } catch (error) {
+      console.error("Load cache status failed", error);
+    }
+  };
+
+  const loadCacheSettings = async (openDialog: boolean = false) => {
+    try {
+      const payload = await getCacheSettings();
+      setCacheSettings(payload);
+      if (openDialog) {
+        setIsSettingsOpen(true);
+      }
+    } catch (error) {
+      console.error("Load cache settings failed", error);
+      toast.error("缓存设置加载失败");
+    }
+  };
+
   useEffect(() => {
     let timer: number | null = null;
     void loadData();
@@ -226,16 +261,8 @@ export default function CacheDebug() {
 
   useEffect(() => {
     let timer: number | null = null;
-    const loadStatus = async () => {
-      try {
-        const status = await getCacheStatus();
-        setCacheStatus(status);
-      } catch (error) {
-        console.error("Load cache status failed", error);
-      }
-    };
-    void loadStatus();
-    timer = window.setInterval(loadStatus, 3000);
+    void loadCacheStatus();
+    timer = window.setInterval(loadCacheStatus, 3000);
     return () => {
       if (timer) window.clearInterval(timer);
     };
@@ -284,6 +311,48 @@ export default function CacheDebug() {
     };
   }, []);
 
+  const resolveCacheRoots = (images: Record<string, any>, config: any, lineKey?: string) => {
+    const lineItems = Array.isArray(config?.lines) ? config.lines : [];
+    const matchedLine =
+      lineItems.find((item) => item?.key === lineKey || item?.name === lineKey) || lineItems[0];
+    const ip = matchedLine?.ip ? String(matchedLine.ip) : "";
+    const resolvePath = (value?: string) => {
+      if (!value) return "--";
+      if (!ip) return String(value);
+      return String(value).replace(/\{ip\}/g, ip);
+    };
+    const topRoot = resolvePath(images.disk_cache_top_root || images.top_root);
+    const bottomRoot = resolvePath(images.disk_cache_bottom_root || images.bottom_root);
+    return { top: topRoot, bottom: bottomRoot };
+  };
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([getTemplateConfig(), getCacheConfig()])
+      .then(([templatePayload, cacheConfig]) => {
+        if (!active) return;
+        const images = (templatePayload?.server?.images ?? {}) as Record<string, any>;
+        templateImagesRef.current = images;
+        cacheConfigRef.current = cacheConfig;
+        const lineKey = env.getLineName();
+        setCacheRoots(resolveCacheRoots(images, cacheConfig, lineKey));
+      })
+      .catch((error) => {
+        console.error("Load cache roots failed", error);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const images = templateImagesRef.current;
+    const config = cacheConfigRef.current;
+    if (!images || !config) return;
+    const lineKey = env.getLineName() || cacheStatus?.line_key || "";
+    setCacheRoots(resolveCacheRoots(images, config, lineKey));
+  }, [cacheStatus?.line_key]);
+
   useEffect(() => {
     if (!logAutoRefresh) {
       return;
@@ -312,6 +381,25 @@ export default function CacheDebug() {
     if (!logRef.current) return;
     logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [activeLogs, activeTab]);
+
+  useEffect(() => {
+    const task = cacheStatus?.task;
+    if (!task?.type) return;
+    if (!["delete", "rebuild"].includes(task.type)) return;
+    const total = Number(task.total || 0);
+    const done = Number(task.done || 0);
+    if (!total || done < total) return;
+    if (cacheStatus?.state !== "ready") return;
+    const key = `${task.type}:${total}:${done}:${task.force ? "force" : "keep"}`;
+    if (completionKeyRef.current === key) return;
+    completionKeyRef.current = key;
+    const title = task.type === "delete" ? "缓存删除完成" : "缓存重建完成";
+    const detail =
+      task.type === "rebuild" && task.force
+        ? `共处理 ${total} 条记录，已覆盖原缓存。`
+        : `共处理 ${total} 条记录。`;
+    setCompletionNotice({ title, detail });
+  }, [cacheStatus]);
 
   const handlePrecache = async () => {
     if (!precacheTarget) return;
@@ -398,8 +486,11 @@ export default function CacheDebug() {
         top_root: migrateTopRoot.trim() || undefined,
         bottom_root: migrateBottomRoot.trim() || undefined,
       });
-      toast.success("缓存迁移已完成");
       setIsMigrateOpen(false);
+      setCompletionNotice({
+        title: "缓存迁移完成",
+        detail: "请检查新缓存目录是否正常。",
+      });
     } catch (error) {
       console.error("Migrate cache failed", error);
       toast.error("缓存迁移失败");
@@ -408,6 +499,28 @@ export default function CacheDebug() {
 
   const handleOpenSettings = async () => {
     await loadCacheSettings(true);
+  };
+
+  const handleSyncCache = async () => {
+    try {
+      if (syncMode === "seq") {
+        const seqNo = Number(syncSeqNo);
+        if (!seqNo) {
+          toast.error("请输入有效的流水号");
+          return;
+        }
+        await scanCacheRecords({ seq_no: seqNo });
+      } else {
+        const limit = Math.max(1, Number(syncLimit) || 0);
+        await scanCacheRecords({ limit });
+      }
+      toast.success("数据同步已触发");
+      setIsSyncOpen(false);
+      await loadData();
+    } catch (error) {
+      console.error("Sync cache failed", error);
+      toast.error("数据同步失败");
+    }
   };
 
   const handleSaveSettings = async () => {
@@ -868,6 +981,13 @@ export default function CacheDebug() {
                     缓存迁移
                   </button>
                   <button
+                    onClick={() => setIsSyncOpen(true)}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-sm border border-border hover:bg-muted/60"
+                  >
+                    <RefreshCcw className="w-3 h-3" />
+                    数据同步
+                  </button>
+                  <button
                     onClick={handleOpenSettings}
                     className="inline-flex items-center gap-1 px-2 py-1 rounded-sm border border-primary/40 text-primary hover:bg-primary hover:text-primary-foreground"
                   >
@@ -880,6 +1000,14 @@ export default function CacheDebug() {
                 <div className="text-xs font-semibold text-muted-foreground mb-2">基础数据信息</div>
                 <div className="grid gap-1 text-[11px] text-muted-foreground">
                   <div>单表面工作线程数量：{cacheStatus?.worker_per_surface ?? 1}</div>
+                  <div>
+                    上表保存位置：
+                    <span className="ml-1 font-mono text-foreground break-all">{cacheRoots.top}</span>
+                  </div>
+                  <div>
+                    下表保存位置：
+                    <span className="ml-1 font-mono text-foreground break-all">{cacheRoots.bottom}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1353,6 +1481,34 @@ export default function CacheDebug() {
         </DialogContent>
       </Dialog>
 
+      <Dialog
+        open={Boolean(completionNotice)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCompletionNotice(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-[460px] bg-card/95 backdrop-blur-xl border-border">
+          <DialogHeader>
+            <DialogTitle className="text-base">{completionNotice?.title ?? "任务完成"}</DialogTitle>
+            {completionNotice?.detail ? (
+              <DialogDescription className="text-xs text-muted-foreground">
+                {completionNotice.detail}
+              </DialogDescription>
+            ) : null}
+          </DialogHeader>
+          <div className="flex items-center justify-end gap-2 mt-3">
+            <button
+              onClick={() => setCompletionNotice(null)}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-sm border border-border text-[11px] text-muted-foreground hover:text-foreground"
+            >
+              关闭
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
         <DialogContent className="max-w-[620px] bg-card/95 backdrop-blur-xl border-border">
           <DialogHeader>
@@ -1437,6 +1593,72 @@ export default function CacheDebug() {
               className="inline-flex items-center gap-1 px-3 py-1.5 rounded-sm border border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground text-[11px]"
             >
               确认删除
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isSyncOpen} onOpenChange={setIsSyncOpen}>
+        <DialogContent className="max-w-[620px] bg-card/95 backdrop-blur-xl border-border">
+          <DialogHeader>
+            <DialogTitle className="text-base">数据同步</DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              对 cache.json 与数据库记录进行比对，更新缓存状态。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 text-xs">
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  checked={syncMode === "recent"}
+                  onChange={() => setSyncMode("recent")}
+                />
+                最近 N 条
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  checked={syncMode === "seq"}
+                  onChange={() => setSyncMode("seq")}
+                />
+                指定流水号
+              </label>
+            </div>
+            {syncMode === "recent" ? (
+              <label className="flex flex-col gap-1">
+                <span className="text-muted-foreground">同步数量</span>
+                <input
+                  type="number"
+                  value={syncLimit}
+                  onChange={(e) => setSyncLimit(Number(e.target.value))}
+                  className="h-8 rounded-sm border border-border bg-background px-2 text-xs"
+                />
+              </label>
+            ) : (
+              <label className="flex flex-col gap-1">
+                <span className="text-muted-foreground">流水号</span>
+                <input
+                  type="number"
+                  value={syncSeqNo}
+                  onChange={(e) => setSyncSeqNo(Number(e.target.value) || "")}
+                  className="h-8 rounded-sm border border-border bg-background px-2 text-xs"
+                />
+              </label>
+            )}
+          </div>
+          <div className="flex items-center justify-end gap-2 mt-3">
+            <button
+              onClick={() => setIsSyncOpen(false)}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-sm border border-border text-[11px] text-muted-foreground hover:text-foreground"
+            >
+              取消
+            </button>
+            <button
+              onClick={handleSyncCache}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-sm border border-primary/40 text-primary hover:bg-primary hover:text-primary-foreground text-[11px]"
+            >
+              开始同步
             </button>
           </div>
         </DialogContent>
@@ -1693,15 +1915,3 @@ export default function CacheDebug() {
     </div>
   );
 }
-  const loadCacheSettings = async (openDialog: boolean = false) => {
-    try {
-      const payload = await getCacheSettings();
-      setCacheSettings(payload);
-      if (openDialog) {
-        setIsSettingsOpen(true);
-      }
-    } catch (error) {
-      console.error("Load cache settings failed", error);
-      toast.error("加载缓存设置失败");
-    }
-  };

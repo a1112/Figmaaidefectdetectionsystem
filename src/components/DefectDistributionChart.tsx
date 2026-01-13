@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useEffect, useState } from "react";
 import type {
   Defect,
   ImageOrientation,
+  DistributionScaleMode,
 } from "../types/app.types";
 import type {
   SurfaceImageInfo,
@@ -34,6 +35,7 @@ interface DefectDistributionChartProps {
   imageOrientation?: ImageOrientation;
   showDistributionImages?: boolean;
   showTileBorders?: boolean;
+  distributionScaleMode?: DistributionScaleMode;
   onViewportCenterChange?: (center: { x: number; y: number } | null) => void;
 }
 
@@ -116,6 +118,7 @@ export function DefectDistributionChart({
   onViewportCenterChange,
   showDistributionImages = true,
   showTileBorders = false,
+  distributionScaleMode = "fit",
 }: DefectDistributionChartProps) {
   const getSeverityColor = (severity: string) => {
     switch (severity) {
@@ -154,14 +157,24 @@ export function DefectDistributionChart({
   // 横向布局：宽度 = 高度 × 单图比例 × 图像数量
   const plateHeight = 120; // 固定高度
 
-  const getDistributionTileLevel = (): number => {
-    const preferred = 6; // L6 - Optimize for single-row layout
-    const normalizedPreferred = Math.max(0, Math.floor(preferred));
+  const getDistributionTileLevel = (
+    worldWidth: number,
+    worldHeight: number,
+    displayWidth: number,
+    displayHeight: number,
+  ): number => {
+    const scaleX = worldWidth / Math.max(1, displayWidth);
+    const scaleY = worldHeight / Math.max(1, displayHeight);
+    const desiredDownscale = Math.max(scaleX, scaleY);
+    const normalized = Math.max(
+      0,
+      Math.ceil(Math.log2(Math.max(1, desiredDownscale))),
+    );
     const cap =
       typeof maxTileLevel === "number" && Number.isFinite(maxTileLevel)
         ? Math.max(0, Math.floor(maxTileLevel))
-        : normalizedPreferred;
-    return Math.min(cap, normalizedPreferred);
+        : normalized;
+    return Math.min(cap, normalized);
   };
 
   const hasMeta =
@@ -204,20 +217,26 @@ export function DefectDistributionChart({
   // 容器引用，用于获取宽度
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState<number>(0);
+  const [containerHeight, setContainerHeight] = useState<number>(0);
 
   // 监听容器宽度变化
   useEffect(() => {
-    if (!containerRef.current) return;
-    
-    const updateWidth = () => {
-      if (containerRef.current) {
-        setContainerWidth(containerRef.current.offsetWidth);
-      }
+    const container = containerRef.current;
+    if (!container) return;
+
+    const updateSize = () => {
+      setContainerWidth(container.offsetWidth);
+      setContainerHeight(container.offsetHeight);
     };
-    
-    updateWidth();
-    window.addEventListener('resize', updateWidth);
-    return () => window.removeEventListener('resize', updateWidth);
+
+    updateSize();
+    const resizeObserver = new ResizeObserver(updateSize);
+    resizeObserver.observe(container);
+    window.addEventListener("resize", updateSize);
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateSize);
+    };
   }, []);
   
   // 计算横向布局的宽度
@@ -255,6 +274,30 @@ export function DefectDistributionChart({
     // 因此两种情况下 finalHeight 都应该是 plateHeight * 2
     
     // 如果宽度不足容器宽度的75%，进行拉伸
+    if (distributionScaleMode === "stretch") {
+      const targetHeight =
+        containerHeight > 0 ? containerHeight : finalHeight;
+      finalHeight = targetHeight;
+      const targetWidth =
+        containerWidth > 0
+          ? containerWidth
+          : Math.max(topWidth, bottomWidth);
+      if (surface === "all") {
+        finalTopWidth = targetWidth;
+        finalBottomWidth = targetWidth;
+      } else if (surface === "top") {
+        finalTopWidth = targetWidth;
+      } else {
+        finalBottomWidth = targetWidth;
+      }
+      return {
+        height: finalHeight,
+        topWidth: finalTopWidth,
+        bottomWidth: finalBottomWidth,
+        scale,
+      };
+    }
+
     if (containerWidth > 0) {
       const targetWidth = containerWidth * 0.75;
       
@@ -287,7 +330,7 @@ export function DefectDistributionChart({
       bottomWidth: finalBottomWidth,
       scale, // 统一的缩放比例
     };
-  }, [surface, containerWidth, surfaceImageInfo]);
+  }, [surface, containerWidth, containerHeight, surfaceImageInfo, distributionScaleMode]);
 
   const computeDisplayRect = (
     defect: Defect,
@@ -411,7 +454,6 @@ export function DefectDistributionChart({
       meta &&
       typeof (seqNo as number | undefined) === "number"
     ) {
-      const level = getDistributionTileLevel();
       const layout = buildOrientationLayout({
         orientation,
         surfaceFilter: surf,
@@ -422,6 +464,14 @@ export function DefectDistributionChart({
       const surfaceLayout = layout.surfaces.find(
         (s) => s.surface === surf,
       );
+      const level = surfaceLayout
+        ? getDistributionTileLevel(
+            surfaceLayout.worldWidth,
+            surfaceLayout.worldHeight,
+            plateWidth,
+            perSurfaceHeight,
+          )
+        : getDistributionTileLevel(1, 1, plateWidth, perSurfaceHeight);
 
       // Calculate tileSize based on layout to ensure single row if possible
       let tileSize = Math.max(
@@ -493,7 +543,7 @@ export function DefectDistributionChart({
               tileX: requestInfo.tileX,
               tileY: requestInfo.tileY,
               tileSize,
-              view: orientation,
+              view: orientation === "horizontal" ? "horizontal" : undefined,
             });
 
             const localX = x - surfaceLayout.offsetX;

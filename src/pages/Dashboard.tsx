@@ -31,6 +31,7 @@ import type {
   SurfaceImageInfo,
   ApiNode,
 } from "../api/types";
+import type { DistributionScaleMode } from "../types/app.types";
 import type {
   Defect,
   DetectionRecord,
@@ -126,6 +127,7 @@ export function Dashboard() {
 
   const [showDistributionImages, setShowDistributionImages] = useState(true);
   const [showTileBorders, setShowTileBorders] = useState(false);
+  const [distributionScaleMode, setDistributionScaleMode] = useState<DistributionScaleMode>("fit");
 
   const handleDefectHover = useCallback(
     (defect: Defect, position: { screenX: number; screenY: number }) => {
@@ -1004,6 +1006,7 @@ export function Dashboard() {
                     maxTileLevel={maxTileLevel}
                     showDistributionImages={showDistributionImages}
                     showTileBorders={showTileBorders}
+                    distributionScaleMode={distributionScaleMode}
                     onDefectHover={handleDefectHover}
                     onDefectHoverEnd={handleDefectHoverEnd}
                   />
@@ -1149,6 +1152,8 @@ export function Dashboard() {
         setShowDistributionImages={setShowDistributionImages}
         showTileBorders={showTileBorders}
         setShowTileBorders={setShowTileBorders}
+        distributionScaleMode={distributionScaleMode}
+        setDistributionScaleMode={setDistributionScaleMode}
         lineKey={activeLineKey}
         apiNodes={apiNodes}
       />

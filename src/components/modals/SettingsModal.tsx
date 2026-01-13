@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner@2.0.3";
 import type { ApiNode } from "../../api/types";
 import { InfoPanel } from "../InfoPanel";
+import type { DistributionScaleMode } from "../types/app.types";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -21,6 +22,8 @@ interface SettingsModalProps {
   setIsImageFit: (val: boolean) => void;
   refreshLimit: number;
   setRefreshLimit: (val: number) => void;
+  distributionScaleMode: DistributionScaleMode;
+  setDistributionScaleMode: (mode: DistributionScaleMode) => void;
   lineKey?: string;
   apiNodes?: ApiNode[];
   companyName?: string;
@@ -35,6 +38,8 @@ export function SettingsModal({
   setIsImageFit,
   refreshLimit,
   setRefreshLimit,
+  distributionScaleMode,
+  setDistributionScaleMode,
   lineKey,
   apiNodes,
   companyName,
@@ -56,7 +61,7 @@ export function SettingsModal({
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-full max-w-lg bg-[#161b22] border border-[#30363d] shadow-2xl rounded-sm flex flex-col overflow-hidden"
+            className="relative w-full max-w-xl bg-[#161b22] border border-[#30363d] shadow-2xl rounded-sm flex flex-col overflow-hidden"
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-[#30363d] bg-[#0d1117]">
               <div className="flex items-center gap-2">
@@ -142,6 +147,26 @@ export function SettingsModal({
                         >
                           <LayoutGrid className="w-4 h-4" />
                           <span className="text-[11px] font-bold">图像平铺</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <label className="text-[11px] font-bold text-[#8b949e] uppercase tracking-tight">分布图显示模式</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => setDistributionScaleMode("fit")}
+                          className={`flex items-center justify-center gap-2 p-3 border rounded-sm transition-all ${distributionScaleMode === "fit" ? 'bg-[#58a6ff]/10 border-[#58a6ff] text-[#58a6ff]' : 'bg-[#0d1117] border-[#30363d] text-[#8b949e] hover:border-[#8b949e]'}`}
+                        >
+                          <Maximize2 className="w-4 h-4" />
+                          <span className="text-[11px] font-bold">等比缩放</span>
+                        </button>
+                        <button
+                          onClick={() => setDistributionScaleMode("stretch")}
+                          className={`flex items-center justify-center gap-2 p-3 border rounded-sm transition-all ${distributionScaleMode === "stretch" ? 'bg-[#58a6ff]/10 border-[#58a6ff] text-[#58a6ff]' : 'bg-[#0d1117] border-[#30363d] text-[#8b949e] hover:border-[#8b949e]'}`}
+                        >
+                          <LayoutGrid className="w-4 h-4" />
+                          <span className="text-[11px] font-bold">拉伸</span>
                         </button>
                       </div>
                     </div>

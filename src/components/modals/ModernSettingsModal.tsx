@@ -18,7 +18,7 @@ import {
   Info,
   Check
 } from "lucide-react";
-import type { ImageOrientation } from "../types/app.types";
+import type { ImageOrientation, DistributionScaleMode } from "../types/app.types";
 import { useTheme, themePresets } from "../ThemeContext";
 import type { ApiNode } from "../../api/types";
 import { InfoPanel } from "../InfoPanel";
@@ -32,6 +32,8 @@ interface ModernSettingsModalProps {
   setShowDistributionImages: (show: boolean) => void;
   showTileBorders: boolean;
   setShowTileBorders: (show: boolean) => void;
+  distributionScaleMode: DistributionScaleMode;
+  setDistributionScaleMode: (mode: DistributionScaleMode) => void;
   lineKey?: string;
   apiNodes?: ApiNode[];
   companyName?: string;
@@ -46,6 +48,8 @@ export function ModernSettingsModal({
   setShowDistributionImages,
   showTileBorders,
   setShowTileBorders,
+  distributionScaleMode,
+  setDistributionScaleMode,
   lineKey,
   apiNodes,
   companyName,
@@ -55,7 +59,7 @@ export function ModernSettingsModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] bg-card/80 backdrop-blur-xl border-border shadow-2xl p-0 overflow-hidden">
+      <DialogContent className="sm:max-w-[720px] bg-card/80 backdrop-blur-xl border-border shadow-2xl p-0 overflow-hidden">
         <div className="flex h-[480px]">
           {/* Sidebar */}
           <div className="w-40 bg-muted/40 border-r border-border p-3 flex flex-col gap-1">
@@ -160,6 +164,34 @@ export function ModernSettingsModal({
                       分布图显示
                     </div>
                     <div className="grid gap-2">
+                      <div className="p-3 rounded-lg border border-border bg-muted/30 flex items-center justify-between">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-xs font-bold">等比/拉升</span>
+                          <span className="text-[10px] text-muted-foreground">分布图显示比例模式</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => setDistributionScaleMode("fit")}
+                            className={`px-2 py-1 text-[10px] font-bold rounded border transition-colors ${
+                              distributionScaleMode === "fit"
+                                ? "border-primary bg-primary/10 text-primary"
+                                : "border-border text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            等比
+                          </button>
+                          <button
+                            onClick={() => setDistributionScaleMode("stretch")}
+                            className={`px-2 py-1 text-[10px] font-bold rounded border transition-colors ${
+                              distributionScaleMode === "stretch"
+                                ? "border-primary bg-primary/10 text-primary"
+                                : "border-border text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            拉升
+                          </button>
+                        </div>
+                      </div>
                       <div className="p-3 rounded-lg border border-border bg-muted/30 flex items-center justify-between">
                         <div className="flex flex-col gap-0.5">
                           <span className="text-xs font-bold">显示瓦片图像</span>

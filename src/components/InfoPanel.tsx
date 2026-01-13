@@ -28,6 +28,8 @@ export function InfoPanel({
     frameHeight?: number | null;
     orgWidth?: number | null;
     orgHeight?: number | null;
+    tileSize?: number | null;
+    tileMaxLevel?: number | null;
   } | null>(null);
 
   const resolvedLineKey = lineKey || (env as any).getLineName?.() || "";
@@ -105,6 +107,8 @@ export function InfoPanel({
         frameHeight: meta?.image?.frame_height ?? meta?.image?.frameHeight ?? null,
         orgWidth: meta?.image?.org_width ?? meta?.image?.orgWidth ?? null,
         orgHeight: meta?.image?.org_height ?? meta?.image?.orgHeight ?? null,
+        tileSize: meta?.tile?.default_tile_size ?? meta?.tile?.tile_size ?? null,
+        tileMaxLevel: meta?.tile?.max_level ?? null,
       });
       setLoading(false);
     };
@@ -209,6 +213,14 @@ export function InfoPanel({
               <span className="font-mono">
                 {displayValue(apiMeta?.orgWidth)} × {displayValue(apiMeta?.orgHeight)}
               </span>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span className={colors.label}>瓦片大小</span>
+              <span className="font-mono">{displayValue(apiMeta?.tileSize)}</span>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span className={colors.label}>最大瓦片级别</span>
+              <span className="font-mono">{displayValue(apiMeta?.tileMaxLevel)}</span>
             </div>
           </div>
         </div>

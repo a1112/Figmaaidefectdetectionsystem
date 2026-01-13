@@ -10,6 +10,7 @@ import type {
   Defect,
   SteelPlate,
   ImageOrientation,
+  DistributionScaleMode,
 } from "../../types/app.types";
 import type { SurfaceImageInfo } from "../../api/types";
 import type {
@@ -54,6 +55,7 @@ interface DefectsPageProps {
   maxTileLevel: number;
   showDistributionImages: boolean;
   showTileBorders: boolean;
+  distributionScaleMode: DistributionScaleMode;
   onDefectHover?: (defect: Defect, position: { screenX: number; screenY: number }) => void;
   onDefectHoverEnd?: () => void;
 }
@@ -85,6 +87,7 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
   maxTileLevel,
   showDistributionImages,
   showTileBorders,
+  distributionScaleMode,
   onDefectHover,
   onDefectHoverEnd,
 }) => {
@@ -245,6 +248,7 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
               maxTileLevel={maxTileLevel}
               showDistributionImages={showDistributionImages}
               showTileBorders={showTileBorders}
+              distributionScaleMode={distributionScaleMode}
               seqNo={
                 selectedPlate
                   ? parseInt(selectedPlate.serialNumber, 10)

@@ -919,7 +919,8 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
     const { minScale, maxScale } = getConstraints();
     const current = transform.current;
 
-    if (wheelMode === "scroll") {
+    const shouldZoom = wheelMode !== "scroll" || e.ctrlKey;
+    if (!shouldZoom) {
       const next = clampTransform({
         scale: current.scale,
         x: current.x,
