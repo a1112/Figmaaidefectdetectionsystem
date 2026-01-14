@@ -66,7 +66,7 @@ export function SettingsModal({
             <div className="flex items-center justify-between px-4 py-3 border-b border-[#30363d] bg-[#0d1117]">
               <div className="flex items-center gap-2">
                 <Settings className="w-4 h-4 text-[#58a6ff]" />
-                <h3 className="text-sm font-bold text-[#f0f6fc] uppercase tracking-wider">系统运行设置</h3>
+                <h3 className="text-sm font-bold text-[#f0f6fc] uppercase tracking-wider">系统设置</h3>
               </div>
               <button onClick={onClose} className="p-1 hover:bg-[#30363d] rounded transition-colors text-[#8b949e] hover:text-[#f0f6fc]">
                 <X className="w-4 h-4" />

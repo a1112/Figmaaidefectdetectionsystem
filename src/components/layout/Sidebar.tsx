@@ -19,6 +19,11 @@ interface SidebarProps {
   setIsFilterDialogOpen: (open: boolean) => void;
   searchButtonRef: React.RefObject<HTMLButtonElement>;
   filterButtonRef: React.RefObject<HTMLButtonElement>;
+  onPlateHover?: (
+    plate: SteelPlate,
+    position: { screenX: number; screenY: number },
+  ) => void;
+  onPlateHoverEnd?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -35,7 +40,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setIsSearchDialogOpen,
   setIsFilterDialogOpen,
   searchButtonRef,
-  filterButtonRef
+  filterButtonRef,
+  onPlateHover,
+  onPlateHoverEnd,
 }) => {
   if (isCollapsed) return null;
   const newPlateKeys = useNewItemKeys(
@@ -197,6 +204,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div 
             key={`${plate.plateId}-${plate.serialNumber}-${index}`}
             onClick={() => setSelectedPlateId(plate.serialNumber)}
+            onMouseEnter={(event) =>
+              onPlateHover?.(plate, {
+                screenX: event.clientX,
+                screenY: event.clientY,
+              })
+            }
+            onMouseMove={(event) =>
+              onPlateHover?.(plate, {
+                screenX: event.clientX,
+                screenY: event.clientY,
+              })
+            }
+            onMouseLeave={() => onPlateHoverEnd?.()}
             className={`p-1.5 border transition-all cursor-pointer ${
               selectedPlateId === plate.serialNumber 
                 ? 'bg-primary/20 border-primary shadow-lg shadow-primary/20' 

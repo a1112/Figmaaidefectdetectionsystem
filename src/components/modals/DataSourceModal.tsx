@@ -158,6 +158,22 @@ export function DataSourceModal({
     onClose();
   };
 
+  const handleProxyConfirm = () => {
+    const trimmedUrl = corsUrl.trim();
+    if (!trimmedUrl) {
+      return;
+    }
+    const normalizedUrl = trimmedUrl
+      .replace(/\/api\/?$/i, "")
+      .replace(/\/+$/, "");
+    const finalUrl = normalizedUrl || trimmedUrl;
+    setCorsUrl(finalUrl);
+    env.setCorsBaseUrl(finalUrl);
+    env.setMode("cors");
+    setCorsProxy(true);
+    onRefresh();
+  };
+
   const stopSpeedTest = (finalElapsed?: number) => {
     if (speedAbortRef.current) {
       speedAbortRef.current.abort();
@@ -436,13 +452,24 @@ export function DataSourceModal({
                     </div>
                     <div className="flex flex-col gap-1.5">
                       <span className="text-[10px] text-muted-foreground">请输入用于解决跨域限制的代理地址:</span>
-                      <input
-                        type="text"
-                        value={corsUrl}
-                        onChange={(e) => setCorsUrl(e.target.value)}
-                        placeholder="http://proxy-server.com"
-                        className="w-full bg-background border border-border rounded px-2 py-1.5 text-[11px] font-mono focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all"
-                      />
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={corsUrl}
+                          onChange={(e) => setCorsUrl(e.target.value)}
+                          placeholder="http://proxy-server.com"
+                          className="w-full bg-background border border-border rounded px-2 py-1.5 text-[11px] font-mono focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleProxyConfirm}
+                          className="h-7 px-3 text-[11px] font-bold whitespace-nowrap"
+                        >
+                          确认
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 )}

@@ -28,6 +28,11 @@ interface PlatesPanelProps {
   setIsFilterDialogOpen: (open: boolean) => void;
   setActiveTab: (tab: "reports" | "settings") => void;
   setIsDiagnosticDialogOpen: (open: boolean) => void;
+  onPlateHover?: (
+    plate: SteelPlate,
+    position: { screenX: number; screenY: number },
+  ) => void;
+  onPlateHoverEnd?: () => void;
 }
 
 export const PlatesPanel: React.FC<PlatesPanelProps> = ({
@@ -43,6 +48,8 @@ export const PlatesPanel: React.FC<PlatesPanelProps> = ({
   setIsFilterDialogOpen,
   setActiveTab,
   setIsDiagnosticDialogOpen,
+  onPlateHover,
+  onPlateHoverEnd,
 }) => {
   const navigate = useNavigate();
   const newPlateKeys = useNewItemKeys(
@@ -199,6 +206,19 @@ export const PlatesPanel: React.FC<PlatesPanelProps> = ({
                     setShowPlatesPanel(false);
                   }
                 }}
+                onMouseEnter={(event) =>
+                  onPlateHover?.(plate, {
+                    screenX: event.clientX,
+                    screenY: event.clientY,
+                  })
+                }
+                onMouseMove={(event) =>
+                  onPlateHover?.(plate, {
+                    screenX: event.clientX,
+                    screenY: event.clientY,
+                  })
+                }
+                onMouseLeave={() => onPlateHoverEnd?.()}
                 className={`bg-card border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md ${
                   selectedPlateId === plate.serialNumber
                     ? "border-primary shadow-lg shadow-primary/20"

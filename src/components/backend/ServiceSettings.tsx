@@ -38,6 +38,32 @@ import {
 
 const formatJson = (value: unknown) => JSON.stringify(value ?? {}, null, 2);
 
+const clampColorChannel = (value: number) =>
+  Math.max(0, Math.min(255, Number.isFinite(value) ? value : 0));
+
+const toHexChannel = (value: number) =>
+  clampColorChannel(value).toString(16).padStart(2, "0");
+
+const rgbToHex = (color?: { red?: number; green?: number; blue?: number }) =>
+  `#${toHexChannel(color?.red ?? 0)}${toHexChannel(color?.green ?? 0)}${toHexChannel(
+    color?.blue ?? 0,
+  )}`;
+
+const hexToRgb = (hex: string) => {
+  const cleaned = hex.replace("#", "").trim();
+  if (cleaned.length !== 6) {
+    return { red: 0, green: 0, blue: 0 };
+  }
+  const red = parseInt(cleaned.slice(0, 2), 16);
+  const green = parseInt(cleaned.slice(2, 4), 16);
+  const blue = parseInt(cleaned.slice(4, 6), 16);
+  return {
+    red: Number.isFinite(red) ? red : 0,
+    green: Number.isFinite(green) ? green : 0,
+    blue: Number.isFinite(blue) ? blue : 0,
+  };
+};
+
 type LineViewDraft = {
   database: Record<string, any>;
   images: Record<string, any>;
@@ -117,6 +143,7 @@ type DefectClassItem = {
   name: string;
   tag: string;
   color: { red: number; green: number; blue: number };
+  severity?: number;
   desc?: string;
   parent?: string[];
 };
@@ -229,6 +256,7 @@ export const ServiceSettings: React.FC = () => {
       const nextDefectItems = templateDefectItems.map((item, index) => ({
         ...item,
         class: Number.isFinite(item.class) ? item.class : index,
+        severity: Number.isFinite(item.severity) ? Number(item.severity) : 1,
         color: {
           red: Number(item.color?.red ?? 0),
           green: Number(item.color?.green ?? 0),
@@ -496,6 +524,7 @@ export const ServiceSettings: React.FC = () => {
         name: "",
         tag: "",
         color: { red: 0, green: 0, blue: 0 },
+        severity: 1,
         desc: "",
         parent: [],
       },
@@ -526,6 +555,7 @@ export const ServiceSettings: React.FC = () => {
             items: lineDefectItems.map((item, index) => ({
               ...item,
               class: Number.isFinite(item.class) ? item.class : index,
+              severity: Number.isFinite(item.severity) ? Number(item.severity) : 1,
               color: {
                 red: Number(item.color?.red ?? 0),
                 green: Number(item.color?.green ?? 0),
@@ -896,18 +926,19 @@ export const ServiceSettings: React.FC = () => {
                 </div>
               </div>
             <div className="max-h-[260px] overflow-auto border border-border rounded-sm">
-              <div className="grid grid-cols-[0.6fr_1fr_0.8fr_1.2fr_1fr_0.6fr] gap-2 px-2 py-2 text-[10px] uppercase tracking-widest text-muted-foreground border-b border-border">
+              <div className="grid grid-cols-[0.6fr_1fr_0.8fr_1.2fr_0.7fr_1.3fr_0.6fr] gap-2 px-2 py-2 text-[10px] uppercase tracking-widest text-muted-foreground border-b border-border">
                 <span>编号</span>
                 <span>名称</span>
                 <span>标签</span>
                 <span>描述</span>
-                <span>颜色RGB</span>
+                <span>严重等级</span>
+                <span>颜色</span>
                 <span className="text-right">操作</span>
               </div>
               {templateDefectItems.map((item, index) => (
                 <div
                   key={`defect-${index}`}
-                  className="grid grid-cols-[0.6fr_1fr_0.8fr_1.2fr_1fr_0.6fr] gap-2 px-2 py-2 text-[11px] border-b border-border/50"
+                  className="grid grid-cols-[0.6fr_1fr_0.8fr_1.2fr_0.7fr_1.3fr_0.6fr] gap-2 px-2 py-2 text-[11px] border-b border-border/50"
                 >
                   <input
                     type="number"
@@ -954,58 +985,91 @@ export const ServiceSettings: React.FC = () => {
                     }
                     className="h-7 rounded-sm border border-border bg-background px-2 text-xs"
                   />
-                  <div className="grid grid-cols-3 gap-1">
-                    <input
-                      type="number"
-                      value={item.color?.red ?? 0}
-                      onChange={(e) =>
-                        setTemplateDefectItems((prev) =>
-                          prev.map((row, i) =>
-                            i === index
-                              ? {
-                                  ...row,
-                                  color: { ...row.color, red: Number(e.target.value) },
-                                }
-                              : row,
-                          ),
-                        )
-                      }
-                      className="h-7 rounded-sm border border-border bg-background px-1 text-xs"
-                    />
-                    <input
-                      type="number"
-                      value={item.color?.green ?? 0}
-                      onChange={(e) =>
-                        setTemplateDefectItems((prev) =>
-                          prev.map((row, i) =>
-                            i === index
-                              ? {
-                                  ...row,
-                                  color: { ...row.color, green: Number(e.target.value) },
-                                }
-                              : row,
-                          ),
-                        )
-                      }
-                      className="h-7 rounded-sm border border-border bg-background px-1 text-xs"
-                    />
-                    <input
-                      type="number"
-                      value={item.color?.blue ?? 0}
-                      onChange={(e) =>
-                        setTemplateDefectItems((prev) =>
-                          prev.map((row, i) =>
-                            i === index
-                              ? {
-                                  ...row,
-                                  color: { ...row.color, blue: Number(e.target.value) },
-                                }
-                              : row,
-                          ),
-                        )
-                      }
-                      className="h-7 rounded-sm border border-border bg-background px-1 text-xs"
-                    />
+                  <input
+                    type="number"
+                    value={item.severity ?? 1}
+                    onChange={(e) =>
+                      setTemplateDefectItems((prev) =>
+                        prev.map((row, i) =>
+                          i === index ? { ...row, severity: Number(e.target.value) } : row,
+                        ),
+                      )
+                    }
+                    className="h-7 rounded-sm border border-border bg-background px-2 text-xs"
+                  />
+                  <div className="grid gap-1">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="h-5 w-5 rounded border border-border"
+                        style={{ backgroundColor: rgbToHex(item.color) }}
+                      />
+                      <input
+                        type="color"
+                        value={rgbToHex(item.color)}
+                        onChange={(e) => {
+                          const next = hexToRgb(e.target.value);
+                          setTemplateDefectItems((prev) =>
+                            prev.map((row, i) =>
+                              i === index ? { ...row, color: next } : row,
+                            ),
+                          );
+                        }}
+                        className="h-7 w-10 rounded-sm border border-border bg-background p-0"
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 gap-1">
+                      <input
+                        type="number"
+                        value={item.color?.red ?? 0}
+                        onChange={(e) =>
+                          setTemplateDefectItems((prev) =>
+                            prev.map((row, i) =>
+                              i === index
+                                ? {
+                                    ...row,
+                                    color: { ...row.color, red: Number(e.target.value) },
+                                  }
+                                : row,
+                            ),
+                          )
+                        }
+                        className="h-7 rounded-sm border border-border bg-background px-1 text-xs"
+                      />
+                      <input
+                        type="number"
+                        value={item.color?.green ?? 0}
+                        onChange={(e) =>
+                          setTemplateDefectItems((prev) =>
+                            prev.map((row, i) =>
+                              i === index
+                                ? {
+                                    ...row,
+                                    color: { ...row.color, green: Number(e.target.value) },
+                                  }
+                                : row,
+                            ),
+                          )
+                        }
+                        className="h-7 rounded-sm border border-border bg-background px-1 text-xs"
+                      />
+                      <input
+                        type="number"
+                        value={item.color?.blue ?? 0}
+                        onChange={(e) =>
+                          setTemplateDefectItems((prev) =>
+                            prev.map((row, i) =>
+                              i === index
+                                ? {
+                                    ...row,
+                                    color: { ...row.color, blue: Number(e.target.value) },
+                                  }
+                                : row,
+                            ),
+                          )
+                        }
+                        className="h-7 rounded-sm border border-border bg-background px-1 text-xs"
+                      />
+                    </div>
                   </div>
                   <div className="flex items-center justify-end">
                     <button
@@ -1667,18 +1731,19 @@ export const ServiceSettings: React.FC = () => {
                                     </button>
                                   </div>
                                   <div className="max-h-[240px] overflow-auto border border-border rounded-sm">
-                                    <div className="grid grid-cols-[0.6fr_1fr_0.8fr_1.2fr_1fr_0.6fr] gap-2 px-2 py-2 text-[10px] uppercase tracking-widest text-muted-foreground border-b border-border">
+                                    <div className="grid grid-cols-[0.6fr_1fr_0.8fr_1.2fr_0.7fr_1.3fr_0.6fr] gap-2 px-2 py-2 text-[10px] uppercase tracking-widest text-muted-foreground border-b border-border">
                                       <span>编号</span>
                                       <span>名称</span>
                                       <span>标签</span>
                                       <span>描述</span>
-                                      <span>颜色RGB</span>
+                                      <span>严重等级</span>
+                                      <span>颜色</span>
                                       <span className="text-right">操作</span>
                                     </div>
                                     {lineDefectItems.map((item, index) => (
                                       <div
                                         key={`line-defect-${index}`}
-                                        className="grid grid-cols-[0.6fr_1fr_0.8fr_1.2fr_1fr_0.6fr] gap-2 px-2 py-2 text-[11px] border-b border-border/50"
+                                        className="grid grid-cols-[0.6fr_1fr_0.8fr_1.2fr_0.7fr_1.3fr_0.6fr] gap-2 px-2 py-2 text-[11px] border-b border-border/50"
                                       >
                                         <input
                                           type="number"
@@ -1725,58 +1790,91 @@ export const ServiceSettings: React.FC = () => {
                                           }
                                           className="h-7 rounded-sm border border-border bg-background px-2 text-xs"
                                         />
-                                        <div className="grid grid-cols-3 gap-1">
-                                          <input
-                                            type="number"
-                                            value={item.color?.red ?? 0}
-                                            onChange={(e) =>
-                                              setLineDefectItems((prev) =>
-                                                prev.map((row, i) =>
-                                                  i === index
-                                                    ? {
-                                                        ...row,
-                                                        color: { ...row.color, red: Number(e.target.value) },
-                                                      }
-                                                    : row,
-                                                ),
-                                              )
-                                            }
-                                            className="h-7 rounded-sm border border-border bg-background px-1 text-xs"
-                                          />
-                                          <input
-                                            type="number"
-                                            value={item.color?.green ?? 0}
-                                            onChange={(e) =>
-                                              setLineDefectItems((prev) =>
-                                                prev.map((row, i) =>
-                                                  i === index
-                                                    ? {
-                                                        ...row,
-                                                        color: { ...row.color, green: Number(e.target.value) },
-                                                      }
-                                                    : row,
-                                                ),
-                                              )
-                                            }
-                                            className="h-7 rounded-sm border border-border bg-background px-1 text-xs"
-                                          />
-                                          <input
-                                            type="number"
-                                            value={item.color?.blue ?? 0}
-                                            onChange={(e) =>
-                                              setLineDefectItems((prev) =>
-                                                prev.map((row, i) =>
-                                                  i === index
-                                                    ? {
-                                                        ...row,
-                                                        color: { ...row.color, blue: Number(e.target.value) },
-                                                      }
-                                                    : row,
-                                                ),
-                                              )
-                                            }
-                                            className="h-7 rounded-sm border border-border bg-background px-1 text-xs"
-                                          />
+                                        <input
+                                          type="number"
+                                          value={item.severity ?? 1}
+                                          onChange={(e) =>
+                                            setLineDefectItems((prev) =>
+                                              prev.map((row, i) =>
+                                                i === index ? { ...row, severity: Number(e.target.value) } : row,
+                                              ),
+                                            )
+                                          }
+                                          className="h-7 rounded-sm border border-border bg-background px-2 text-xs"
+                                        />
+                                        <div className="grid gap-1">
+                                          <div className="flex items-center gap-2">
+                                            <span
+                                              className="h-5 w-5 rounded border border-border"
+                                              style={{ backgroundColor: rgbToHex(item.color) }}
+                                            />
+                                            <input
+                                              type="color"
+                                              value={rgbToHex(item.color)}
+                                              onChange={(e) => {
+                                                const next = hexToRgb(e.target.value);
+                                                setLineDefectItems((prev) =>
+                                                  prev.map((row, i) =>
+                                                    i === index ? { ...row, color: next } : row,
+                                                  ),
+                                                );
+                                              }}
+                                              className="h-7 w-10 rounded-sm border border-border bg-background p-0"
+                                            />
+                                          </div>
+                                          <div className="grid grid-cols-3 gap-1">
+                                            <input
+                                              type="number"
+                                              value={item.color?.red ?? 0}
+                                              onChange={(e) =>
+                                                setLineDefectItems((prev) =>
+                                                  prev.map((row, i) =>
+                                                    i === index
+                                                      ? {
+                                                          ...row,
+                                                          color: { ...row.color, red: Number(e.target.value) },
+                                                        }
+                                                      : row,
+                                                  ),
+                                                )
+                                              }
+                                              className="h-7 rounded-sm border border-border bg-background px-1 text-xs"
+                                            />
+                                            <input
+                                              type="number"
+                                              value={item.color?.green ?? 0}
+                                              onChange={(e) =>
+                                                setLineDefectItems((prev) =>
+                                                  prev.map((row, i) =>
+                                                    i === index
+                                                      ? {
+                                                          ...row,
+                                                          color: { ...row.color, green: Number(e.target.value) },
+                                                        }
+                                                      : row,
+                                                  ),
+                                                )
+                                              }
+                                              className="h-7 rounded-sm border border-border bg-background px-1 text-xs"
+                                            />
+                                            <input
+                                              type="number"
+                                              value={item.color?.blue ?? 0}
+                                              onChange={(e) =>
+                                                setLineDefectItems((prev) =>
+                                                  prev.map((row, i) =>
+                                                    i === index
+                                                      ? {
+                                                          ...row,
+                                                          color: { ...row.color, blue: Number(e.target.value) },
+                                                        }
+                                                      : row,
+                                                  ),
+                                                )
+                                              }
+                                              className="h-7 rounded-sm border border-border bg-background px-1 text-xs"
+                                            />
+                                          </div>
                                         </div>
                                         <div className="flex items-center justify-end">
                                           <button

@@ -120,6 +120,8 @@ export interface DefectItemRaw {
   confidence: number;
   surface: Surface;
   image_index: number; // 关联的图像索引
+  class_id?: number | null;
+  class_name?: string | null;
   // 物理坐标（mm），来自后端 bbox_object / leftInObj 等，可选
   x_mm?: number;
   y_mm?: number;
@@ -181,6 +183,7 @@ export interface DefectClassItem {
   color: DefectClassColor;
   desc: string;
   parent: number[];
+  severity?: number;
 }
 
 export interface DefectClassesResponse {

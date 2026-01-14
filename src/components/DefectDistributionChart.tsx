@@ -170,11 +170,7 @@ export function DefectDistributionChart({
       0,
       Math.ceil(Math.log2(Math.max(1, desiredDownscale))),
     );
-    const cap =
-      typeof maxTileLevel === "number" && Number.isFinite(maxTileLevel)
-        ? Math.max(0, Math.floor(maxTileLevel))
-        : normalized;
-    return Math.min(cap, normalized);
+    return normalized;
   };
 
   const hasMeta =
@@ -240,7 +236,10 @@ export function DefectDistributionChart({
   }, []);
   
   // 计算横向布局的宽度
-  const calculatePlateWidth = (meta: SurfaceImageInfo | undefined): number => {
+  const calculatePlateWidth = (
+    meta: SurfaceImageInfo | undefined,
+    displayHeight: number,
+  ): number => {
     if (!meta) return 360; // 默认宽度
     const frameCount = meta.frame_count || 1;
     const imageWidth = meta.image_width || 1;
@@ -252,32 +251,27 @@ export function DefectDistributionChart({
     // plateHeight / plateWidth = imageWidth / (imageHeight × frameCount)
     // plateWidth = plateHeight × (imageHeight × frameCount) / imageWidth
     const totalLength = imageHeight * frameCount;
-    return plateHeight * totalLength / imageWidth;
+    return displayHeight * totalLength / imageWidth;
   };
 
   // 计算最终显示高度和宽度（包括拉伸逻辑）
   const calculateFinalDimensions = useMemo(() => {
     const topMeta = findMetaForSurface("top");
     const bottomMeta = findMetaForSurface("bottom");
-    
-    const topWidth = calculatePlateWidth(topMeta);
-    const bottomWidth = calculatePlateWidth(bottomMeta);
-    
-    // 默认总高度为 plateHeight * 2（适配双表面显示）
-    let finalHeight = plateHeight * 2;
+
+    const baseHeight = plateHeight * 2;
+    let finalHeight = baseHeight;
+    let scale = 1;
+
+    const perSurfaceHeight =
+      surface === "all" ? baseHeight / 2 : baseHeight;
+    const topWidth = calculatePlateWidth(topMeta, perSurfaceHeight);
+    const bottomWidth = calculatePlateWidth(bottomMeta, perSurfaceHeight);
+
     let finalTopWidth = topWidth;
     let finalBottomWidth = bottomWidth;
-    let scale = 1; // 统一的缩放比例
-    
-    // 注意：surface === "all" 时显示两个表面，每个占 finalHeight/2
-    // surface !== "all" 时显示单个表面，占 finalHeight 全部
-    // 因此两种情况下 finalHeight 都应该是 plateHeight * 2
-    
-    // 如果宽度不足容器宽度的75%，进行拉伸
+
     if (distributionScaleMode === "stretch") {
-      const targetHeight =
-        containerHeight > 0 ? containerHeight : finalHeight;
-      finalHeight = targetHeight;
       const targetWidth =
         containerWidth > 0
           ? containerWidth
@@ -298,39 +292,15 @@ export function DefectDistributionChart({
       };
     }
 
-    if (containerWidth > 0) {
-      const targetWidth = containerWidth * 0.75;
-      
-      if (surface === "all") {
-        // 两个表面都显示：使用较长的那个来计算统一缩放比例
-        const maxWidth = Math.max(topWidth, bottomWidth);
-        if (maxWidth < targetWidth) {
-          scale = targetWidth / maxWidth;
-          // 两个表面都应用相同的缩放比例
-          finalTopWidth = topWidth * scale;
-          finalBottomWidth = bottomWidth * scale;
-        }
-      } else {
-        // 单表面显示：只拉伸当前表面
-        const currentWidth = surface === "top" ? topWidth : bottomWidth;
-        if (currentWidth < targetWidth) {
-          scale = targetWidth / currentWidth;
-          if (surface === "top") {
-            finalTopWidth = topWidth * scale;
-          } else {
-            finalBottomWidth = bottomWidth * scale;
-          }
-        }
-      }
-    }
-    
+    finalHeight = baseHeight;
+
     return {
       height: finalHeight,
       topWidth: finalTopWidth,
       bottomWidth: finalBottomWidth,
-      scale, // 统一的缩放比例
+      scale,
     };
-  }, [surface, containerWidth, containerHeight, surfaceImageInfo, distributionScaleMode]);
+  }, [surface, containerWidth, surfaceImageInfo, distributionScaleMode]);
 
   const computeDisplayRect = (
     defect: Defect,

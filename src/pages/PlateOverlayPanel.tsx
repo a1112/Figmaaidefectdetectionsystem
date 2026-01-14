@@ -18,6 +18,11 @@ interface PlateOverlayPanelProps {
   setIsSearchDialogOpen: (open: boolean) => void;
   setIsFilterDialogOpen: (open: boolean) => void;
   setShowPlatesPanel: (open: boolean) => void;
+  onPlateHover?: (
+    plate: SteelPlate,
+    position: { screenX: number; screenY: number },
+  ) => void;
+  onPlateHoverEnd?: () => void;
 }
 
 export function PlateOverlayPanel({
@@ -32,6 +37,8 @@ export function PlateOverlayPanel({
   setIsSearchDialogOpen,
   setIsFilterDialogOpen,
   setShowPlatesPanel,
+  onPlateHover,
+  onPlateHoverEnd,
 }: PlateOverlayPanelProps) {
   const handleClearFilters = () => {
     setSearchCriteria({});
@@ -132,6 +139,8 @@ export function PlateOverlayPanel({
         }}
         isMobileDevice={isMobileDevice}
         onClearFilters={handleClearFilters}
+        onPlateHover={onPlateHover}
+        onPlateHoverEnd={onPlateHoverEnd}
       />
     </div>
   );

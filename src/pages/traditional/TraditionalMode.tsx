@@ -23,7 +23,7 @@ import {
   getGlobalMeta,
 } from "../../api/client";
 import { getConfigMate } from "../../api/admin";
-import type { SteelItem, DefectItem, SurfaceImageInfo, ApiNode } from "../../api/types";
+import type { SteelItem, DefectItem, DefectItemRaw, SurfaceImageInfo, ApiNode } from "../../api/types";
 import { toast } from "sonner@2.0.3";
 import { DataSourceModal } from "../../components/modals/DataSourceModal";
 import { SettingsModal } from "../../components/modals/SettingsModal";
@@ -51,6 +51,7 @@ import type { FilterCriteria } from "../../components/FilterDialog";
 import { FilterDialog } from "../../components/FilterDialog";
 import { LargeImageViewer } from "../../components/LargeImageViewer/LargeImageViewer";
 import { DefectHoverTooltip } from "../../components/DefectHoverTooltip";
+import { PlateHoverTooltip } from "../../components/PlateHoverTooltip";
 import type { Tile } from "../../components/LargeImageViewer/utils";
 import { drawTileImage, tryDrawFallbackTile } from "../../utils/tileFallback";
 import {
@@ -444,6 +445,8 @@ export default function TraditionalMode() {
   const [selectedDefectTypes, setSelectedDefectTypes] = useState<string[]>(
     DEFAULT_DEFECT_TYPES.map((t) => t.label),
   );
+  const [defectSeverityByName, setDefectSeverityByName] = useState<Record<string, number>>({});
+  const [defectSeverityByClassId, setDefectSeverityByClassId] = useState<Record<number, number>>({});
 
   // Defect Chart Data
   const defectChartData = useMemo(() => {
@@ -485,6 +488,149 @@ export default function TraditionalMode() {
     screenX: number;
     screenY: number;
   } | null>(null);
+  const [hoveredPlateRecord, setHoveredPlateRecord] = useState<{
+    plate: SteelItem;
+    screenX: number;
+    screenY: number;
+  } | null>(null);
+  const [plateDefectSummaryMap, setPlateDefectSummaryMap] = useState<
+    Record<string, Array<{ type: string; count: number }>>
+  >({});
+  const [plateDefectPreviewMap, setPlateDefectPreviewMap] = useState<
+    Record<
+      string,
+      Array<{
+        label: string;
+        count: number;
+        classId?: number | null;
+        severity?: number;
+        items: Array<{ id: string; surface: "top" | "bottom" }>;
+      }>
+    >
+  >({});
+  const plateDefectSummaryLoadingRef = useRef<Set<string>>(new Set());
+  const [showPlatePreview, setShowPlatePreview] = useState(false);
+  const buildPlatePreviewGroups = useCallback((defects: DefectItemRaw[]) => {
+    const groups = new Map<
+      string,
+      {
+        label: string;
+        count: number;
+        classId?: number | null;
+        severity?: number;
+        items: Array<{ id: string; surface: "top" | "bottom" }>;
+      }
+    >();
+
+    defects.forEach((defect) => {
+      const label = defect.class_name || defect.defect_type || "-";
+      const surface = defect.surface === "top" ? "top" : "bottom";
+      const classId = typeof defect.class_id === "number" ? defect.class_id : null;
+      const severity = classId != null ? defectSeverityByClassId[classId] ?? 1 : 1;
+      const existing = groups.get(label);
+      if (!existing) {
+        groups.set(label, {
+          label,
+          count: 1,
+          classId,
+          severity,
+          items: [{ id: defect.defect_id, surface }],
+        });
+        return;
+      }
+      existing.count += 1;
+      existing.severity = Math.max(existing.severity ?? 1, severity);
+      if (existing.items.length < 5) {
+        existing.items.push({ id: defect.defect_id, surface });
+      }
+      if (classId !== null) {
+        if (existing.classId === null || existing.classId === undefined) {
+          existing.classId = classId;
+        } else {
+          existing.classId = Math.min(existing.classId, classId);
+        }
+      }
+    });
+
+    return Array.from(groups.values()).sort((a, b) => {
+      const aSeverity = a.severity ?? 1;
+      const bSeverity = b.severity ?? 1;
+      if (aSeverity !== bSeverity) return bSeverity - aSeverity;
+      const aClass = a.classId;
+      const bClass = b.classId;
+      if (aClass != null && bClass != null && aClass != bClass) {
+        return aClass - bClass;
+      }
+      if (aClass != null && bClass == null) return -1;
+      if (aClass == null && bClass != null) return 1;
+      if (a.count != b.count) return b.count - a.count;
+      return a.label.localeCompare(b.label);
+    });
+  }, [defectSeverityByClassId]);
+
+  const buildDefectSummary = useCallback((types: string[]) => {
+    const counts = new Map<string, number>();
+    types.forEach((type) => {
+      if (!type) return;
+      counts.set(type, (counts.get(type) ?? 0) + 1);
+    });
+    return Array.from(counts, ([type, count]) => ({
+      type,
+      count,
+      severity: defectSeverityByName[type] ?? 1,
+    }))
+      .sort((a, b) => {
+        if (a.severity !== b.severity) return b.severity - a.severity;
+        if (a.count !== b.count) return b.count - a.count;
+        return a.type.localeCompare(b.type);
+      })
+      .map(({ type, count }) => ({ type, count }));
+  }, [defectSeverityByName]);
+
+  const handlePlateHover = useCallback(
+    (plate: SteelItem, position: { screenX: number; screenY: number }) => {
+      setHoveredPlateRecord({
+        plate,
+        screenX: position.screenX,
+        screenY: position.screenY,
+      });
+
+      const serialNumber = plate.serialNumber;
+      if (plateDefectPreviewMap[serialNumber]) return;
+      if (plateDefectSummaryLoadingRef.current.has(serialNumber)) return;
+      const seqNo = Number.parseInt(serialNumber, 10);
+      if (!Number.isFinite(seqNo)) return;
+
+      plateDefectSummaryLoadingRef.current.add(serialNumber);
+      getDefectsRaw(seqNo)
+        .then((response) => {
+          const previewGroups = buildPlatePreviewGroups(response.defects);
+          const summary = previewGroups.map((group) => ({
+            type: group.label,
+            count: group.count,
+          }));
+          setPlateDefectPreviewMap((prev) => ({
+            ...prev,
+            [serialNumber]: previewGroups,
+          }));
+          setPlateDefectSummaryMap((prev) => ({
+            ...prev,
+            [serialNumber]: summary,
+          }));
+        })
+        .catch(() => {})
+        .finally(() => {
+          plateDefectSummaryLoadingRef.current.delete(serialNumber);
+        });
+    },
+    [buildPlatePreviewGroups, plateDefectPreviewMap],
+  );
+
+  const handlePlateHoverEnd = useCallback(() => {
+    setHoveredPlateRecord(null);
+    setShowPlatePreview(false);
+  }, []);
+
   const distributionPlateRef = useRef<HTMLDivElement>(null);
   const [distributionPlateSize, setDistributionPlateSize] = useState({
     width: 0,
@@ -533,6 +679,12 @@ export default function TraditionalMode() {
       }),
     [plates, filterCriteria, listFilter]
   );
+  const hoveredPlateSummary = hoveredPlateRecord
+    ? plateDefectSummaryMap[hoveredPlateRecord.plate.serialNumber]
+    : undefined;
+  const hoveredPlatePreview = hoveredPlateRecord
+    ? plateDefectPreviewMap[hoveredPlateRecord.plate.serialNumber]
+    : undefined;
   const visibleDefects = useMemo(() => {
     if (!plateDefects || plateDefects.length === 0) return [];
     if (selectedDefectTypes.length === 0) return [];
@@ -1285,6 +1437,10 @@ export default function TraditionalMode() {
         }
         case "Tab":
           e.preventDefault();
+          if (hoveredPlateRecord) {
+            setShowPlatePreview(prev => !prev);
+            break;
+          }
           setIsGridView(prev => !prev);
           break;
         case "f":
@@ -1299,7 +1455,7 @@ export default function TraditionalMode() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [plates, selectedPlate, imgScale]);
+  }, [plates, selectedPlate, imgScale, hoveredPlateRecord]);
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -1404,16 +1560,24 @@ export default function TraditionalMode() {
               return Math.max(0, Math.min(255, Math.round(num)));
             };
             const toHex = (value: number) => value.toString(16).padStart(2, "0");
+            const severityByName: Record<string, number> = {};
+            const severityByClassId: Record<number, number> = {};
             const options = meta.defect_classes.items.map((item: any) => {
               const label =
                 item?.desc?.toString()?.trim() ||
                 item?.name?.toString()?.trim() ||
                 item?.tag?.toString()?.trim() ||
                 "未知缺陷";
+              const classId = Number(item?.class ?? item?.id ?? item?.num ?? item?.value ?? 0);
+              const severity = Number.isFinite(item?.severity) ? Number(item.severity) : 1;
               const colorObj = item?.color || {};
               const red = normalize(colorObj.red);
               const green = normalize(colorObj.green);
               const blue = normalize(colorObj.blue);
+              severityByName[label] = severity;
+              if (Number.isFinite(classId)) {
+                severityByClassId[classId] = severity;
+              }
               return {
                 label,
                 color: `#${toHex(red)}${toHex(green)}${toHex(blue)}`,
@@ -1426,6 +1590,8 @@ export default function TraditionalMode() {
               setDefectTypeOptions(deduped);
               setSelectedDefectTypes(deduped.map((item) => item.label));
             }
+            setDefectSeverityByName(severityByName);
+            setDefectSeverityByClassId(severityByClassId);
           }
           await loadPlatesWithCriteria({}, 50, false);
         } catch (error) {
@@ -1459,6 +1625,12 @@ export default function TraditionalMode() {
 
         if (!mounted) return;
 
+        const previewGroups = buildPlatePreviewGroups(defectsRes.defects);
+        setPlateDefectPreviewMap((prev) => ({
+          ...prev,
+          [selectedPlate.serialNumber]: previewGroups,
+        }));
+
         const normalizeSurface = (value: unknown) =>
           value === "top" ? "top" : "bottom";
         setPlateDefects(defectsRes.defects.map(d => ({
@@ -1487,6 +1659,29 @@ export default function TraditionalMode() {
     loadPlateDetails();
     return () => { mounted = false; };
   }, [selectedPlate]);
+
+  useEffect(() => {
+    if (!selectedPlate) return;
+    const preview = plateDefectPreviewMap[selectedPlate.serialNumber];
+    if (preview) {
+      const summary = preview.map((group) => ({
+        type: group.label,
+        count: group.count,
+      }));
+      setPlateDefectSummaryMap((prev) => ({
+        ...prev,
+        [selectedPlate.serialNumber]: summary,
+      }));
+      return;
+    }
+    const summary = buildDefectSummary(
+      plateDefects.map((defect) => defect.type),
+    );
+    setPlateDefectSummaryMap((prev) => ({
+      ...prev,
+      [selectedPlate.serialNumber]: summary,
+    }));
+  }, [buildDefectSummary, plateDefects, plateDefectPreviewMap, selectedPlate]);
 
   useEffect(() => {
     if (activeNav !== "图像分析" || !selectedDefectId) return;
@@ -2123,6 +2318,16 @@ export default function TraditionalMode() {
                 }
               : undefined
           }
+        />
+      )}
+      {hoveredPlateRecord && (
+        <PlateHoverTooltip
+          plate={hoveredPlateRecord.plate}
+          screenX={hoveredPlateRecord.screenX}
+          screenY={hoveredPlateRecord.screenY}
+          defectSummary={hoveredPlateSummary}
+          showPreview={showPlatePreview}
+          previewGroups={hoveredPlatePreview}
         />
       )}
       {/* Header */}
@@ -3041,6 +3246,19 @@ export default function TraditionalMode() {
                   <tr 
                     key={`${plate.plateId}-${plate.serialNumber}`} 
                     onClick={() => setSelectedPlate(plate)}
+                    onMouseEnter={(event) =>
+                      handlePlateHover(plate, {
+                        screenX: event.clientX,
+                        screenY: event.clientY,
+                      })
+                    }
+                    onMouseMove={(event) =>
+                      handlePlateHover(plate, {
+                        screenX: event.clientX,
+                        screenY: event.clientY,
+                      })
+                    }
+                    onMouseLeave={handlePlateHoverEnd}
                     className={`cursor-pointer group transition-colors ${
                       selectedPlate?.serialNumber === plate.serialNumber 
                         ? 'bg-[#58a6ff]/15' 

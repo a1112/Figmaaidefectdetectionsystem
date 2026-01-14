@@ -17,6 +17,11 @@ interface PlatesTabProps {
   setSelectedPlateId: (plateId: string) => void;
   setIsFilterDialogOpen: (open: boolean) => void;
   setShowPlatesPanel: (open: boolean) => void;
+  onPlateHover?: (
+    plate: SteelPlate,
+    position: { screenX: number; screenY: number },
+  ) => void;
+  onPlateHoverEnd?: () => void;
 }
 
 export function PlatesTab({
@@ -30,6 +35,8 @@ export function PlatesTab({
   setSelectedPlateId,
   setIsFilterDialogOpen,
   setShowPlatesPanel,
+  onPlateHover,
+  onPlateHoverEnd,
 }: PlatesTabProps) {
   const handleClearFilters = () => {
     setSearchCriteria({});
@@ -101,6 +108,8 @@ export function PlatesTab({
         }}
         isMobileDevice={isMobileDevice}
         onClearFilters={handleClearFilters}
+        onPlateHover={onPlateHover}
+        onPlateHoverEnd={onPlateHoverEnd}
       />
     </div>
   );

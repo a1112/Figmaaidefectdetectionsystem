@@ -581,6 +581,7 @@ export async function getApiList(): Promise<ApiNode[]> {
   const url = configBase ? `${configBase}/config/api_list` : "/config/api_list";
   
   try {
+    console.log(`📡 getApiList: ${url}`);
     const response = await fetch(url, { cache: "no-store" });
     if (!response.ok) {
       throw new Error(`加载 API 列表失败: ${response.status} ${response.statusText}`);
