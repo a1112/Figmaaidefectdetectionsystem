@@ -727,6 +727,14 @@ export default function TraditionalMode() {
     }
     return surfaceFilter === "bottom" ? distributionDefects : [];
   }, [visibleDefects, distributionDefects, surfaceFilter]);
+  const selectedTopDistributionDefect = useMemo(() => {
+    if (!selectedDefectId) return undefined;
+    return topDistributionDefects.find((defect) => defect.id === selectedDefectId);
+  }, [selectedDefectId, topDistributionDefects]);
+  const selectedBottomDistributionDefect = useMemo(() => {
+    if (!selectedDefectId) return undefined;
+    return bottomDistributionDefects.find((defect) => defect.id === selectedDefectId);
+  }, [selectedDefectId, bottomDistributionDefects]);
 
 
   const analysisOrientation: ImageOrientation = "vertical";
@@ -1045,6 +1053,50 @@ export default function TraditionalMode() {
       containerHeight: bottomDistributionPlateSize.height,
     };
   }, [bottomDistributionMeta, bottomDistributionPlateSize, distributionScaleMode]);
+  const getDistributionMarkerPosition = (
+    defect: DefectItem,
+    draw:
+      | {
+          mosaicWidth: number;
+          mosaicHeight: number;
+          drawWidth: number;
+          drawHeight: number;
+          offsetX: number;
+          offsetY: number;
+          containerWidth: number;
+          containerHeight: number;
+        }
+      | null,
+    surfaceMeta?: SurfaceImageInfo | null,
+  ) => {
+    const frameHeight = surfaceMeta?.image_height ?? 0;
+    const frameWidth = surfaceMeta?.image_width ?? 0;
+    const frameCount = surfaceMeta?.frame_count ?? 0;
+    const mosaicHeight = frameHeight * frameCount;
+    const mosaicWidth = frameWidth;
+    if (!mosaicHeight || !mosaicWidth) return null;
+
+    const rawIndex =
+      typeof defect.imageIndex === "number" ? defect.imageIndex : 0;
+    const frameIndex = Math.max(0, rawIndex - 1);
+    const worldX = defect.x;
+    const worldY = defect.y + frameIndex * frameHeight;
+
+    let leftPos = (worldX / mosaicWidth) * 100;
+    let topPos = (worldY / mosaicHeight) * 100;
+    if (draw) {
+      const leftPx =
+        draw.offsetX + (worldX / draw.mosaicWidth) * draw.drawWidth;
+      const topPx =
+        draw.offsetY + (worldY / draw.mosaicHeight) * draw.drawHeight;
+      leftPos = (leftPx / draw.containerWidth) * 100;
+      topPos = (topPx / draw.containerHeight) * 100;
+    }
+    return {
+      left: Math.max(0, Math.min(100, leftPos)),
+      top: Math.max(0, Math.min(100, topPos)),
+    };
+  };
   const distributionTilePlan = useMemo(() => {
     if (!distributionMeta || !distributionDraw) return null;
     const tileSize = Math.max(
@@ -3402,6 +3454,36 @@ export default function TraditionalMode() {
                  <div className="w-full h-px bg-[#30363d]/20 absolute top-[25%]" />
                  <div className="w-full h-px bg-[#30363d]/20 absolute top-[50%]" />
                  <div className="w-full h-px bg-[#30363d]/20 absolute top-[75%]" />
+                 {selectedTopDistributionDefect && (() => {
+                   const surfaceMeta = surfaceImages.find(
+                     (info) => info.surface === selectedTopDistributionDefect.surface,
+                   );
+                   const pos = getDistributionMarkerPosition(
+                     selectedTopDistributionDefect,
+                     distributionDraw,
+                     surfaceMeta,
+                   );
+                   if (!pos) return null;
+                   const crossSize = Math.max(
+                     12,
+                     Math.min(20, Math.round(distributionPlateSize.width * 0.08)),
+                   );
+                   return (
+                     <div
+                       className="absolute pointer-events-none z-20"
+                       style={{
+                         top: `${pos.top}%`,
+                         left: `${pos.left}%`,
+                         width: crossSize,
+                         height: crossSize,
+                         transform: "translate(-50%, -50%)",
+                       }}
+                     >
+                       <div className="absolute left-0 right-0 top-1/2 h-0.5 -translate-y-1/2 bg-[#58a6ff]" />
+                       <div className="absolute top-0 bottom-0 left-1/2 w-0.5 -translate-x-1/2 bg-[#58a6ff]" />
+                     </div>
+                   );
+                 })()}
                  
                  {/* Real Defect points mapping */}
                  {topDistributionDefects.map((defect, index) => {
@@ -4347,6 +4429,39 @@ export default function TraditionalMode() {
                   <div className="w-full h-px bg-[#30363d]/20 absolute top-[25%]" />
                   <div className="w-full h-px bg-[#30363d]/20 absolute top-[50%]" />
                   <div className="w-full h-px bg-[#30363d]/20 absolute top-[75%]" />
+                  {selectedBottomDistributionDefect && (() => {
+                    const surfaceMeta = surfaceImages.find(
+                      (info) => info.surface === selectedBottomDistributionDefect.surface,
+                    );
+                    const pos = getDistributionMarkerPosition(
+                      selectedBottomDistributionDefect,
+                      bottomDistributionDraw,
+                      surfaceMeta,
+                    );
+                    if (!pos) return null;
+                    const crossSize = Math.max(
+                      12,
+                      Math.min(
+                        20,
+                        Math.round(bottomDistributionPlateSize.width * 0.08),
+                      ),
+                    );
+                    return (
+                      <div
+                        className="absolute pointer-events-none z-20"
+                        style={{
+                          top: `${pos.top}%`,
+                          left: `${pos.left}%`,
+                          width: crossSize,
+                          height: crossSize,
+                          transform: "translate(-50%, -50%)",
+                        }}
+                      >
+                        <div className="absolute left-0 right-0 top-1/2 h-0.5 -translate-y-1/2 bg-[#58a6ff]" />
+                        <div className="absolute top-0 bottom-0 left-1/2 w-0.5 -translate-x-1/2 bg-[#58a6ff]" />
+                      </div>
+                    );
+                  })()}
 
                   {bottomDistributionDefects.map((defect, index) => {
                     const surfaceMeta = surfaceImages.find((info) => info.surface === defect.surface);

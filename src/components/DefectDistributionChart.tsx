@@ -417,6 +417,9 @@ export function DefectDistributionChart({
       ? calculateFinalDimensions.topWidth 
       : calculateFinalDimensions.bottomWidth;
     const frameCount = meta?.frame_count || 1;
+    const selectedDefect = selectedDefectId
+      ? plateDefects.find((defect) => defect.id === selectedDefectId)
+      : undefined;
 
     const tileImages: JSX.Element[] = [];
     if (
@@ -750,6 +753,40 @@ export function DefectDistributionChart({
             style={{ left: 0, bottom: 0 }}
             title="Origin debug point (0,0)"
           />
+
+          {/* Selected defect marker (hollow cross) */}
+          {selectedDefect && (() => {
+            const { x, y, w, h } = computeDisplayRect(
+              selectedDefect,
+              hasMeta ? meta : undefined,
+              perSurfaceHeight,
+              plateWidth,
+            );
+            const centerX = x + w / 2;
+            const centerY = y + h / 2;
+            const crossSize = Math.max(
+              12,
+              Math.min(
+                28,
+                Math.round(Math.min(perSurfaceHeight, plateWidth) * 0.06),
+              ),
+            );
+            return (
+              <div
+                className="absolute pointer-events-none z-20"
+                style={{
+                  left: centerX,
+                  top: centerY,
+                  width: crossSize,
+                  height: crossSize,
+                  transform: "translate(-50%, -50%)",
+                }}
+              >
+                <div className="absolute left-0 right-0 top-1/2 h-0.5 -translate-y-1/2 bg-primary" />
+                <div className="absolute top-0 bottom-0 left-1/2 w-0.5 -translate-x-1/2 bg-primary" />
+              </div>
+            );
+          })()}
 
           {/* 缺陷矩形 */}
           {plateDefects.map((defect) => {
