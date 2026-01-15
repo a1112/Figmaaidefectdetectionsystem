@@ -11,6 +11,7 @@ import StatusCenterPage from "./pages/StatusCenter";
 import { toast } from "sonner@2.0.3";
 import { ThemeProvider } from "./components/ThemeContext";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { isElectronRuntime, isTauriRuntime, isFileRuntime } from "./utils/runtime";
 
 export default function App() {
   // 全局非阻塞错误处理
@@ -38,14 +39,9 @@ export default function App() {
     };
   }, []);
 
-  const isElectron =
-    typeof navigator !== "undefined" &&
-    navigator.userAgent?.toLowerCase().includes("electron");
-  const isTauri =
-    typeof window !== "undefined" && !!(window as any).__TAURI__;
-  const isFileProtocol =
-    typeof window !== "undefined" &&
-    window.location.protocol === "file:";
+  const isElectron = isElectronRuntime();
+  const isTauri = isTauriRuntime();
+  const isFileProtocol = isFileRuntime();
   const Router =
     isElectron || isTauri || isFileProtocol ? HashRouter : BrowserRouter;
 

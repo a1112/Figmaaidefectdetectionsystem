@@ -14,6 +14,7 @@ import { getConfigSpeedTestUrl } from "../../api/admin";
 import { env } from "../../config/env";
 import { RotateCw } from "lucide-react";
 import { Checkbox } from "../ui/checkbox";
+import { isElectronRuntime, isTauriRuntime } from "../../utils/runtime";
 
 const SPEED_TEST_DURATION_MS = 60_000;
 const SPEED_SAMPLE_INTERVAL_MS = 1_000;
@@ -35,10 +36,8 @@ export function DataSourceModal({
   onConfirm,
   onRefresh,
 }: DataSourceModalProps) {
-  const isElectron =
-    typeof window !== "undefined" && !!window.electronWindow;
-  const isTauri =
-    typeof window !== "undefined" && !!(window as any).__TAURI__;
+  const isElectron = isElectronRuntime();
+  const isTauri = isTauriRuntime();
   const isDesktop = isElectron || isTauri;
   const [selected, setSelected] = useState("");
   const [apiProfile, setApiProfile] = useState<"small" | "large">(env.getApiProfile() === "small" ? "small" : "large");

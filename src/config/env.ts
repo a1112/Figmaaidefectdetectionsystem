@@ -1,3 +1,5 @@
+import { isDesktopRuntime, isFileRuntime } from "../utils/runtime";
+
 /**
  * 环境配置
  * 用于切换开发模式（Mock数据）和生产模式（真实API）
@@ -75,21 +77,12 @@ class EnvironmentConfig {
     this.productionBaseUrl = getInitialProductionBaseUrl();
   }
 
-  private isFileProtocolInternal(): boolean {
-    return typeof window !== "undefined" && window.location.protocol === "file:";
-  }
-
   private isDesktopShell(): boolean {
-    if (typeof window === "undefined") return false;
-    if (this.isFileProtocolInternal()) return true;
-    return (
-      !!(window as any).electronWindow ||
-      !!(window as any).__TAURI__
-    );
+    return isDesktopRuntime();
   }
 
   isFileProtocol(): boolean {
-    return this.isFileProtocolInternal();
+    return isFileRuntime();
   }
 
   /**

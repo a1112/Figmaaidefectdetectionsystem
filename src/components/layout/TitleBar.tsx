@@ -48,6 +48,8 @@ import type { AuthUser } from "../../api/admin";
 import { getTestModelStatus } from "../../api/testModel";
 import { getConfigStatusSimple } from "../../api/status";
 import { env } from "../../config/env";
+import { isElectronRuntime, isTauriRuntime } from "../../utils/runtime";
+import { withTauriWindow } from "../../utils/tauriWindow";
 
 interface TitleBarProps {
   activeTab: ActiveTab;
@@ -90,24 +92,12 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   onRefreshApiNodes,
   onOpenSettings,
 }) => {
-  const isElectron = typeof window !== "undefined" && !!window.electronWindow;
-  const isTauri =
-    typeof window !== "undefined" && !!(window as any).__TAURI__;
+  const isElectron = isElectronRuntime();
+  const isTauri = isTauriRuntime();
   const canDrag = isElectron || isTauri;
   const useElectronDragRegion = isElectron;
   const hasWindowControls = isElectron || isTauri;
   const isWebOnly = !isElectron && !isTauri;
-  const withTauriWindow = async (
-    action: (appWindow: any) => Promise<void> | void,
-  ) => {
-    if (!isTauri) return;
-    try {
-      const { appWindow } = await import("@tauri-apps/api/window");
-      await action(appWindow);
-    } catch {
-      // Ignore missing API in non-Tauri runtimes
-    }
-  };
   const handleTauriDragStart = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!isTauri || event.button !== 0) return;
     if (event.detail > 1) return;

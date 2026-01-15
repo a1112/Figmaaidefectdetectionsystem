@@ -24,6 +24,8 @@ import { ProxySettings } from "../components/backend/ProxySettings";
 import { SystemInfoPanel } from "../components/backend/SystemInfoPanel";
 import { ServiceSettings } from "../components/backend/ServiceSettings";
 import { useTheme } from "../components/ThemeContext";
+import { isElectronRuntime, isTauriRuntime } from "../utils/runtime";
+import { withTauriWindow } from "../utils/tauriWindow";
 import {
   getConfigMate,
   type ConfigMatePayload,
@@ -81,23 +83,11 @@ const menuItems: MenuItem[] = [
 export const BackendManagement: React.FC = () => {
   const navigate = useNavigate();
   const { currentTheme } = useTheme();
-  const isElectron = typeof window !== "undefined" && !!window.electronWindow;
-  const isTauri =
-    typeof window !== "undefined" && !!(window as any).__TAURI__;
+  const isElectron = isElectronRuntime();
+  const isTauri = isTauriRuntime();
   const canDrag = isElectron || isTauri;
   const useElectronDragRegion = isElectron;
   const hasWindowControls = isElectron || isTauri;
-  const withTauriWindow = async (
-    action: (appWindow: any) => Promise<void> | void,
-  ) => {
-    if (!isTauri) return;
-    try {
-      const { appWindow } = await import("@tauri-apps/api/window");
-      await action(appWindow);
-    } catch {
-      // Ignore missing API in non-Tauri runtimes
-    }
-  };
   const handleTauriDragStart = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!isTauri || event.button !== 0) return;
     if (event.detail > 1) return;
