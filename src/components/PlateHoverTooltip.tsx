@@ -18,6 +18,10 @@ interface PlateHoverTooltipProps {
     classId?: number | null;
     items: Array<{ id: string; surface: Surface }>;
   }>;
+  maxSummaryItems?: number;
+  previewMaxCategories?: number;
+  previewMaxItems?: number;
+  previewItemSize?: number;
 }
 
 export function PlateHoverTooltip({
@@ -28,6 +32,10 @@ export function PlateHoverTooltip({
   defectSummary,
   showPreview = false,
   previewGroups,
+  maxSummaryItems = 5,
+  previewMaxCategories = 6,
+  previewMaxItems = 5,
+  previewItemSize = 32,
 }: PlateHoverTooltipProps) {
   const tooltipStyle = useMemo(() => {
     const maxWidth = 260 + (showPreview ? 280 : 0);
@@ -52,12 +60,17 @@ export function PlateHoverTooltip({
           ? "bg-yellow-500/10 border-yellow-500/30 text-yellow-400"
           : "bg-red-500/10 border-red-500/30 text-red-400";
 
-  const displaySummary = defectSummary?.slice(0, 5) ?? [];
+  const displaySummary = defectSummary?.slice(0, maxSummaryItems) ?? [];
   const summaryRemaining = Math.max(
     0,
     (defectSummary?.length ?? 0) - displaySummary.length,
   );
-  const displayPreviewGroups = previewGroups?.slice(0, 6) ?? [];
+  const displayPreviewGroups =
+    previewGroups?.slice(0, previewMaxCategories) ?? [];
+  const previewImageStyle = {
+    width: previewItemSize,
+    height: previewItemSize,
+  };
 
   return (
     <div
@@ -156,8 +169,8 @@ export function PlateHoverTooltip({
                       <span>{group.label}</span>
                       <span className="font-mono">{group.count}</span>
                     </div>
-                    <div className="mt-1 flex items-center gap-1">
-                      {group.items.slice(0, 5).map((item) => (
+                    <div className="mt-1 flex flex-wrap items-center gap-1">
+                      {group.items.slice(0, previewMaxItems).map((item) => (
                         <img
                           key={item.id}
                           src={getDefectImageUrl({
@@ -165,7 +178,8 @@ export function PlateHoverTooltip({
                             surface: item.surface,
                           })}
                           alt={group.label}
-                          className="h-8 w-8 rounded border border-border object-cover"
+                          className="rounded border border-border object-cover"
+                          style={previewImageStyle}
                         />
                       ))}
                     </div>

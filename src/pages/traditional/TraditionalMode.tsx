@@ -52,6 +52,7 @@ import { FilterDialog } from "../../components/FilterDialog";
 import { LargeImageViewer } from "../../components/LargeImageViewer/LargeImageViewer";
 import { DefectHoverTooltip } from "../../components/DefectHoverTooltip";
 import { PlateHoverTooltip } from "../../components/PlateHoverTooltip";
+import { useGlobalUiSettings } from "../../hooks/useGlobalUiSettings";
 import type { Tile } from "../../components/LargeImageViewer/utils";
 import { drawTileImage, tryDrawFallbackTile } from "../../utils/tileFallback";
 import {
@@ -61,7 +62,7 @@ import {
   convertDefectToWorldRect,
   type SurfaceLayout,
 } from "../../utils/imageOrientation";
-import type { ImageOrientation, DistributionScaleMode } from "../../types/app.types";
+import type { ImageOrientation } from "../../types/app.types";
 import { useNewItemKeys } from "../../hooks/useNewItems";
 
 // Separate Clock component to prevent full page re-renders every second
@@ -132,6 +133,17 @@ import {
 export default function TraditionalMode() {
   const navigate = useNavigate();
   const { currentTheme } = useTheme();
+  const { settings, updateSetting } = useGlobalUiSettings();
+  const {
+    distributionScaleMode,
+    defectHoverCardWidth,
+    defectHoverImageStretch,
+    plateHoverEnabled,
+    defectListHoverDefaultVisible,
+    defectListHoverMaxCategories,
+    defectListHoverMaxItems,
+    defectListHoverItemSize,
+  } = settings;
   const [plates, setPlates] = useState<SteelItem[]>([]);
   const [selectedPlate, setSelectedPlate] = useState<SteelItem | null>(null);
   const [plateDefects, setPlateDefects] = useState<DefectItem[]>([]);
@@ -228,8 +240,6 @@ export default function TraditionalMode() {
   const [queryTab, setQueryTab] = useState("SN"); // SN, ID, TIME
   const [sidebarTab, setSidebarTab] = useState<'records' | 'defects'>('records');
   const [refreshLimit, setRefreshLimit] = useState(20);
-  const [distributionScaleMode, setDistributionScaleMode] =
-    useState<DistributionScaleMode>("fit");
   
   useEffect(() => {
     if (!isElectron || !window.electronWindow?.isMaximized) return;
@@ -509,7 +519,9 @@ export default function TraditionalMode() {
     >
   >({});
   const plateDefectSummaryLoadingRef = useRef<Set<string>>(new Set());
-  const [showPlatePreview, setShowPlatePreview] = useState(false);
+  const [showPlatePreview, setShowPlatePreview] = useState(
+    defectListHoverDefaultVisible,
+  );
   const buildPlatePreviewGroups = useCallback((defects: DefectItemRaw[]) => {
     const groups = new Map<
       string,
@@ -589,6 +601,9 @@ export default function TraditionalMode() {
 
   const handlePlateHover = useCallback(
     (plate: SteelItem, position: { screenX: number; screenY: number }) => {
+      if (!plateHoverEnabled) {
+        return;
+      }
       setHoveredPlateRecord({
         plate,
         screenX: position.screenX,
@@ -623,13 +638,26 @@ export default function TraditionalMode() {
           plateDefectSummaryLoadingRef.current.delete(serialNumber);
         });
     },
-    [buildPlatePreviewGroups, plateDefectPreviewMap],
+    [buildPlatePreviewGroups, plateDefectPreviewMap, plateHoverEnabled],
   );
 
   const handlePlateHoverEnd = useCallback(() => {
     setHoveredPlateRecord(null);
     setShowPlatePreview(false);
   }, []);
+
+  useEffect(() => {
+    if (!plateHoverEnabled) {
+      setHoveredPlateRecord(null);
+      setShowPlatePreview(false);
+    }
+  }, [plateHoverEnabled]);
+
+  useEffect(() => {
+    if (hoveredPlateRecord) {
+      setShowPlatePreview(defectListHoverDefaultVisible);
+    }
+  }, [hoveredPlateRecord?.plate.serialNumber, defectListHoverDefaultVisible]);
 
   const distributionPlateRef = useRef<HTMLDivElement>(null);
   const [distributionPlateSize, setDistributionPlateSize] = useState({
@@ -2310,6 +2338,8 @@ export default function TraditionalMode() {
           defect={hoveredDefect.defect}
           screenX={hoveredDefect.screenX}
           screenY={hoveredDefect.screenY}
+          cardWidth={defectHoverCardWidth}
+          imageStretch={defectHoverImageStretch}
           plateSize={
             selectedPlate
               ? {
@@ -2320,7 +2350,7 @@ export default function TraditionalMode() {
           }
         />
       )}
-      {hoveredPlateRecord && (
+      {hoveredPlateRecord && plateHoverEnabled && (
         <PlateHoverTooltip
           plate={hoveredPlateRecord.plate}
           screenX={hoveredPlateRecord.screenX}
@@ -2328,6 +2358,10 @@ export default function TraditionalMode() {
           defectSummary={hoveredPlateSummary}
           showPreview={showPlatePreview}
           previewGroups={hoveredPlatePreview}
+          maxSummaryItems={defectListHoverMaxCategories}
+          previewMaxCategories={defectListHoverMaxCategories}
+          previewMaxItems={defectListHoverMaxItems}
+          previewItemSize={defectListHoverItemSize}
         />
       )}
       {/* Header */}
@@ -2686,7 +2720,9 @@ export default function TraditionalMode() {
         refreshLimit={refreshLimit}
         setRefreshLimit={setRefreshLimit}
         distributionScaleMode={distributionScaleMode}
-        setDistributionScaleMode={setDistributionScaleMode}
+        setDistributionScaleMode={(mode) =>
+          updateSetting("distributionScaleMode", mode)
+        }
         lineKey={currentLineKey}
         apiNodes={apiNodes}
         companyName={companyName}

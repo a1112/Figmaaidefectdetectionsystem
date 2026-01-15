@@ -7,14 +7,16 @@ import {
   DialogDescription,
 } from "../ui/dialog";
 import { Button } from "../ui/button";
+import { Input } from "../ui/input";
 import { 
   Settings, 
   Monitor, 
   Layers, 
   Palette, 
   ArrowUpDown, 
-  RotateCw,
+  SlidersHorizontal,
   Keyboard,
+  MousePointer2,
   Info,
   Check
 } from "lucide-react";
@@ -34,6 +36,20 @@ interface ModernSettingsModalProps {
   setShowTileBorders: (show: boolean) => void;
   distributionScaleMode: DistributionScaleMode;
   setDistributionScaleMode: (mode: DistributionScaleMode) => void;
+  defectHoverCardWidth: number;
+  setDefectHoverCardWidth: (value: number) => void;
+  defectHoverImageStretch: boolean;
+  setDefectHoverImageStretch: (value: boolean) => void;
+  plateHoverEnabled: boolean;
+  setPlateHoverEnabled: (value: boolean) => void;
+  defectListHoverDefaultVisible: boolean;
+  setDefectListHoverDefaultVisible: (value: boolean) => void;
+  defectListHoverMaxCategories: number;
+  setDefectListHoverMaxCategories: (value: number) => void;
+  defectListHoverMaxItems: number;
+  setDefectListHoverMaxItems: (value: number) => void;
+  defectListHoverItemSize: number;
+  setDefectListHoverItemSize: (value: number) => void;
   lineKey?: string;
   apiNodes?: ApiNode[];
   companyName?: string;
@@ -50,6 +66,20 @@ export function ModernSettingsModal({
   setShowTileBorders,
   distributionScaleMode,
   setDistributionScaleMode,
+  defectHoverCardWidth,
+  setDefectHoverCardWidth,
+  defectHoverImageStretch,
+  setDefectHoverImageStretch,
+  plateHoverEnabled,
+  setPlateHoverEnabled,
+  defectListHoverDefaultVisible,
+  setDefectListHoverDefaultVisible,
+  defectListHoverMaxCategories,
+  setDefectListHoverMaxCategories,
+  defectListHoverMaxItems,
+  setDefectListHoverMaxItems,
+  defectListHoverItemSize,
+  setDefectListHoverItemSize,
   lineKey,
   apiNodes,
   companyName,
@@ -119,6 +149,242 @@ export function ModernSettingsModal({
                 </DialogHeader>
 
                 <div className="flex-1 overflow-y-auto p-6 pt-0 space-y-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                      <SlidersHorizontal className="w-3.5 h-3.5" />
+                      全局设置
+                    </div>
+                    <div className="space-y-4">
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                          <Layers className="w-3.5 h-3.5" />
+                          分布图显示
+                        </div>
+                        <div className="grid gap-2">
+                          <div className="p-3 rounded-lg border border-border bg-muted/30 flex items-center justify-between">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-xs font-bold">等比/拉伸</span>
+                              <span className="text-[10px] text-muted-foreground">分布图显示比例模式</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => setDistributionScaleMode("fit")}
+                                className={`px-2 py-1 text-[10px] font-bold rounded border transition-colors ${
+                                  distributionScaleMode === "fit"
+                                    ? "border-primary bg-primary/10 text-primary"
+                                    : "border-border text-muted-foreground hover:text-foreground"
+                                }`}
+                              >
+                                等比
+                              </button>
+                              <button
+                                onClick={() => setDistributionScaleMode("stretch")}
+                                className={`px-2 py-1 text-[10px] font-bold rounded border transition-colors ${
+                                  distributionScaleMode === "stretch"
+                                    ? "border-primary bg-primary/10 text-primary"
+                                    : "border-border text-muted-foreground hover:text-foreground"
+                                }`}
+                              >
+                                拉伸
+                              </button>
+                            </div>
+                          </div>
+                          <div className="p-3 rounded-lg border border-border bg-muted/30 flex items-center justify-between">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-xs font-bold">显示瓦片图像</span>
+                              <span className="text-[10px] text-muted-foreground">在缺陷分布图中加载并显示钢板表面图像</span>
+                            </div>
+                            <button
+                              onClick={() => setShowDistributionImages(!showDistributionImages)}
+                              className={`w-8 h-4 rounded-full relative transition-colors ${
+                                showDistributionImages ? "bg-primary" : "bg-muted-foreground/30"
+                              }`}
+                            >
+                              <div 
+                                className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow-sm transition-all ${
+                                  showDistributionImages ? "right-0.5" : "left-0.5"
+                                }`} 
+                              />
+                            </button>
+                          </div>
+
+                          <div className="p-3 rounded-lg border border-border bg-muted/30 flex items-center justify-between">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-xs font-bold">显示瓦片轮廓</span>
+                              <span className="text-[10px] text-muted-foreground">瓦片加载器调试：显示瓦片边缘及整体轮廓</span>
+                            </div>
+                            <button
+                              onClick={() => setShowTileBorders(!showTileBorders)}
+                              className={`w-8 h-4 rounded-full relative transition-colors ${
+                                showTileBorders ? "bg-primary" : "bg-muted-foreground/30"
+                              }`}
+                            >
+                              <div 
+                                className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow-sm transition-all ${
+                                  showTileBorders ? "right-0.5" : "left-0.5"
+                                }`} 
+                              />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                          <MousePointer2 className="w-3.5 h-3.5" />
+                          悬浮框设置
+                        </div>
+                        <div className="grid gap-2">
+                          <div className="p-3 rounded-lg border border-border bg-muted/30 space-y-2">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-xs font-bold">缺陷悬浮框</span>
+                                <span className="text-[10px] text-muted-foreground">调整缺陷显示大小与拉伸方式</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-muted-foreground">拉伸</span>
+                                <button
+                                  onClick={() => setDefectHoverImageStretch(!defectHoverImageStretch)}
+                                  className={`w-8 h-4 rounded-full relative transition-colors ${
+                                    defectHoverImageStretch ? "bg-primary" : "bg-muted-foreground/30"
+                                  }`}
+                                >
+                                  <div 
+                                    className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow-sm transition-all ${
+                                      defectHoverImageStretch ? "right-0.5" : "left-0.5"
+                                    }`} 
+                                  />
+                                </button>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
+                              <span>显示宽度</span>
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  type="number"
+                                  min={160}
+                                  max={320}
+                                  step={10}
+                                  value={defectHoverCardWidth}
+                                  onChange={(event) => {
+                                    const next = Number.isFinite(event.target.valueAsNumber)
+                                      ? event.target.valueAsNumber
+                                      : defectHoverCardWidth;
+                                    setDefectHoverCardWidth(next);
+                                  }}
+                                  className="h-7 w-20 text-[10px] px-2"
+                                />
+                                <span>px</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="p-3 rounded-lg border border-border bg-muted/30 flex items-center justify-between">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-xs font-bold">记录悬浮框</span>
+                              <span className="text-[10px] text-muted-foreground">悬浮时显示钢板记录摘要</span>
+                            </div>
+                            <button
+                              onClick={() => setPlateHoverEnabled(!plateHoverEnabled)}
+                              className={`w-8 h-4 rounded-full relative transition-colors ${
+                                plateHoverEnabled ? "bg-primary" : "bg-muted-foreground/30"
+                              }`}
+                            >
+                              <div 
+                                className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow-sm transition-all ${
+                                  plateHoverEnabled ? "right-0.5" : "left-0.5"
+                                }`} 
+                              />
+                            </button>
+                          </div>
+
+                          <div className="p-3 rounded-lg border border-border bg-muted/30 space-y-2">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-xs font-bold">缺陷列表悬浮框</span>
+                                <span className="text-[10px] text-muted-foreground">控制缺陷预览显示方式</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-muted-foreground">
+                                  {defectListHoverDefaultVisible ? "默认显示" : "默认隐藏"}
+                                </span>
+                                <button
+                                  onClick={() =>
+                                    setDefectListHoverDefaultVisible(!defectListHoverDefaultVisible)
+                                  }
+                                  className={`w-8 h-4 rounded-full relative transition-colors ${
+                                    defectListHoverDefaultVisible
+                                      ? "bg-primary"
+                                      : "bg-muted-foreground/30"
+                                  }`}
+                                >
+                                  <div 
+                                    className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow-sm transition-all ${
+                                      defectListHoverDefaultVisible ? "right-0.5" : "left-0.5"
+                                    }`} 
+                                  />
+                                </button>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                              <div className="space-y-1">
+                                <span className="text-[10px] text-muted-foreground">最大缺陷类别</span>
+                                <Input
+                                  type="number"
+                                  min={1}
+                                  max={12}
+                                  step={1}
+                                  value={defectListHoverMaxCategories}
+                                  onChange={(event) => {
+                                    const next = Number.isFinite(event.target.valueAsNumber)
+                                      ? event.target.valueAsNumber
+                                      : defectListHoverMaxCategories;
+                                    setDefectListHoverMaxCategories(next);
+                                  }}
+                                  className="h-7 text-[10px] px-2"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <span className="text-[10px] text-muted-foreground">单类最大数量</span>
+                                <Input
+                                  type="number"
+                                  min={1}
+                                  max={12}
+                                  step={1}
+                                  value={defectListHoverMaxItems}
+                                  onChange={(event) => {
+                                    const next = Number.isFinite(event.target.valueAsNumber)
+                                      ? event.target.valueAsNumber
+                                      : defectListHoverMaxItems;
+                                    setDefectListHoverMaxItems(next);
+                                  }}
+                                  className="h-7 text-[10px] px-2"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <span className="text-[10px] text-muted-foreground">单个缺陷大小</span>
+                                <Input
+                                  type="number"
+                                  min={24}
+                                  max={64}
+                                  step={2}
+                                  value={defectListHoverItemSize}
+                                  onChange={(event) => {
+                                    const next = Number.isFinite(event.target.valueAsNumber)
+                                      ? event.target.valueAsNumber
+                                      : defectListHoverItemSize;
+                                    setDefectListHoverItemSize(next);
+                                  }}
+                                  className="h-7 text-[10px] px-2"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Image Orientation Section */}
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
@@ -157,80 +423,7 @@ export function ModernSettingsModal({
                     </div>
                   </div>
 
-                  {/* Distribution Map Images Section */}
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                      <Layers className="w-3.5 h-3.5" />
-                      分布图显示
-                    </div>
-                    <div className="grid gap-2">
-                      <div className="p-3 rounded-lg border border-border bg-muted/30 flex items-center justify-between">
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-xs font-bold">等比/拉升</span>
-                          <span className="text-[10px] text-muted-foreground">分布图显示比例模式</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => setDistributionScaleMode("fit")}
-                            className={`px-2 py-1 text-[10px] font-bold rounded border transition-colors ${
-                              distributionScaleMode === "fit"
-                                ? "border-primary bg-primary/10 text-primary"
-                                : "border-border text-muted-foreground hover:text-foreground"
-                            }`}
-                          >
-                            等比
-                          </button>
-                          <button
-                            onClick={() => setDistributionScaleMode("stretch")}
-                            className={`px-2 py-1 text-[10px] font-bold rounded border transition-colors ${
-                              distributionScaleMode === "stretch"
-                                ? "border-primary bg-primary/10 text-primary"
-                                : "border-border text-muted-foreground hover:text-foreground"
-                            }`}
-                          >
-                            拉升
-                          </button>
-                        </div>
-                      </div>
-                      <div className="p-3 rounded-lg border border-border bg-muted/30 flex items-center justify-between">
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-xs font-bold">显示瓦片图像</span>
-                          <span className="text-[10px] text-muted-foreground">在缺陷分布图中加载并显示钢板表面图像</span>
-                        </div>
-                        <button
-                          onClick={() => setShowDistributionImages(!showDistributionImages)}
-                          className={`w-8 h-4 rounded-full relative transition-colors ${
-                            showDistributionImages ? "bg-primary" : "bg-muted-foreground/30"
-                          }`}
-                        >
-                          <div 
-                            className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow-sm transition-all ${
-                              showDistributionImages ? "right-0.5" : "left-0.5"
-                            }`} 
-                          />
-                        </button>
-                      </div>
-
-                      <div className="p-3 rounded-lg border border-border bg-muted/30 flex items-center justify-between">
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-xs font-bold">显示瓦片轮廓</span>
-                          <span className="text-[10px] text-muted-foreground">瓦片加载器调试：显示瓦片边缘及整体轮廓</span>
-                        </div>
-                        <button
-                          onClick={() => setShowTileBorders(!showTileBorders)}
-                          className={`w-8 h-4 rounded-full relative transition-colors ${
-                            showTileBorders ? "bg-primary" : "bg-muted-foreground/30"
-                          }`}
-                        >
-                          <div 
-                            className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow-sm transition-all ${
-                              showTileBorders ? "right-0.5" : "left-0.5"
-                            }`} 
-                          />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                  
                 </div>
               </>
             )}

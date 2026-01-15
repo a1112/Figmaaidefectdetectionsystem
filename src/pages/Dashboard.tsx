@@ -32,7 +32,6 @@ import type {
   SurfaceImageInfo,
   ApiNode,
 } from "../api/types";
-import type { DistributionScaleMode } from "../types/app.types";
 import type {
   Defect,
   DetectionRecord,
@@ -68,6 +67,7 @@ import { useTheme } from "../components/ThemeContext";
 import { ModernSettingsModal } from "../components/modals/ModernSettingsModal";
 import { DefectHoverTooltip } from "../components/DefectHoverTooltip";
 import { PlateHoverTooltip } from "../components/PlateHoverTooltip";
+import { useGlobalUiSettings } from "../hooks/useGlobalUiSettings";
 
 type DefectClassOption = {
   id: number;
@@ -78,7 +78,20 @@ type DefectClassOption = {
 export function Dashboard() {
   const navigate = useNavigate();
   const { currentTheme } = useTheme();
+  const { settings, updateSetting } = useGlobalUiSettings();
   const theme = currentTheme.colors.background === "#ffffff" ? "light" : "dark";
+  const {
+    showDistributionImages,
+    showTileBorders,
+    distributionScaleMode,
+    defectHoverCardWidth,
+    defectHoverImageStretch,
+    plateHoverEnabled,
+    defectListHoverDefaultVisible,
+    defectListHoverMaxCategories,
+    defectListHoverMaxItems,
+    defectListHoverItemSize,
+  } = settings;
   
   const [history, setHistory] = useState<DetectionRecord[]>([]);
   const [activeTab, setActiveTab] = useState<AppTab>("defects");
@@ -124,7 +137,9 @@ export function Dashboard() {
     >
   >({});
   const plateDefectSummaryLoadingRef = useRef<Set<string>>(new Set());
-  const [showPlatePreview, setShowPlatePreview] = useState(false);
+  const [showPlatePreview, setShowPlatePreview] = useState(
+    settings.defectListHoverDefaultVisible,
+  );
   const [imageViewMode, setImageViewMode] = useState<
     "full" | "single"
   >("full"); // 图像显示模式：大图/单缺陷
@@ -149,9 +164,6 @@ export function Dashboard() {
     }
   };
 
-  const [showDistributionImages, setShowDistributionImages] = useState(true);
-  const [showTileBorders, setShowTileBorders] = useState(false);
-  const [distributionScaleMode, setDistributionScaleMode] = useState<DistributionScaleMode>("fit");
   const [defectSeverityByName, setDefectSeverityByName] = useState<Record<string, number>>({});
   const [defectSeverityByClassId, setDefectSeverityByClassId] = useState<Record<number, number>>({});
 
@@ -245,6 +257,9 @@ export function Dashboard() {
   
   const handlePlateHover = useCallback(
     (plate: SteelPlate, position: { screenX: number; screenY: number }) => {
+      if (!plateHoverEnabled) {
+        return;
+      }
       setHoveredPlateRecord({
         plate,
         screenX: position.screenX,
@@ -279,13 +294,26 @@ export function Dashboard() {
           plateDefectSummaryLoadingRef.current.delete(serialNumber);
         });
     },
-    [buildPlatePreviewGroups, plateDefectPreviewMap],
+    [buildPlatePreviewGroups, plateDefectPreviewMap, plateHoverEnabled],
   );
 
   const handlePlateHoverEnd = useCallback(() => {
     setHoveredPlateRecord(null);
     setShowPlatePreview(false);
   }, []);
+
+  useEffect(() => {
+    if (!plateHoverEnabled) {
+      setHoveredPlateRecord(null);
+      setShowPlatePreview(false);
+    }
+  }, [plateHoverEnabled]);
+
+  useEffect(() => {
+    if (hoveredPlateRecord) {
+      setShowPlatePreview(defectListHoverDefaultVisible);
+    }
+  }, [hoveredPlateRecord?.plate.serialNumber, defectListHoverDefaultVisible]);
   
   useEffect(() => {
     if (!hoveredPlateRecord) {
@@ -1365,11 +1393,45 @@ export function Dashboard() {
         imageOrientation={imageOrientation}
         setImageOrientation={handleImageOrientationChange}
         showDistributionImages={showDistributionImages}
-        setShowDistributionImages={setShowDistributionImages}
+        setShowDistributionImages={(value) =>
+          updateSetting("showDistributionImages", value)
+        }
         showTileBorders={showTileBorders}
-        setShowTileBorders={setShowTileBorders}
+        setShowTileBorders={(value) =>
+          updateSetting("showTileBorders", value)
+        }
         distributionScaleMode={distributionScaleMode}
-        setDistributionScaleMode={setDistributionScaleMode}
+        setDistributionScaleMode={(value) =>
+          updateSetting("distributionScaleMode", value)
+        }
+        defectHoverCardWidth={defectHoverCardWidth}
+        setDefectHoverCardWidth={(value) =>
+          updateSetting("defectHoverCardWidth", value)
+        }
+        defectHoverImageStretch={defectHoverImageStretch}
+        setDefectHoverImageStretch={(value) =>
+          updateSetting("defectHoverImageStretch", value)
+        }
+        plateHoverEnabled={plateHoverEnabled}
+        setPlateHoverEnabled={(value) =>
+          updateSetting("plateHoverEnabled", value)
+        }
+        defectListHoverDefaultVisible={defectListHoverDefaultVisible}
+        setDefectListHoverDefaultVisible={(value) =>
+          updateSetting("defectListHoverDefaultVisible", value)
+        }
+        defectListHoverMaxCategories={defectListHoverMaxCategories}
+        setDefectListHoverMaxCategories={(value) =>
+          updateSetting("defectListHoverMaxCategories", value)
+        }
+        defectListHoverMaxItems={defectListHoverMaxItems}
+        setDefectListHoverMaxItems={(value) =>
+          updateSetting("defectListHoverMaxItems", value)
+        }
+        defectListHoverItemSize={defectListHoverItemSize}
+        setDefectListHoverItemSize={(value) =>
+          updateSetting("defectListHoverItemSize", value)
+        }
         lineKey={activeLineKey}
         apiNodes={apiNodes}
       />
@@ -1379,6 +1441,8 @@ export function Dashboard() {
           defect={hoveredDefect.defect}
           screenX={hoveredDefect.screenX}
           screenY={hoveredDefect.screenY}
+          cardWidth={defectHoverCardWidth}
+          imageStretch={defectHoverImageStretch}
           plateSize={
             selectedPlateForTooltip
               ? {
@@ -1389,7 +1453,7 @@ export function Dashboard() {
           }
         />
       )}
-      {hoveredPlateRecord && (
+      {hoveredPlateRecord && plateHoverEnabled && (
         <PlateHoverTooltip
           plate={hoveredPlateRecord.plate}
           screenX={hoveredPlateRecord.screenX}
@@ -1397,6 +1461,10 @@ export function Dashboard() {
           defectSummary={hoveredPlateSummary}
           showPreview={showPlatePreview}
           previewGroups={hoveredPlatePreview}
+          maxSummaryItems={defectListHoverMaxCategories}
+          previewMaxCategories={defectListHoverMaxCategories}
+          previewMaxItems={defectListHoverMaxItems}
+          previewItemSize={defectListHoverItemSize}
         />
       )}
     </div>

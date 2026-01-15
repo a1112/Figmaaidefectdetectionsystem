@@ -21,6 +21,8 @@ interface DefectHoverTooltipProps {
   screenY: number;
   offset?: number;
   plateSize?: { width: number; length: number };
+  cardWidth?: number;
+  imageStretch?: boolean;
 }
 
 export function DefectHoverTooltip({
@@ -29,7 +31,11 @@ export function DefectHoverTooltip({
   screenY,
   offset = 4,
   plateSize,
+  cardWidth = 220,
+  imageStretch = false,
 }: DefectHoverTooltipProps) {
+  const imageHeight = Math.round(cardWidth * (120 / 220));
+  const tooltipHeight = imageHeight + 92;
   const imageUrl = useMemo(
     () =>
       getDefectImageUrl({
@@ -40,8 +46,8 @@ export function DefectHoverTooltip({
   );
 
   const tooltipStyle = useMemo(() => {
-    const maxWidth = 220;
-    const maxHeight = 180;
+    const maxWidth = cardWidth;
+    const maxHeight = tooltipHeight;
     let left = screenX + offset;
     let top = screenY + offset;
     if (typeof window !== "undefined") {
@@ -51,7 +57,7 @@ export function DefectHoverTooltip({
       top = Math.min(top, maxTop);
     }
     return { left, top };
-  }, [screenX, screenY, offset]);
+  }, [cardWidth, tooltipHeight, screenX, screenY, offset]);
 
   const displayX = Math.round(defect.xMm ?? defect.x);
   const displayY = Math.round(defect.yMm ?? defect.y);
@@ -73,12 +79,18 @@ export function DefectHoverTooltip({
       className="fixed z-[200] pointer-events-none"
       style={{ left: tooltipStyle.left, top: tooltipStyle.top }}
     >
-      <div className="w-[220px] bg-black/85 border border-[#30363d] rounded-sm shadow-[0_10px_30px_rgba(0,0,0,0.6)] backdrop-blur-sm overflow-hidden">
-        <div className="h-[120px] bg-[#0d1117] flex items-center justify-center overflow-hidden">
+      <div
+        className="bg-black/85 border border-[#30363d] rounded-sm shadow-[0_10px_30px_rgba(0,0,0,0.6)] backdrop-blur-sm overflow-hidden"
+        style={{ width: cardWidth }}
+      >
+        <div
+          className="bg-[#0d1117] flex items-center justify-center overflow-hidden"
+          style={{ height: imageHeight }}
+        >
           <img
             src={imageUrl}
             alt="缺陷图像"
-            className="w-full h-full object-cover"
+            className={`w-full h-full ${imageStretch ? "object-fill" : "object-cover"}`}
           />
         </div>
         <div className="p-2 text-[10px] text-[#c9d1d9] space-y-1">
