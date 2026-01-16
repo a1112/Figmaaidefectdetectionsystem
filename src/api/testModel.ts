@@ -6,11 +6,14 @@ export type TestModelStatus = {
   current_seq?: number | null;
   current_steel_id?: string | null;
   remaining_records?: number | null;
+  current_image_index?: number | null;
   steel_count?: number | null;
   max_seq?: number | null;
   defect_count?: number | null;
   database_name?: string | null;
   database_url?: string | null;
+  image_top_root?: string | null;
+  image_bottom_root?: string | null;
 };
 
 const getBaseUrl = () => {

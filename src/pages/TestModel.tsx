@@ -1,11 +1,8 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Play, Pause, RefreshCcw, Trash2, Wand2, Database, Layers } from "lucide-react";
+import { ArrowLeft, Play, Pause, RefreshCcw, Trash2, Database, Layers } from "lucide-react";
 import { toast } from "sonner@2.0.3";
 import {
-  addTestDefects,
-  addTestImages,
-  addTestImageOne,
   clearTestDatabase,
   clearTestModelLogs,
   deleteTestImages,
@@ -49,7 +46,8 @@ export default function TestModelPage() {
   const [dbUrl, setDbUrl] = useState<string | null>(null);
   const [rangeStart, setRangeStart] = useState(2);
   const [rangeEnd, setRangeEnd] = useState(10);
-  const [addCount, setAddCount] = useState(1);
+  const [imageTopRoot, setImageTopRoot] = useState<string | null>(null);
+  const [imageBottomRoot, setImageBottomRoot] = useState<string | null>(null);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isClearDbOpen, setIsClearDbOpen] = useState(false);
   const [logs, setLogs] = useState<any[]>([]);
@@ -75,6 +73,8 @@ export default function TestModelPage() {
       setMaxSeq(status.max_seq ?? null);
       setDbName(status.database_name ?? null);
       setDbUrl(status.database_url ?? null);
+      setImageTopRoot(status.image_top_root ?? null);
+      setImageBottomRoot(status.image_bottom_root ?? null);
     } catch {
       setEnabled(false);
     }
@@ -431,114 +431,88 @@ export default function TestModelPage() {
           </div>
 
           <div className="border border-border rounded-sm p-3 bg-card/70 flex flex-col gap-3">
-            <div className="text-xs font-semibold">手动操作</div>
+            <div className="text-xs font-semibold">{"\u4fe1\u606f\u663e\u793a"}</div>
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <label className="flex flex-col gap-1">
-                <span className="text-muted-foreground">新增数量</span>
-                <input
-                  type="number"
-                  value={addCount}
-                  onChange={(e) => setAddCount(numberOr(e.target.value, 1))}
-                  className="h-8 rounded-sm border border-border bg-background px-2 text-xs"
-                />
-              </label>
-              <div className="flex flex-col gap-1 text-[11px] text-muted-foreground">
-                <span>缺陷数量由间隔设置控制</span>
-                <span>手动生成会随机 0~N 条</span>
+              <div className="flex flex-col gap-1">
+                <span className="text-muted-foreground">{"\u4e0a\u8868\u9762\u4fdd\u5b58\u8def\u5f84"}</span>
+                <div
+                  className="rounded-sm border border-border bg-background px-2 py-1 text-[11px] font-mono break-all"
+                  title={imageTopRoot ?? ""}
+                >
+                  {imageTopRoot ?? "--"}
+                </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-muted-foreground">{"\u4e0b\u8868\u9762\u4fdd\u5b58\u8def\u5f84"}</span>
+                <div
+                  className="rounded-sm border border-border bg-background px-2 py-1 text-[11px] font-mono break-all"
+                  title={imageBottomRoot ?? ""}
+                >
+                  {imageBottomRoot ?? "--"}
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={async () => {
-                  await addTestImages(addCount);
-                  toast.success("已新增图像记录");
-                }}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-sm border border-border text-xs"
-              >
-                <Wand2 className="w-3 h-3" />
-                增加图像
-              </button>
-              <button
-                onClick={async () => {
-                  await addTestImageOne();
-                  toast.success("已生成单张图像");
-                }}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-sm border border-border text-xs"
-              >
-                生成单张
-              </button>
-              <button
-                onClick={async () => {
-                  await addTestDefects();
-                  toast.success("已生成缺陷");
-                }}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-sm border border-border text-xs"
-              >
-                增加缺陷
-              </button>
+            <div className="border-t border-border/60 pt-2 flex flex-col gap-2">
+              <div className="text-xs font-semibold flex items-center gap-2">
+                <Database className="w-4 h-4 text-primary" />
+                {"\u6570\u636e\u5e93\u72b6\u6001"}
+              </div>
+              <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1">
+                  <Layers className="w-3.5 h-3.5" />
+                  {"\u8bb0\u5f55\u6570"}:{steelCount ?? "--"}
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  {"\u7f3a\u9677\u6570"}:{defectCount ?? "--"}
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  {"\u6700\u5927\u6d41\u6c34\u53f7"}:{maxSeq ?? "--"}
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  {"\u5e93\u540d"}:{dbName ?? "--"}
+                </span>
+              </div>
+              <div className="flex items-center justify-end text-[11px] text-muted-foreground font-mono">
+                {dbUrl ?? "--"}
+              </div>
             </div>
-          </div>
-
-          <div className="border border-border rounded-sm p-3 bg-card/70 flex flex-col gap-3">
-            <div className="text-xs font-semibold">数据删除</div>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <label className="flex flex-col gap-1">
-                <span className="text-muted-foreground">起始流水号</span>
-                <input
-                  type="number"
-                  value={rangeStart}
-                  onChange={(e) => setRangeStart(numberOr(e.target.value, 2))}
-                  className="h-8 rounded-sm border border-border bg-background px-2 text-xs"
-                />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-muted-foreground">结束流水号</span>
-                <input
-                  type="number"
-                  value={rangeEnd}
-                  onChange={(e) => setRangeEnd(numberOr(e.target.value, 10))}
-                  className="h-8 rounded-sm border border-border bg-background px-2 text-xs"
-                />
-              </label>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setIsDeleteOpen(true)}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-sm border border-destructive/40 text-destructive text-xs"
-              >
-                <Trash2 className="w-3 h-3" />
-                删除图像
-              </button>
-              <button
-                onClick={() => setIsClearDbOpen(true)}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-sm border border-destructive/40 text-destructive text-xs"
-              >
-                清空数据库
-              </button>
-            </div>
-          </div>
-          <div className="border border-border rounded-sm p-3 bg-card/70 flex flex-col gap-3">
-            <div className="text-xs font-semibold flex items-center gap-2">
-              <Database className="w-4 h-4 text-primary" />
-              数据库状态
-            </div>
-            <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-              <span className="inline-flex items-center gap-1">
-                <Layers className="w-3.5 h-3.5" />
-                记录数：{steelCount ?? "--"}
-              </span>
-              <span className="inline-flex items-center gap-1">
-                缺陷数：{defectCount ?? "--"}
-              </span>
-              <span className="inline-flex items-center gap-1">
-                最大流水号：{maxSeq ?? "--"}
-              </span>
-              <span className="inline-flex items-center gap-1">
-                库名：{dbName ?? "--"}
-              </span>
-            </div>
-            <div className="flex items-center justify-end text-[11px] text-muted-foreground font-mono">
-              {dbUrl ?? "--"}
+            <div className="border-t border-border/60 pt-2 flex flex-col gap-2">
+              <div className="text-xs font-semibold">{"\u6570\u636e\u5220\u9664"}</div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <label className="flex flex-col gap-1">
+                  <span className="text-muted-foreground">{"\u8d77\u59cb\u6d41\u6c34\u53f7"}</span>
+                  <input
+                    type="number"
+                    value={rangeStart}
+                    onChange={(e) => setRangeStart(numberOr(e.target.value, 2))}
+                    className="h-8 rounded-sm border border-border bg-background px-2 text-xs"
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-muted-foreground">{"\u7ed3\u675f\u6d41\u6c34\u53f7"}</span>
+                  <input
+                    type="number"
+                    value={rangeEnd}
+                    onChange={(e) => setRangeEnd(numberOr(e.target.value, 10))}
+                    className="h-8 rounded-sm border border-border bg-background px-2 text-xs"
+                  />
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsDeleteOpen(true)}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-sm border border-destructive/40 text-destructive text-xs"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  {"\u5220\u9664\u56fe\u50cf"}
+                </button>
+                <button
+                  onClick={() => setIsClearDbOpen(true)}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-sm border border-destructive/40 text-destructive text-xs"
+                >
+                  {"\u6e05\u7a7a\u6570\u636e\u5e93"}
+                </button>
+              </div>
             </div>
           </div>
           <div className="border border-border rounded-sm p-3 bg-card/70 flex flex-col gap-3 col-span-2">
@@ -591,18 +565,22 @@ export default function TestModelPage() {
               {logs.length === 0 ? (
                 <div className="px-3 py-4 text-xs text-muted-foreground">暂无日志</div>
               ) : (
-                logs.map((item, idx) => (
-                  <div
-                    key={`log-${idx}`}
-                    className="px-3 py-2 text-[11px] border-b border-white/5"
-                  >
-                    <div className="text-[#8b949e]">
-                      [{item.id}] {item.time} - {item.message}
-                    </div>
-                    <div className="text-[#7aa2f7]">
-                      {item.data?.seq_no ? `流水号: ${item.data.seq_no} ` : ""}
-                      {item.data?.steel_id ? `板号: ${item.data.steel_id} ` : ""}
-                      {item.data?.views?.length ? `视图: ${item.data.views.join(", ")} ` : ""}
+                logs.map((item, idx) => {
+                  const files = Array.isArray(item.data?.files) ? item.data.files : [];
+                  const fileLabel = files.length ? files[0] : "";
+                  const fileSuffix = files.length > 1 ? ` (+${files.length - 1})` : "";
+                  return (
+                    <div
+                      key={`log-${idx}`}
+                      className="px-3 py-2 text-[11px] border-b border-white/5"
+                    >
+                      <div className="text-[#8b949e]">
+                        [{item.id}] {item.time} - {item.message}
+                      </div>
+                      <div className="text-[#7aa2f7]">
+                        {item.data?.seq_no ? `流水号: ${item.data.seq_no} ` : ""}
+                        {item.data?.steel_id ? `板号: ${item.data.steel_id} ` : ""}
+                        {item.data?.views?.length ? `视图: ${item.data.views.join(", ")} ` : ""}
                         {item.data?.surfaces?.length
                           ? `表面: ${item.data.surfaces
                               .map((surface: any) => {
@@ -615,22 +593,24 @@ export default function TestModelPage() {
                               .filter(Boolean)
                               .join(" ")} `
                           : ""}
-                      {item.data?.image_interval_ms !== undefined
-                        ? `单张间隔: ${item.data.image_interval_ms}ms `
-                        : ""}
-                      {item.data?.elapsed_seconds !== undefined
-                        ? `耗时: ${item.data.elapsed_seconds}s `
-                        : ""}
+                        {fileLabel ? `文件: ${fileLabel}${fileSuffix} ` : ""}
+                        {item.data?.image_interval_ms !== undefined
+                          ? `单张间隔: ${item.data.image_interval_ms}ms `
+                          : ""}
+                        {item.data?.elapsed_seconds !== undefined
+                          ? `耗时: ${item.data.elapsed_seconds}s `
+                          : ""}
                         {item.data?.defect_count !== undefined ? `缺陷: ${item.data.defect_count} ` : ""}
                         {Number.isFinite(item.data?.image_index) ? `图像索引: ${item.data.image_index} ` : ""}
                         {Number.isFinite(item.data?.img_index_max)
                           ? `图像索引范围: ${item.data.img_index_min ?? 1}-${item.data.img_index_max} `
                           : ""}
-                      {item.data?.samples?.length ? `样本: ${item.data.samples[0]}` : ""}
-                      {item.data?.error ? `错误: ${item.data.error}` : ""}
+                        {item.data?.samples?.length ? `样本: ${item.data.samples[0]}` : ""}
+                        {item.data?.error ? `错误: ${item.data.error}` : ""}
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
