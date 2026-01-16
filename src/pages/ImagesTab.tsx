@@ -1,7 +1,7 @@
 import type { Defect, SteelPlate, ImageOrientation } from "../types/app.types";
 import type { SurfaceImageInfo } from "../api/types";
 import { LargeImageViewer } from "../components/LargeImageViewer/LargeImageViewer";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import {
   buildOrientationLayout,
   pickSurfaceForTile,
@@ -13,6 +13,9 @@ import { getTileImageUrl } from "../api/client";
 import { env } from "../config/env";
 import { drawTileImage, tryDrawFallbackTile } from "../utils/tileFallback";
 import type { Tile } from "../components/LargeImageViewer/utils";
+
+// 实时更新导入
+import { useRealtimeUpdates } from "../hooks/useRealtimeUpdates";
 
 const tileImageCache = new Map<string, HTMLImageElement>();
 const tileImageLoading = new Set<string>();
@@ -33,6 +36,7 @@ interface ImagesTabProps {
   defectClasses?: { id: number; name: string; color?: string }[];
   onDefectHover?: (defect: Defect, position: { screenX: number; screenY: number }) => void;
   onDefectHoverEnd?: () => void;
+  onNewDataDetected?: (latestSeqNo: number) => void; // 新增：新数据检测回调
 }
 
 export function ImagesTab({
@@ -61,6 +65,78 @@ export function ImagesTab({
         : undefined,
     [selectedPlateId, steelPlates],
   );
+  
+  // 实时更新相关状态
+  const [realtimeEnabled, setRealtimeEnabled] = useState(env.isProduction());
+  const [autoScrollLatest, setAutoScrollLatest] = useState(true);
+  const [newDataNotification, setNewDataNotification] = useState<{
+    show: boolean;
+    seqNo: number;
+  }>({ show: false, seqNo: 0 });
+  
+  const viewerRef = useRef<any>(null);
+  const realtimeCheckTimerRef = useRef<number | null>(null);
+  
+  // 获取当前卷的总瓦片数
+  const getTileCountForLevel = useCallback((
+    level: number,
+    imageInfo: any
+  ): number => {
+    if (!imageInfo || !selectedPlate) return 0;
+    
+    const imageHeight = Math.max(
+      imageInfo[0]?.image_height ?? 0,
+      imageInfo[1]?.image_height ?? 0,
+    1024,
+    512,
+    defaultTileSize,
+    );
+    
+    const tileWidth = defaultTileSize;
+    const tileHeight = defaultTileSize;
+    
+    // 计算总瓦片数
+    const worldWidth = selectedPlate.dimensions.width;
+    const worldHeight = imageHeight;
+    const tilesX = Math.ceil(worldWidth / tileWidth);
+    const tilesY = Math.ceil(worldHeight / tileHeight);
+    const totalTiles = tilesX * tilesY * Math.pow(4, level);
+    
+    return totalTiles;
+  }, [selectedPlate, defaultTileSize]);
+  
+  // 实时更新Hook
+  const {
+    isUpdating,
+    hasNewData,
+    manualCheck,
+    toggleRealtimeUpdates,
+    selectLatestVolume,
+    scrollToLastTile,
+    alignTilesAtLevel,
+  } = useRealtimeUpdates({
+    enabled: realtimeEnabled,
+    updateInterval: 5000,
+    autoSelectLatest: true,
+    autoScrollToEnd: autoScrollLatest,
+    onNewDataDetected: (latestSeqNo: number, tileCount: number) => {
+      setNewDataNotification({ show: true, seqNo: latestSeqNo });
+      console.log(`🚀 检测到新数据: 序号 ${latestSeqNo}, 瓦片数 ${tileCount}`);
+      
+      // 如果当前选择的不是最新卷，自动选择最新卷
+      if (selectedPlate) {
+        const currentSeqNo = parseInt(selectedPlate.serialNumber, 10);
+        if (currentSeqNo < latestSeqNo) {
+          console.log(`🎯 自动选择最新卷: ${currentSeqNo} → ${latestSeqNo}`);
+          // 这里需要触发父组件的选择变更
+          // 由于ImagesTab没有setSelectedPlateId的权限，需要通过回调实现
+          if (onNewDataDetected) {
+            onNewDataDetected(latestSeqNo);
+          }
+        }
+      }
+    },
+  });
   const plateWidth = selectedPlate?.dimensions.width ?? 0;
   const plateLength = selectedPlate?.dimensions.length ?? 0;
   const distLeft = hoveredDefect ? Math.round(hoveredDefect.x) : null;
@@ -94,6 +170,22 @@ export function ImagesTab({
           <span className="text-[11px] font-mono">--</span>
         )}
         <span className="font-mono">当前瓦片等级: L{activeTileLevel}</span>
+        {realtimeEnabled && hasNewData && newDataNotification.show && (
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 border border-blue-500/30 rounded-sm animate-pulse">
+            <span className="text-[11px] font-medium text-blue-600">
+              🚀 检测到新卷 #{newDataNotification.seqNo}
+            </span>
+            <button
+              onClick={() => {
+                setNewDataNotification({ show: false, seqNo: 0 });
+                onNewDataDetected?.(newDataNotification.seqNo);
+              }}
+              className="text-xs px-2 py-0.5 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+            >
+              选择最新卷
+            </button>
+          </div>
+        )}
       </div>
       <div className="flex-1 min-h-0 bg-card border border-border relative">
         {(() => {
@@ -429,8 +521,33 @@ export function ImagesTab({
               }}
             />
           );
-        })()}
+         })()}
       </div>
+      
+      {/* 实时更新初始化 */}
+      {useEffect(() => {
+        if (env.isProduction() && realtimeEnabled) {
+          console.log("🚀 启动实时更新功能");
+          
+          // 启动实时更新
+          const startUpdates = () => {
+            realtimeCheckTimerRef.current = window.setInterval(async () => {
+              await manualCheck();
+            }, 5000);
+            console.log("✅ 实时更新已启动");
+          };
+          
+          startUpdates();
+          
+          // 清理函数
+          return () => {
+            if (realtimeCheckTimerRef.current) {
+              clearInterval(realtimeCheckTimerRef.current);
+              console.log("🛑 实时更新已停止");
+            }
+          };
+        }
+      }, [realtimeEnabled, manualCheck])}
     </div>
   );
 }
