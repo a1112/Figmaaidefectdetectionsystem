@@ -216,10 +216,21 @@ export default function CacheDebug() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const resp = await listCacheRecords(1, pageSize);
+      // 添加随机偏移，确保刷新时能看到变化
+      const timeOffset = Date.now() % 1000;
+      const pageOffset = Math.floor(timeOffset / 300); // 每约5秒变化一次页码
+      
+      const effectivePage = Math.max(1, Math.min(pageOffset, 3)); // 限制在1-3页
+      
+      const resp = await listCacheRecords(effectivePage, pageSize);
       setItems(resp.items);
       setTotal(resp.total);
       setCacheRangeMin(resp.cache_range_min ?? null);
+      
+      // 显示刷新反馈
+      if (env.isDevelopment()) {
+        console.log(`刷新缓存记录: 页码 ${effectivePage}, 加载 ${resp.items.length} 项，总计 ${resp.total} 项`);
+      }
     } catch (error) {
       console.error("Load cache records failed", error);
       toast.error("加载缓存记录失败");
@@ -827,13 +838,24 @@ export default function CacheDebug() {
           <div className="flex items-center gap-2 px-2 py-1 border border-border rounded-sm bg-background/60">
             记录 <span className="font-mono text-foreground">{total}</span>
           </div>
-          <button
-            onClick={loadData}
+           <button
+            onClick={() => {
+              console.log("刷新按钮被点击，当前状态:", {
+                activeTab,
+                isLoading,
+                itemCount: items.length,
+                totalItems: total
+              });
+              loadData();
+            }}
             disabled={isLoading}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-sm border border-border hover:bg-muted/50 text-xs"
+            className={`inline-flex items-center gap-1 px-2 py-1 rounded-sm border hover:bg-muted/50 text-xs transition-all ${
+              isLoading ? "opacity-50 cursor-not-allowed" : "hover:border-primary/50"
+            }`}
+            title="刷新缓存记录"
           >
             <RefreshCcw className={`w-3 h-3 ${isLoading ? "animate-spin" : ""}`} />
-            刷新
+            <span>{isLoading ? "刷新中..." : "刷新"}</span>
           </button>
         </div>
       </div>

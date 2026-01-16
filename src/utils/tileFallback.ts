@@ -72,6 +72,7 @@ export function tryDrawFallbackTile(params: {
   tileSize: number;
   maxLevel: number;
   imageScale?: number;
+  useTransparentBackground?: boolean;
 }): boolean {
   const {
     ctx,
@@ -86,6 +87,7 @@ export function tryDrawFallbackTile(params: {
     tileSize,
     maxLevel,
     imageScale,
+    useTransparentBackground = true,
   } = params;
 
   const scaleSuffix =
@@ -110,13 +112,27 @@ export function tryDrawFallbackTile(params: {
     const srcW = Math.max(1, Math.min(subW, imgW - offsetX));
     const srcH = Math.max(1, Math.min(subH, imgH - offsetY));
 
-    drawTileImage({
-      ctx,
-      img,
-      tile,
-      orientation,
-      source: { x: offsetX, y: offsetY, width: srcW, height: srcH },
-    });
+    // 在非测试模式下，使用透明背景避免闪烁
+    if (useTransparentBackground) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'destination-over';
+      drawTileImage({
+        ctx,
+        img,
+        tile,
+        orientation,
+        source: { x: offsetX, y: offsetY, width: srcW, height: srcH },
+      });
+      ctx.restore();
+    } else {
+      drawTileImage({
+        ctx,
+        img,
+        tile,
+        orientation,
+        source: { x: offsetX, y: offsetY, width: srcW, height: srcH },
+      });
+    }
     return true;
   }
 

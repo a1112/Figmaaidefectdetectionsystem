@@ -14,6 +14,8 @@ import {
   DialogTitle,
 } from '../ui/dialog';
 import { clamp, getVisibleTiles, Size, Point, Tile } from './utils';
+import { globalPreheatManager } from '../../utils/tilePreheatManager';
+import type { Surface } from '../../api/types';
 
 type AnnotationSurface = "top" | "bottom";
 
@@ -206,6 +208,10 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
   const transform = useRef({ x: 0, y: 0, scale: 1 });
   const isDragging = useRef(false);
   const lastMousePosition = useRef<Point>({ x: 0, y: 0 });
+  
+  // 瓦片预热相关状态
+  const lastPreheatTime = useRef(0);
+  const preheatThrottle = 300; // 300ms节流
   const zoomAnimRef = useRef<number | null>(null);
   const drawingRef = useRef<{
     mode: "measure" | "mark";
@@ -222,6 +228,59 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
   
   // Container size state
   const [containerSize, setContainerSize] = useState<Size>({ width: 0, height: 0 });
+
+  // 瓦片预热函数
+  const triggerTilePreheat = useCallback((
+    tiles: Tile[],
+    scale: number,
+    visibleRect: { x: number; y: number; width: number; height: number }
+  ) => {
+    const now = Date.now();
+    if (now - lastPreheatTime.current < preheatThrottle) {
+      return;
+    }
+    lastPreheatTime.current = now;
+
+    // 记录用户行为
+    const actionType = isDragging.current ? 'drag' : 'idle';
+    globalPreheatManager.recordUserAction({
+      type: actionType,
+      viewport: {
+        x: visibleRect.x,
+        y: visibleRect.y,
+        width: visibleRect.width,
+        height: visibleRect.height,
+        scale: scale,
+      },
+      timestamp: now,
+    });
+
+    // 异步触发瓦片预热
+    setTimeout(() => {
+      // 转换瓦片格式
+      const tileInfos = tiles.map(tile => ({
+        level: tile.level,
+        tileX: tile.col,
+        tileY: tile.row,
+        tileSize: tileSize,
+      }));
+
+      // 获取surface和seqNo信息（从annotationContext推断）
+      const surface = annotationContext?.lineKey?.includes('top') ? 'top' : 'bottom';
+      const seqNo = annotationContext?.seqNo || 0;
+
+      if (seqNo > 0) {
+        globalPreheatManager.preheatFromVisibleTiles({
+          surface: surface as Surface,
+          seqNo: seqNo,
+          visibleTiles: tileInfos,
+          view: annotationContext?.view,
+        }).catch(error => {
+          console.warn('Tile preheat failed:', error);
+        });
+      }
+    }, 100); // 延迟100ms执行，避免影响渲染
+  }, [annotationContext, tileSize, preheatThrottle, globalPreheatManager]);
   const [drawMode, setDrawMode] = useState<"none" | "view" | "measure" | "mark">("none");
   const [showScrollbars, setShowScrollbars] = useState(false);
   const [showMeasureData, setShowMeasureData] = useState(true);
@@ -692,6 +751,9 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
         ctx.restore();
       }
     });
+
+    // 瓦片预热逻辑
+    triggerTilePreheat && triggerTilePreheat(tiles, scale, visibleRect);
 
     // 在所有瓦片绘制完成后，绘制覆盖层（如表面边框）
     if (renderOverlay) {

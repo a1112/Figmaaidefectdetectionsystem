@@ -454,6 +454,133 @@ export function getTileImageUrl(params: {
 }
 
 /**
+ * 瓦片预热API - 预热瓦片到后端缓存但不返回图像数据
+ */
+export async function preheatTiles(params: {
+  surface: Surface;
+  seqNo: number;
+  tiles: Array<{
+    level: number;
+    tileX: number;
+    tileY: number;
+    tileSize?: number;
+  }>;
+  view?: string;
+  priority?: 'low' | 'normal' | 'high';
+}): Promise<{ success: boolean; preheated: number; message: string }> {
+  const { surface, seqNo, tiles, view, priority = 'normal' } = params;
+  
+  const baseUrl = env.getApiBaseUrl();
+  const response = await fetch(`${baseUrl}/images/tile/preheat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      surface,
+      seq_no: seqNo,
+      tiles,
+      view,
+      priority,
+    }),
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Tile preheat failed: ${response.statusText}`);
+  }
+  
+  return response.json();
+}
+
+/**
+ * 批量预热相邻瓦片 - 基于当前可见瓦片
+ */
+export async function preheatAdjacentTiles(params: {
+  surface: Surface;
+  seqNo: number;
+  currentTiles: Array<{
+    level: number;
+    tileX: number;
+    tileY: number;
+    tileSize?: number;
+  }>;
+  view?: string;
+  radius?: number; // 预热半径（瓦片数量）
+  includeCrossLevel?: boolean; // 是否包含跨级别预热
+}): Promise<{ success: boolean; preheated: number; message: string }> {
+  const { 
+    surface, 
+    seqNo, 
+    currentTiles, 
+    view, 
+    radius = 2, 
+    includeCrossLevel = true 
+  } = params;
+  
+  const tilesToPreheat: Array<{
+    level: number;
+    tileX: number;
+    tileY: number;
+    tileSize?: number;
+  }> = [];
+  
+  // 为每个当前瓦片添加相邻瓦片
+  for (const tile of currentTiles) {
+    const { level, tileX, tileY, tileSize } = tile;
+    
+    // 添加同级别的相邻瓦片
+    for (let dx = -radius; dx <= radius; dx++) {
+      for (let dy = -radius; dy <= radius; dy++) {
+        // 跳过当前瓦片本身
+        if (dx === 0 && dy === 0) continue;
+        
+        tilesToPreheat.push({
+          level,
+          tileX: tileX + dx,
+          tileY: tileY + dy,
+          tileSize,
+        });
+      }
+    }
+    
+    // 跨级别预热
+    if (includeCrossLevel) {
+      // 上级别和下级别的对应瓦片
+      for (const adjLevel of [level - 1, level + 1]) {
+        if (adjLevel >= 0) {
+          // 跨级别时的坐标调整
+          const factor = Math.pow(2, adjLevel - level);
+          tilesToPreheat.push({
+            level: adjLevel,
+            tileX: Math.floor(tileX * factor),
+            tileY: Math.floor(tileY * factor),
+            tileSize,
+          });
+        }
+      }
+    }
+  }
+  
+  // 去重
+  const uniqueTiles = Array.from(
+    new Map(
+      tilesToPreheat.map(tile => [
+        `${tile.level}-${tile.tileX}-${tile.tileY}`,
+        tile
+      ])
+    ).values()
+  );
+  
+  return preheatTiles({
+    surface,
+    seqNo,
+    tiles: uniqueTiles,
+    view,
+    priority: 'normal',
+  });
+}
+
+/**
  * 获取全局 Meta 信息（缺陷字典 + 瓦片配置等）
  * 用于页面刷新时一次性加载全局配置，避免单独再调 defect-classes。
  */

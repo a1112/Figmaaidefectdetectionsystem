@@ -299,6 +299,7 @@ export function ImagesTab({
                 tileSize: tileSizeArg,
                 maxLevel: maxTileLevel,
                 imageScale,
+                useTransparentBackground: true,
               });
               if (!tileImageLoading.has(cacheKey)) {
                 tileImageLoading.add(cacheKey);

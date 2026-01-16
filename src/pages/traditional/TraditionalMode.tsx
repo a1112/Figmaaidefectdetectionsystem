@@ -57,6 +57,7 @@ import { PlateHoverTooltip } from "../../components/PlateHoverTooltip";
 import { useGlobalUiSettings } from "../../hooks/useGlobalUiSettings";
 import type { Tile } from "../../components/LargeImageViewer/utils";
 import { drawTileImage, tryDrawFallbackTile } from "../../utils/tileFallback";
+import { globalPreheatManager } from "../../utils/tilePreheatManager";
 import {
   buildOrientationLayout,
   pickSurfaceForTile,
@@ -1308,6 +1309,23 @@ export default function TraditionalMode() {
         const imageScale = env.getImageScale();
         const cacheKey = `${analysisOrientation}-${surfaceLayout.surface}-${analysisSeqNo}-${tile.level}-${requestInfo.tileX}-${requestInfo.tileY}-${tileSizeArg}-s${imageScale}`;
         const cached = analysisTileImageCache.get(cacheKey);
+        
+        // 触发瓦片预热（如果缓存未命中）
+        if (!cached && analysisSeqNo > 0) {
+          globalPreheatManager.preheatFromVisibleTiles({
+            surface: surfaceLayout.surface,
+            seqNo: analysisSeqNo,
+            visibleTiles: [{
+              level: tile.level,
+              tileX: requestInfo.tileX,
+              tileY: requestInfo.tileY,
+              tileSize: tileSizeArg,
+            }],
+            view: analysisOrientation,
+          }).catch(error => {
+            // 静默失败，不影响主渲染流程
+          });
+        }
         const url = getTileImageUrl({
           surface: surfaceLayout.surface,
           seqNo: analysisSeqNo,
@@ -1338,6 +1356,7 @@ export default function TraditionalMode() {
             tileSize: tileSizeArg,
             maxLevel,
             imageScale,
+            useTransparentBackground: true,
           });
           if (!analysisTileImageLoading.has(cacheKey)) {
             analysisTileImageLoading.add(cacheKey);
@@ -2192,6 +2211,19 @@ export default function TraditionalMode() {
   const handleTopTransformChange = useCallback(
     (info: { x: number; y: number; scale: number }) => {
       topScaleRef.current = info.scale;
+      
+      // 记录用户行为用于预热预测
+      globalPreheatManager.recordUserAction({
+        type: 'zoom', // 缩放变化
+        viewport: {
+          x: info.x,
+          y: info.y,
+          width: 800, // 估算值
+          height: 600,
+          scale: info.scale,
+        },
+        timestamp: Date.now(),
+      });
     },
     [],
   );
@@ -2229,6 +2261,19 @@ export default function TraditionalMode() {
   const handleBottomTransformChange = useCallback(
     (info: { x: number; y: number; scale: number }) => {
       bottomScaleRef.current = info.scale;
+      
+      // 记录用户行为用于预热预测
+      globalPreheatManager.recordUserAction({
+        type: 'zoom',
+        viewport: {
+          x: info.x,
+          y: info.y,
+          width: 800,
+          height: 600,
+          scale: info.scale,
+        },
+        timestamp: Date.now(),
+      });
     },
     [],
   );
@@ -2313,6 +2358,7 @@ export default function TraditionalMode() {
         tileSize: tileSizeArg,
         maxLevel: mapMaxLevel,
         imageScale,
+        useTransparentBackground: true,
       });
 
       if (!mapTileImageLoading.has(cacheKey)) {

@@ -57,40 +57,57 @@ export type CacheSettingsResponse = {
   disk_cache: Record<string, any>;
 };
 
-const mockItems: CacheRecordItem[] = Array.from({ length: 12 }).map((_, idx) => {
-  const seq = 1200 - idx;
-  const status = idx % 3 === 0 ? "complete" : idx % 3 === 1 ? "partial" : "none";
-  return {
-    seq_no: seq,
-    steel_no: `S-${seq}`,
-    detect_time: new Date(Date.now() - idx * 3600_000).toISOString(),
-    status,
-    surfaces: [
-      {
-        surface: "top",
-        view: "2D",
-        cached: status !== "none",
-        tile_max_level: status === "none" ? null : 4,
-        tile_size: 1024,
-        defect_expand: 100,
-        defect_cache_enabled: true,
-        disk_cache_enabled: true,
-        updated_at: status === "none" ? null : new Date().toISOString(),
-      },
-      {
-        surface: "bottom",
-        view: "2D",
-        cached: status === "complete",
-        tile_max_level: status === "complete" ? 4 : null,
-        tile_size: 1024,
-        defect_expand: 100,
-        defect_cache_enabled: true,
-        disk_cache_enabled: true,
-        updated_at: status === "complete" ? new Date().toISOString() : null,
-      },
-    ],
+  // 使用缓存的mock数据以保持开发模式下的数据一致性
+  const mockCache = new Map<string, CacheRecordItem[]>();
+  
+  const getMockItems = (page: number, pageSize: number): CacheRecordItem[] => {
+    const cacheKey = `page_${page}_size_${pageSize}`;
+    
+    // 如果缓存中没有，生成新数据
+    if (!mockCache.has(cacheKey)) {
+      const newItems = Array.from({ length: Math.min(12, page * pageSize) }).map((_, idx) => {
+        const globalIdx = (page - 1) * pageSize + idx;
+        const seq = 1200 - globalIdx;
+        const status = idx % 4 === 0 ? "complete" : idx % 4 === 1 ? "partial" : "none";
+        
+        return {
+          seq_no: seq,
+          steel_no: `S-${seq}`,
+          detect_time: new Date(Date.now() - globalIdx * 3600_000).toISOString(),
+          status,
+          surfaces: [
+            {
+              surface: "top",
+              view: "2D",
+              cached: status !== "none",
+              tile_max_level: status !== "none" ? 4 : null,
+              tile_size: 1024,
+              defect_expand: 100,
+              defect_cache_enabled: true,
+              disk_cache_enabled: true,
+              updated_at: status !== "none" ? new Date().toISOString() : null,
+            },
+            {
+              surface: "bottom",
+              view: "2D",
+              cached: status === "complete",
+              tile_max_level: status === "complete" ? 4 : null,
+              tile_size: 1024,
+              defect_expand: 100,
+              defect_cache_enabled: true,
+              disk_cache_enabled: true,
+              updated_at: status === "complete" ? new Date().toISOString() : null,
+            },
+          ],
+        };
+      });
+      
+      mockCache.set(cacheKey, newItems);
+      console.log(`生成新的mock数据: 页码${page}, 每页${pageSize}项, 共${newItems.length}项`);
+    }
+    
+    return mockCache.get(cacheKey)!;
   };
-});
 
 const buildApiUrl = (path: string): string => {
   const base = env.getApiBaseUrl();
@@ -102,17 +119,16 @@ export async function listCacheRecords(
   pageSize: number,
 ): Promise<CacheRecordsResponse> {
   if (env.isDevelopment()) {
-    const start = (page - 1) * pageSize;
-    const items = mockItems.slice(start, start + pageSize);
-    return {
-      items,
-      total: mockItems.length,
-      max_seq: mockItems[0]?.seq_no ?? null,
-      cache_range_min: mockItems[0]?.seq_no ? mockItems[0].seq_no - 200 + 1 : null,
-      expected_tile_max_level: 4,
-      expected_defect_expand: 100,
-    };
-  }
+     const items = getMockItems(page, pageSize);
+     return {
+       items,
+       total: items.length,
+       max_seq: items[0]?.seq_no ?? null,
+       cache_range_min: items[0]?.seq_no ? items[0].seq_no - 200 + 1 : null,
+       expected_tile_max_level: 4,
+       expected_defect_expand: 100,
+     };
+   }
   const url = `${buildApiUrl("/cache/records")}?page=${page}&page_size=${pageSize}`;
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) {
