@@ -1075,11 +1075,6 @@ export async function getCacheConfig(): Promise<CacheConfig> {
           frame_height: 1024,
           pixel_scale: 1.0,
         },
-        small: {
-          frame_width: 8192,
-          frame_height: 512,
-          pixel_scale: 0.5,
-        },
       },
       lines: [
         {
@@ -1108,26 +1103,6 @@ export async function getCacheConfig(): Promise<CacheConfig> {
                 frame_width: 16384,
                 frame_height: 1024,
                 pixel_scale: 1.0,
-              },
-            },
-            {
-              view: "small",
-              memory_cache: {
-                max_frames: -1,
-                max_tiles: -1,
-                max_mosaics: 8,
-                max_defect_crops: 256,
-                ttl_seconds: 300,
-              },
-              disk_cache: {
-                disk_cache_enabled: true,
-                defect_cache_enabled: true,
-                defect_cache_expand: 100,
-              },
-              images: {
-                frame_width: 8192,
-                frame_height: 512,
-                pixel_scale: 0.5,
               },
             },
           ],

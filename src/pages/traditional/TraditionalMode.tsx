@@ -346,7 +346,7 @@ export default function TraditionalMode() {
     let mounted = true;
     const loadSimple = async () => {
       try {
-        const kind = env.getApiProfile() === "small" ? "small" : "2D";
+        const kind = "2D";
         const status = await getConfigStatusSimple(currentLineKey || env.getLineName(), kind);
         if (mounted) setSimpleStatus(status);
       } catch {
@@ -1305,7 +1305,8 @@ export default function TraditionalMode() {
           ctx.fillRect(tile.x, tile.y, tile.width, tile.height);
           return;
         }
-        const cacheKey = `${analysisOrientation}-${surfaceLayout.surface}-${analysisSeqNo}-${tile.level}-${requestInfo.tileX}-${requestInfo.tileY}-${tileSizeArg}`;
+        const imageScale = env.getImageScale();
+        const cacheKey = `${analysisOrientation}-${surfaceLayout.surface}-${analysisSeqNo}-${tile.level}-${requestInfo.tileX}-${requestInfo.tileY}-${tileSizeArg}-s${imageScale}`;
         const cached = analysisTileImageCache.get(cacheKey);
         const url = getTileImageUrl({
           surface: surfaceLayout.surface,
@@ -1336,6 +1337,7 @@ export default function TraditionalMode() {
             tileY: requestInfo.tileY,
             tileSize: tileSizeArg,
             maxLevel,
+            imageScale,
           });
           if (!analysisTileImageLoading.has(cacheKey)) {
             analysisTileImageLoading.add(cacheKey);
@@ -2267,7 +2269,8 @@ export default function TraditionalMode() {
         return;
       }
 
-      const cacheKey = `vertical-${mapSurface}-${mapSeqNo}-${tile.level}-${tile.col}-${tile.row}-${tileSizeArg}`;
+      const imageScale = env.getImageScale();
+      const cacheKey = `vertical-${mapSurface}-${mapSeqNo}-${tile.level}-${tile.col}-${tile.row}-${tileSizeArg}-s${imageScale}`;
       const cached = mapTileImageCache.get(cacheKey);
       const url = getTileImageUrl({
         surface: mapSurface,
@@ -2309,6 +2312,7 @@ export default function TraditionalMode() {
         tileY: tile.row,
         tileSize: tileSizeArg,
         maxLevel: mapMaxLevel,
+        imageScale,
       });
 
       if (!mapTileImageLoading.has(cacheKey)) {

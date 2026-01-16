@@ -371,7 +371,7 @@ export async function mockGetApiList(): Promise<ApiNode[]> {
       key: "mock-line-b",
       name: "模拟产线 B",
       mode: "mock",
-      profile: "small",
+      profile: "default",
       ip: "127.0.0.1",
       port: 8121,
       online: true,

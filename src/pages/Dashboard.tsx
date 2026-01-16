@@ -407,13 +407,11 @@ export function Dashboard() {
     const bootstrap = async () => {
       const storedMode =
         window.localStorage.getItem("app_mode");
-      const storedProfile =
-        window.localStorage.getItem("api_profile");
       const storedOrientation = window.localStorage.getItem(
         "image_orientation",
       );
 
-      if (storedMode || storedProfile) {
+      if (storedMode) {
         if (!cancelled) setStartupReady(true);
         return;
       }
@@ -445,7 +443,6 @@ export function Dashboard() {
 
           if (isHealthy) {
             env.setMode("production");
-            env.setApiProfile("small");
             if (!storedOrientation) {
               handleImageOrientationChange("vertical");
             }

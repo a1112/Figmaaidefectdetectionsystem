@@ -217,7 +217,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
     let mounted = true;
     const loadSimple = async () => {
       try {
-        const kind = env.getApiProfile() === "small" ? "small" : "2D";
+        const kind = "2D";
         const status = await getConfigStatusSimple(lineKey || env.getLineName(), kind);
         if (!mounted) return;
         setSimpleStatus(status);

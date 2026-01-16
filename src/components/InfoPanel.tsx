@@ -58,7 +58,7 @@ export function InfoPanel({
   const resolveServerUrl = () => {
     const apiBaseUrl = env.getApiBaseUrl();
     if (apiBaseUrl && /^https?:\/\//.test(apiBaseUrl)) {
-      return apiBaseUrl.replace(/\/(api|small--api).*/, "");
+      return apiBaseUrl.replace(/\/api.*/, "");
     }
     const configBaseUrl = env.getConfigBaseUrl();
     if (configBaseUrl) {
@@ -73,7 +73,7 @@ export function InfoPanel({
   const serverUrl = resolveServerUrl();
   const basePath = resolveBasePath();
   const healthUrl = `${serverUrl.replace(/\/+$/, "")}${basePath}/health`;
-  const apiView = env.getApiProfile() === "small" ? "small" : "2D";
+  const imageScale = env.getImageScale();
 
   useEffect(() => {
     let active = true;
@@ -196,7 +196,7 @@ export function InfoPanel({
             </div>
             <div className="flex justify-between gap-3">
               <span className={colors.label}>视图</span>
-              <span className="font-mono">{displayValue(apiView)}</span>
+              <span className="font-mono">{Math.round(imageScale * 100)}%</span>
             </div>
             <div className="flex justify-between gap-3">
               <span className={colors.label}>健康地址</span>

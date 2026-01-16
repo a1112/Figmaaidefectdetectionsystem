@@ -72,11 +72,6 @@ export default defineConfig({
                 changeOrigin: true,
                 secure: false,
             },
-            '/small--api': {
-                target: 'http://localhost:80',
-                changeOrigin: true,
-                secure: false,
-            },
         },
     },
 });

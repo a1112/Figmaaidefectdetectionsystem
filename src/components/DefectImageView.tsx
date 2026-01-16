@@ -234,6 +234,7 @@ export function DefectImageView({
       h: Math.ceil(selectedDefect.height + padding * 2).toString(),
       fmt: "JPEG",
     });
+    params.set("scale", env.getImageScale().toString());
     const url = `${baseUrl}/images/crop?${params.toString()}`;
     setIsLoadingImage(true);
     setImageError(null);
@@ -270,7 +271,8 @@ export function DefectImageView({
         return;
       }
 
-      const cacheKey = `${imageOrientation}-${surfaceLayout.surface}-${seqNo}-${tile.level}-${requestInfo.tileX}-${requestInfo.tileY}-${tileSizeArg}`;
+      const imageScale = env.getImageScale();
+      const cacheKey = `${imageOrientation}-${surfaceLayout.surface}-${seqNo}-${tile.level}-${requestInfo.tileX}-${requestInfo.tileY}-${tileSizeArg}-s${imageScale}`;
       const cached = tileImageCache.get(cacheKey);
       const url = getTileImageUrl({
         surface: surfaceLayout.surface,
@@ -302,6 +304,7 @@ export function DefectImageView({
           tileY: requestInfo.tileY,
           tileSize: tileSizeArg,
           maxLevel: maxTileLevel,
+          imageScale,
         });
         if (!tileImageLoading.has(cacheKey)) {
           tileImageLoading.add(cacheKey);

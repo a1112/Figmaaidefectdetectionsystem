@@ -279,7 +279,13 @@ export async function getFrameImage(
 
   // 生产模式：返回真实 API 图像 URL
   const baseUrl = env.getApiBaseUrl();
-  return `${baseUrl}/images/frame?surface=${surface}&seq_no=${seqNo}&image_index=${imageIndex}`;
+  const search = new URLSearchParams({
+    surface,
+    seq_no: seqNo.toString(),
+    image_index: imageIndex.toString(),
+    scale: env.getImageScale().toString(),
+  });
+  return `${baseUrl}/images/frame?${search.toString()}`;
 }
 
 /**
@@ -327,6 +333,7 @@ export function getDefectImageUrl(params: {
   if (fmt) {
     search.set("fmt", fmt);
   }
+  search.set("scale", env.getImageScale().toString());
 
   search.set("defect_id", String(defectId));
   return `${baseUrl}/images/crop?${search.toString()}`;
@@ -434,6 +441,7 @@ export function getTileImageUrl(params: {
   if (typeof tileSize === "number") {
     search.set("tile_size", tileSize.toString());
   }
+  search.set("scale", env.getImageScale().toString());
   if (prefetch?.mode === "defect") {
     search.set("prefetch", "defect");
     search.set("prefetch_x", Math.round(prefetch.x).toString());

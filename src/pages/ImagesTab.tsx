@@ -10,6 +10,7 @@ import {
   type SurfaceLayout,
 } from "../utils/imageOrientation";
 import { getTileImageUrl } from "../api/client";
+import { env } from "../config/env";
 import { drawTileImage, tryDrawFallbackTile } from "../utils/tileFallback";
 import type { Tile } from "../components/LargeImageViewer/utils";
 
@@ -265,7 +266,8 @@ export function ImagesTab({
               ctx.fillRect(tile.x, tile.y, tile.width, tile.height);
               return;
             }
-            const cacheKey = `${imageOrientation}-${surfaceLayout.surface}-${seqNo}-${tile.level}-${requestInfo.tileX}-${requestInfo.tileY}-${tileSizeArg}`;
+            const imageScale = env.getImageScale();
+            const cacheKey = `${imageOrientation}-${surfaceLayout.surface}-${seqNo}-${tile.level}-${requestInfo.tileX}-${requestInfo.tileY}-${tileSizeArg}-s${imageScale}`;
             const cached = tileImageCache.get(cacheKey);
             const url = getTileImageUrl({
               surface: surfaceLayout.surface,
@@ -296,6 +298,7 @@ export function ImagesTab({
                 tileY: requestInfo.tileY,
                 tileSize: tileSizeArg,
                 maxLevel: maxTileLevel,
+                imageScale,
               });
               if (!tileImageLoading.has(cacheKey)) {
                 tileImageLoading.add(cacheKey);

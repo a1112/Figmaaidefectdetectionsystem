@@ -6,11 +6,13 @@ import { isDesktopRuntime, isFileRuntime } from "../utils/runtime";
  */
 
 export type AppMode = "development" | "production" | "cors";
-export type ApiProfile = "default" | "small";
+export type ImageScale = 0.25 | 0.5 | 0.75 | 1;
 const LINE_COOKIE = "line_name";
 const DEFAULT_CORS_BASE_URL = "http://9qwygl8e.zjz-service.cn:80";
 const DEFAULT_LOCAL_BASE_URL = "http://127.0.0.1:80";
 const PRODUCTION_BASE_URL_KEY = "production_base_url";
+const IMAGE_SCALE_KEY = "image_scale";
+const DEFAULT_IMAGE_SCALE: ImageScale = 1;
 
 // 从 localStorage 读取用户偏好，默认为开发模式
 const getInitialMode = (): AppMode => {
@@ -20,10 +22,18 @@ const getInitialMode = (): AppMode => {
     : "development";
 };
 
-// 从 localStorage 读取 API Profile（标准 / small），默认为 default
-const getInitialApiProfile = (): ApiProfile => {
-  const stored = localStorage.getItem("api_profile");
-  return stored === "small" ? "small" : "default";
+// 从 localStorage 读取 image scale（标准 ），默认为 default
+const normalizeImageScale = (value: unknown): ImageScale => {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (parsed === 0.25 || parsed === 0.5 || parsed === 0.75 || parsed === 1) {
+    return parsed;
+  }
+  return DEFAULT_IMAGE_SCALE;
+};
+
+const getInitialImageScale = (): ImageScale => {
+  const stored = localStorage.getItem(IMAGE_SCALE_KEY);
+  return normalizeImageScale(stored);
 };
 
 const getInitialCorsBaseUrl = (): string => {
@@ -64,17 +74,17 @@ const getInitialLineName = (): string => {
 
 class EnvironmentConfig {
   private mode: AppMode;
-  private apiProfile: ApiProfile;
   private lineName: string;
   private corsBaseUrl: string;
   private productionBaseUrl: string;
+  private imageScale: ImageScale;
 
   constructor() {
     this.mode = getInitialMode();
-    this.apiProfile = getInitialApiProfile();
     this.lineName = getInitialLineName();
     this.corsBaseUrl = getInitialCorsBaseUrl();
     this.productionBaseUrl = getInitialProductionBaseUrl();
+    this.imageScale = getInitialImageScale();
   }
 
   private isDesktopShell(): boolean {
@@ -105,21 +115,19 @@ class EnvironmentConfig {
   }
 
   /**
-   * 获取当前 API Profile（标准 / small 实例）
+   * 获取当前 image scale（标准  实例）
    */
-  getApiProfile(): ApiProfile {
-    return this.apiProfile;
+  getImageScale(): ImageScale {
+    return this.imageScale;
   }
 
-  /**
-   * 设置 API Profile（切换 standard / small 实例）
-   */
-  setApiProfile(profile: ApiProfile): void {
-    this.apiProfile = profile;
-    localStorage.setItem("api_profile", profile);
+  setImageScale(scale: number): void {
+    const normalized = normalizeImageScale(scale);
+    this.imageScale = normalized;
+    localStorage.setItem(IMAGE_SCALE_KEY, String(normalized));
     window.dispatchEvent(
-      new CustomEvent("api_profile_change", {
-        detail: profile,
+      new CustomEvent("image_scale_change", {
+        detail: normalized,
       }),
     );
   }
@@ -236,12 +244,8 @@ class EnvironmentConfig {
       return base;
     }
 
-    // 生产模式：根据产线与 apiProfile 选择标准实例或 small 实例
     // Windows + nginx 测试环境下：
-    // 前端统一走 /api/test 或 /small--api/test，
-    // 具体转发规则由 nginx 完成（rewrite 到后端 /api/* 或 /small--api/*）。
-    const basePath =
-      this.apiProfile === "small" ? "/small--api/test" : "/api/test";
+    const basePath = "/api/test";
     if (this.isDesktopShell()) {
       return `${this.getLocalBaseUrl()}${basePath}`;
     }

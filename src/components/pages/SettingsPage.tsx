@@ -2,8 +2,6 @@ import React, { useEffect, useState } from "react";
 import {
   Moon,
   Sun,
-  HardDrive,
-  Minimize2,
   Rows3,
   Columns3,
   Palette,
@@ -13,7 +11,7 @@ import type {
   ActiveTab,
   ImageOrientation,
 } from "../../types/app.types";
-import { env, type ApiProfile } from "../../config/env";
+import { env } from "../../config/env";
 import type { ApiNode } from "../../api/types";
 import { useTheme, themePresets } from "../ThemeContext";
 import { Button } from "../ui/button";
@@ -33,9 +31,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   lineName,
   onLineChange,
 }) => {
-  const [apiProfile, setApiProfile] = useState<ApiProfile>(
-    env.getApiProfile(),
-  );
+  const [imageScale, setImageScale] = useState(env.getImageScale());
   const [mode, setMode] = useState(env.getMode());
   const [corsBaseUrl, setCorsBaseUrl] = useState(env.getCorsBaseUrl());
   const { currentTheme, applyTheme, applyThemeById } = useTheme();
@@ -44,8 +40,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
   const activeNode =
     apiNodes.find((node) => node.key === lineName) ?? apiNodes[0];
-  const isFullAvailable = Boolean(activeNode?.port);
-  const isSmallAvailable = Boolean(activeNode?.small_port);
   
   useEffect(() => {
     const handleModeChange = (e: CustomEvent) => {
@@ -54,6 +48,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     const handleCorsBaseUrlChange = (e: CustomEvent) => {
       setCorsBaseUrl(e.detail || "");
     };
+    const handleImageScaleChange = (e: CustomEvent) => {
+      setImageScale(Number(e.detail));
+    };
     window.addEventListener(
       "app_mode_change",
       handleModeChange as EventListener,
@@ -61,6 +58,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     window.addEventListener(
       "cors_base_url_change",
       handleCorsBaseUrlChange as EventListener,
+    );
+    window.addEventListener(
+      "image_scale_change",
+      handleImageScaleChange as EventListener,
     );
     return () => {
       window.removeEventListener(
@@ -71,20 +72,17 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         "cors_base_url_change",
         handleCorsBaseUrlChange as EventListener,
       );
+      window.removeEventListener(
+        "image_scale_change",
+        handleImageScaleChange as EventListener,
+      );
     };
   }, []);
 
-  const handleApiProfileChange = (profile: ApiProfile) => {
-    if (profile === apiProfile) return;
-    env.setApiProfile(profile);
-    setApiProfile(profile);
-    if (
-      confirm(
-        "切换图像服务器模式后需要刷新页面，是否立即刷新？",
-      )
-    ) {
-      window.location.reload();
-    }
+  const handleImageScaleChange = (scale: number) => {
+    if (scale === imageScale) return;
+    env.setImageScale(scale);
+    setImageScale(scale);
   };
 
   return (
@@ -158,79 +156,31 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             </select>
           </div>
         )}
-
-        {/* 图像服务器模式：标准 / SMALL 实例（仅生产模式显示） */}
         {mode === "production" && (
           <div className="bg-card border border-border rounded-lg p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm font-medium">
-                  图像服务器 / 图像模式
-                </div>
+                <div className="text-sm font-medium">Image Scale</div>
                 <div className="text-xs text-muted-foreground mt-0.5">
-                  在标准 16K 2D 与 8K SMALL 图像服务实例之间切换
+                  Output scale for tile/defect/frame images
                 </div>
               </div>
             </div>
-
-            <div className="flex gap-2 mt-2">
-              <button
-                onClick={() =>
-                  handleApiProfileChange("default")
-                }
-                disabled={!isFullAvailable}
-                className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-xs rounded-lg border-2 transition-colors ${
-                  apiProfile === "default"
-                    ? "bg-primary/10 border-primary text-primary"
-                    : "bg-muted/30 border-border text-muted-foreground hover:border-primary/50"
-                } ${!isFullAvailable ? "pointer-events-none cursor-not-allowed opacity-50" : ""}`}
+            <div className="mt-2 flex items-center gap-3">
+              <select
+                className="w-full px-3 py-2 text-xs bg-background border border-border rounded-sm focus:outline-none focus:border-primary"
+                value={imageScale}
+                onChange={(event) => handleImageScaleChange(Number(event.target.value))}
               >
-                <div className="flex items-center gap-2">
-                  <HardDrive className="w-4 h-4" />
-                  <div className="text-left">
-                    <div className="text-xs font-semibold">
-                      完整模式
-                    </div>
-                    <div className="text-[10px] opacity-70">
-                      16K 数据 / 原始 2D
-                    </div>
-                  </div>
-                </div>
-              </button>
-              <button
-                onClick={() => handleApiProfileChange("small")}
-                disabled={!isSmallAvailable}
-                className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-xs rounded-lg border-2 transition-colors ${
-                  apiProfile === "small"
-                    ? "bg-primary/10 border-primary text-primary"
-                    : "bg-muted/30 border-border text-muted-foreground hover:border-primary/50"
-                } ${!isSmallAvailable ? "pointer-events-none cursor-not-allowed opacity-50" : ""}`}
-              >
-                <div className="flex items-center gap-2">
-                  <Minimize2 className="w-4 h-4" />
-                  <div className="text-left">
-                    <div className="text-xs font-semibold">
-                      精简模式
-                    </div>
-                    <div className="text-[10px] opacity-70">
-                      8K 数据 / 精简图像
-                    </div>
-                  </div>
-                </div>
-              </button>
-            </div>
-
-            <div className="text-[11px] text-muted-foreground/80 mt-1">
-              当前将通过
-              <span className="font-mono px-1">
-                {apiProfile === "small" ? "/small-api" : "/api"}
-              </span>
-              访问图像接口。切换后需要刷新页面以完全生效。
+                <option value={1}>100%</option>
+                <option value={0.75}>75%</option>
+                <option value={0.5}>50%</option>
+                <option value={0.25}>25%</option>
+              </select>
             </div>
           </div>
         )}
-
-        {/* 主题设置 */}
+        {/* Theme Settings */}
         <div className="bg-card border border-border rounded-lg p-4 space-y-3">
           <div className="flex items-center justify-between">
             <div>

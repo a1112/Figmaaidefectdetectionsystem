@@ -9,7 +9,7 @@ import {
 } from "../ui/dialog";
 import { Button } from "../ui/button";
 import type { ApiNode } from "../../api/types";
-import { Database, Gauge, Zap, LayoutGrid, Monitor } from "lucide-react";
+import { Database, Gauge, Zap, Monitor } from "lucide-react";
 import { getConfigSpeedTestUrl } from "../../api/admin";
 import { env } from "../../config/env";
 import { RotateCw } from "lucide-react";
@@ -40,7 +40,7 @@ export function DataSourceModal({
   const isTauri = isTauriRuntime();
   const isDesktop = isElectron || isTauri;
   const [selected, setSelected] = useState("");
-  const [apiProfile, setApiProfile] = useState<"small" | "large">(env.getApiProfile() === "small" ? "small" : "large");
+  const [imageScale, setImageScale] = useState<number>(env.getImageScale());
   const [appMode, setAppMode] = useState<"development" | "production">(env.getMode() === "development" ? "development" : "production");
   const [corsProxy, setCorsProxy] = useState<boolean>(env.getMode() === "cors");
   const [corsUrl, setCorsUrl] = useState(env.getCorsBaseUrl());
@@ -140,7 +140,7 @@ export function DataSourceModal({
 
   const handleConfirm = () => {
     if (selected) {
-      env.setApiProfile(apiProfile === "small" ? "small" : "default" as any);
+      env.setImageScale(imageScale);
       
       let finalMode: AppMode = appMode;
       if (corsProxy) {
@@ -259,8 +259,8 @@ export function DataSourceModal({
           )}/speed_test?${params.toString()}`;
         }
 
-        // 本地 / 生产：根据 API Profile 选择 /api 或 /small--api
-        const basePath = apiProfile === "small" ? "/small--api" : "/api";
+        // 本地 / 生产：统一走 /api
+        const basePath = "/api";
         const prefix = isFileProtocol ? `${env.getConfigBaseUrl()}${basePath}` : basePath;
         return `${prefix}/${encodeURIComponent(
           lineKey,
@@ -580,23 +580,12 @@ export function DataSourceModal({
                           </span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`rounded-full border px-1.5 py-0.5 text-[10px] ${
-                            node.small_port
-                              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600"
-                              : "border-red-500/30 bg-red-500/10 text-red-500"
-                          }`}
-                        >
-                          SMALL
-                        </span>
-                        <div
-                          className={`text-xs ${
-                            isOffline ? "text-red-500" : "text-muted-foreground"
-                          }`}
-                        >
-                          {node.ip ? node.ip : "-"}:{node.port ?? "-"}
-                        </div>
+                      <div
+                        className={`text-xs ${
+                          isOffline ? "text-red-500" : "text-muted-foreground"
+                        }`}
+                      >
+                        {node.ip ? node.ip : "-"}:{node.port ?? "-"}
                       </div>
                     </label>
                   );
@@ -604,45 +593,26 @@ export function DataSourceModal({
               </div>
             </div>
 
-            {/* API Mode Selection */}
+            {/* Image Scale Selection */}
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-sm font-bold text-muted-foreground uppercase tracking-wider">
                 <Zap className="w-4 h-4" />
-                API 模式控制
+                图像缩放
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => setApiProfile("small")}
-                  className={`flex flex-col items-start gap-1 p-3 rounded-lg border transition-all ${
-                    apiProfile === "small"
-                      ? "border-primary bg-primary/10 ring-1 ring-primary"
-                      : "border-border bg-muted/30 hover:bg-muted/50"
-                  }`}
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2">
+                <div className="text-[11px] text-muted-foreground">
+                  影响瓦片、缺陷小图与帧图像返回的分辨率
+                </div>
+                <select
+                  className="h-7 rounded-md border border-border bg-background px-2 text-[11px] font-mono"
+                  value={imageScale}
+                  onChange={(event) => setImageScale(Number(event.target.value))}
                 >
-                  <div className="flex items-center gap-2 font-bold text-sm">
-                    <LayoutGrid className="w-4 h-4" />
-                    精简模式 (Small)
-                  </div>
-                  <span className="text-[11px] text-muted-foreground text-left leading-tight">
-                    仅加载核心字段，响应极快，适合网络较差或大规模概览。
-                  </span>
-                </button>
-                <button
-                  onClick={() => setApiProfile("large")}
-                  className={`flex flex-col items-start gap-1 p-3 rounded-lg border transition-all ${
-                    apiProfile === "large"
-                      ? "border-primary bg-primary/10 ring-1 ring-primary"
-                      : "border-border bg-muted/30 hover:bg-muted/50"
-                  }`}
-                >
-                  <div className="flex items-center gap-2 font-bold text-sm">
-                    <Zap className="w-4 h-4" />
-                    全量模式 (Large)
-                  </div>
-                  <span className="text-[11px] text-muted-foreground text-left leading-tight">
-                    加载所有原始元数据与图像细节，适合深度缺陷分析。
-                  </span>
-                </button>
+                  <option value={1}>100%</option>
+                  <option value={0.75}>75%</option>
+                  <option value={0.5}>50%</option>
+                  <option value={0.25}>25%</option>
+                </select>
               </div>
             </div>
           </div>

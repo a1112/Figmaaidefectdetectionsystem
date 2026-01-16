@@ -203,8 +203,8 @@ export default function CacheDebug() {
   const prefetchRunningRef = useRef(false);
 
   const lineKey = env.getLineName() || "未选择";
-  const apiProfile = env.getApiProfile() === "small" ? "small" : "full";
-  const currentView = cacheStatus?.view || (apiProfile === "small" ? "small" : "2D");
+  const currentView = cacheStatus?.view || "2D";
+  const imageScale = env.getImageScale();
 
   const activeLogs =
     activeTab === "preheat"
@@ -822,7 +822,7 @@ export default function CacheDebug() {
             产线 <span className="font-mono text-foreground">{lineKey}</span>
           </div>
           <div className="flex items-center gap-2 px-2 py-1 border border-border rounded-sm bg-background/60">
-            模式 <span className="font-mono text-foreground">{apiProfile}</span>
+            缩放 <span className="font-mono text-foreground">{Math.round(imageScale * 100)}%</span>
           </div>
           <div className="flex items-center gap-2 px-2 py-1 border border-border rounded-sm bg-background/60">
             记录 <span className="font-mono text-foreground">{total}</span>

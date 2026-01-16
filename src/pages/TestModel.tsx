@@ -103,11 +103,11 @@ export default function TestModelPage() {
         })).filter((item) => item.key);
         setLineOptions(lines);
         const views = payload.views ? Object.keys(payload.views) : [];
-        setViewOptions(views.length ? views : ["2D", "small"]);
+        setViewOptions(views.length ? views : ["2D"]);
       })
       .catch(() => {
         setLineOptions([]);
-        setViewOptions(["2D", "small"]);
+        setViewOptions(["2D"]);
       });
   }, []);
 

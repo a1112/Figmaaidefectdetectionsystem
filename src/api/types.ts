@@ -52,9 +52,8 @@ export interface ApiNode {
   name: string;
   mode?: string;
   path?: string;
-  profile?: "default" | "small";
+  profile?: string;
   port?: number;
-  small_port?: number;
   ip?: string;
   online?: boolean;
   latest_timestamp?: string;

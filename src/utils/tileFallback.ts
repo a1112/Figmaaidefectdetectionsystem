@@ -71,6 +71,7 @@ export function tryDrawFallbackTile(params: {
   tileY: number;
   tileSize: number;
   maxLevel: number;
+  imageScale?: number;
 }): boolean {
   const {
     ctx,
@@ -84,14 +85,17 @@ export function tryDrawFallbackTile(params: {
     tileY,
     tileSize,
     maxLevel,
+    imageScale,
   } = params;
 
+  const scaleSuffix =
+    typeof imageScale === "number" ? `-s${imageScale}` : "";
   for (let fallbackLevel = tile.level + 1; fallbackLevel <= maxLevel; fallbackLevel += 1) {
     const delta = fallbackLevel - tile.level;
     const factor = 2 ** delta;
     const fallbackX = Math.floor(tileX / factor);
     const fallbackY = Math.floor(tileY / factor);
-    const cacheKey = `${cacheKeyPrefix}-${surface}-${seqNo}-${fallbackLevel}-${fallbackX}-${fallbackY}-${tileSize}`;
+    const cacheKey = `${cacheKeyPrefix}-${surface}-${seqNo}-${fallbackLevel}-${fallbackX}-${fallbackY}-${tileSize}${scaleSuffix}`;
     const img = cache.get(cacheKey);
     if (!img || !img.complete) continue;
 

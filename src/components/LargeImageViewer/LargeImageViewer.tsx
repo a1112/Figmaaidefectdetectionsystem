@@ -820,7 +820,7 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
   }, [forcedScale, containerSize, clampTransform]);
 
   useEffect(() => {
-    if (!annotationContext) {
+    if (!annotationContext || drawMode !== "mark") {
       return;
     }
     let cancelled = false;
@@ -858,7 +858,7 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [annotationContext]);
+  }, [annotationContext, drawMode]);
 
   useEffect(() => {
     if (selectedMarkId && !markRects.some((item) => item.id === selectedMarkId)) {
