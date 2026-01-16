@@ -1950,6 +1950,36 @@ export default function TraditionalMode() {
     },
     [visibleDefects],
   );
+  const selectDefectById = useCallback(
+    (nextDefect?: DefectItem | null) => {
+      if (!nextDefect) return;
+      setSelectedDefectId(nextDefect.id);
+      setActiveNav("缺陷分析");
+      setImgScale(1);
+      setImgOffset({ x: 0, y: 0 });
+    },
+    [setActiveNav, setImgOffset, setImgScale, setSelectedDefectId],
+  );
+  const handleDistributionWheel = useCallback(
+    (event: React.WheelEvent<HTMLDivElement>, defects: DefectItem[]) => {
+      if (!defects.length) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const delta = event.deltaY !== 0 ? event.deltaY : event.deltaX;
+      const direction = delta > 0 ? 1 : -1;
+      const currentIndex = selectedDefectId
+        ? defects.findIndex((defect) => defect.id === selectedDefectId)
+        : -1;
+      const nextIndex =
+        currentIndex < 0
+          ? direction > 0
+            ? 0
+            : defects.length - 1
+          : (currentIndex + direction + defects.length) % defects.length;
+      selectDefectById(defects[nextIndex]);
+    },
+    [selectDefectById, selectedDefectId],
+  );
 
   const updateDefectImageMetrics = useCallback(() => {
     const img = defectImageRef.current;
@@ -3411,6 +3441,7 @@ export default function TraditionalMode() {
                className="w-full h-full relative cursor-pointer group flex justify-center"
                onMouseDown={handleDistributionInteraction}
                onMouseMove={handleDistributionInteraction}
+               onWheel={(e) => handleDistributionWheel(e, topDistributionDefects)}
              >
                {/* Plate Visual Representation (Vertical Strip) */}
                <div ref={distributionPlateRef} className="w-[80%] h-full bg-[#161b22] relative border-x border-[#30363d]">
@@ -4388,7 +4419,12 @@ export default function TraditionalMode() {
                    style={bottomDistributionViewportStyle}
                  />
                )}
-              <div className="w-full h-full relative flex justify-center">
+              <div
+                className="w-full h-full relative flex justify-center"
+                onWheel={(e) =>
+                  handleDistributionWheel(e, bottomDistributionDefects)
+                }
+              >
                 <div ref={bottomDistributionPlateRef} className="w-[80%] h-full bg-[#161b22] relative border-x border-[#30363d]">
                   {bottomDistributionTilePlan && analysisSeqNo != null && (
                     <div className="absolute inset-0 pointer-events-none">

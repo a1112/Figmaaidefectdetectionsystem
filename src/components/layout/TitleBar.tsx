@@ -460,7 +460,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
 
         <div className="flex items-center gap-2">
           {/* 功能按钮 */}
-          <div className="flex items-center gap-2 rounded-sm border border-border bg-background/50 px-2 py-1 text-[11px] text-muted-foreground font-mono">
+          <div className="hidden lg:flex items-center gap-2 rounded-sm border border-border bg-background/50 px-2 py-1 text-[11px] text-muted-foreground font-mono">
             <span>
               {clockNow.toLocaleString("zh-CN", {
                 year: "numeric",

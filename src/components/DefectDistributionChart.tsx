@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useEffect, useState } from "react";
+import React, { useMemo, useRef, useEffect, useState, useCallback } from "react";
 import type {
   Defect,
   ImageOrientation,
@@ -204,6 +204,32 @@ export function DefectDistributionChart({
     // 后续如需按视图窗口动态裁剪，可在这里加入视图相关逻辑。
     return filteredDefects.slice(0, MAX_DEFECTS_TO_DRAW);
   }, [filteredDefects]);
+  const handleWheel = useCallback(
+    (event: React.WheelEvent<HTMLDivElement>) => {
+      if (!onDefectSelect || visibleDefects.length === 0) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      const delta = event.deltaY !== 0 ? event.deltaY : event.deltaX;
+      const direction = delta > 0 ? 1 : -1;
+      const currentIndex = selectedDefectId
+        ? visibleDefects.findIndex((defect) => defect.id === selectedDefectId)
+        : -1;
+      const nextIndex =
+        currentIndex < 0
+          ? direction > 0
+            ? 0
+            : visibleDefects.length - 1
+          : (currentIndex + direction + visibleDefects.length) %
+            visibleDefects.length;
+      const nextDefect = visibleDefects[nextIndex];
+      if (nextDefect) {
+        onDefectSelect(nextDefect.id);
+      }
+    },
+    [onDefectSelect, selectedDefectId, visibleDefects],
+  );
 
   const findMetaForSurface = (
     surf: "top" | "bottom",
@@ -840,7 +866,10 @@ export function DefectDistributionChart({
     <div className="h-full flex flex-col" ref={containerRef}>
 
       {/* 横向滚动容器 - 支持横向滚动查看长钢板 */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden">
+      <div
+        className="flex-1 overflow-x-auto overflow-y-hidden"
+        onWheel={handleWheel}
+      >
         <div className="flex flex-col gap-0 h-full">
           {surface === "all" ? (
             <>
