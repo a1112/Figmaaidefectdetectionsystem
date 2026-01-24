@@ -9,12 +9,9 @@ import type {
   Surface,
 } from "../api/types";
 import { getTileImageUrl } from "../api/client";
+import { env } from "../config/env";
 import type { ViewportInfo } from "./DefectImageView";
 import type { Tile } from "./LargeImageViewer/utils";
-import {
-  buildOrientationLayout,
-  computeTileRequestInfo,
-} from "../utils/imageOrientation";
 
 interface DefectDistributionChartProps {
   defects: Defect[];
@@ -36,6 +33,7 @@ interface DefectDistributionChartProps {
   showDistributionImages?: boolean;
   showTileBorders?: boolean;
   distributionScaleMode?: DistributionScaleMode;
+  setDistributionScaleMode?: (mode: DistributionScaleMode) => void;
   onViewportCenterChange?: (center: { x: number; y: number } | null) => void;
 }
 
@@ -119,6 +117,7 @@ export function DefectDistributionChart({
   showDistributionImages = true,
   showTileBorders = false,
   distributionScaleMode = "fit",
+  setDistributionScaleMode,
 }: DefectDistributionChartProps) {
   const getSeverityColor = (severity: string) => {
     switch (severity) {
@@ -155,7 +154,7 @@ export function DefectDistributionChart({
 
   // 钢板缩略显示尺寸
   // 横向布局：宽度 = 高度 × 单图比例 × 图像数量
-  const plateHeight = 120; // 固定高度
+  const plateHeight = 160; // 固定高度，增加以确保图像正确显示
 
   const getDistributionTileLevel = (
     worldWidth: number,
@@ -247,15 +246,22 @@ export function DefectDistributionChart({
     if (!container) return;
 
     const updateSize = () => {
-      setContainerWidth(container.offsetWidth);
-      setContainerHeight(container.offsetHeight);
+      const width = container.offsetWidth;
+      const height = container.offsetHeight;
+      if (width > 0 && height > 0) {
+        setContainerWidth(width);
+        setContainerHeight(height);
+      }
     };
 
+    // 使用 setTimeout 确保在布局完成后执行
+    const timer = setTimeout(updateSize, 0);
     updateSize();
     const resizeObserver = new ResizeObserver(updateSize);
     resizeObserver.observe(container);
     window.addEventListener("resize", updateSize);
     return () => {
+      clearTimeout(timer);
       resizeObserver.disconnect();
       window.removeEventListener("resize", updateSize);
     };
@@ -289,6 +295,7 @@ export function DefectDistributionChart({
     let finalHeight = baseHeight;
     let scale = 1;
 
+    // 计算每个表面的高度（非拉伸模式）
     const perSurfaceHeight =
       surface === "all" ? baseHeight / 2 : baseHeight;
     const topWidth = calculatePlateWidth(topMeta, perSurfaceHeight);
@@ -296,25 +303,51 @@ export function DefectDistributionChart({
 
     let finalTopWidth = topWidth;
     let finalBottomWidth = bottomWidth;
+    let finalPerSurfaceHeight = perSurfaceHeight;
 
     if (distributionScaleMode === "stretch") {
       const targetWidth =
         containerWidth > 0
           ? containerWidth
           : Math.max(topWidth, bottomWidth);
+
+      // 根据宽度计算对应的高度，保持宽高比
+      const calculateHeightFromWidth = (
+        meta: SurfaceImageInfo | undefined,
+        width: number,
+      ): number => {
+        if (!meta) return plateHeight;
+        const frameCount = meta.frame_count || 1;
+        const imageWidth = meta.image_width || 1;
+        const imageHeight = meta.image_height || 1;
+        // plateWidth / plateHeight = (imageHeight * frameCount) / imageWidth
+        // plateHeight = plateWidth * imageWidth / (imageHeight * frameCount)
+        return width * imageWidth / (imageHeight * frameCount);
+      };
+
       if (surface === "all") {
         finalTopWidth = targetWidth;
         finalBottomWidth = targetWidth;
+        const topHeight = calculateHeightFromWidth(topMeta, targetWidth);
+        const bottomHeight = calculateHeightFromWidth(bottomMeta, targetWidth);
+        finalPerSurfaceHeight = Math.max(topHeight, bottomHeight);
+        finalHeight = finalPerSurfaceHeight * 2;
       } else if (surface === "top") {
         finalTopWidth = targetWidth;
+        finalPerSurfaceHeight = calculateHeightFromWidth(topMeta, targetWidth);
+        finalHeight = finalPerSurfaceHeight;
       } else {
         finalBottomWidth = targetWidth;
+        finalPerSurfaceHeight = calculateHeightFromWidth(bottomMeta, targetWidth);
+        finalHeight = finalPerSurfaceHeight;
       }
+
       return {
         height: finalHeight,
         topWidth: finalTopWidth,
         bottomWidth: finalBottomWidth,
         scale,
+        perSurfaceHeight: finalPerSurfaceHeight,
       };
     }
 
@@ -325,8 +358,9 @@ export function DefectDistributionChart({
       topWidth: finalTopWidth,
       bottomWidth: finalBottomWidth,
       scale,
+      perSurfaceHeight,
     };
-  }, [surface, containerWidth, surfaceImageInfo, distributionScaleMode]);
+  }, [surface, containerWidth, surfaceImageInfo, distributionScaleMode, plateHeight]);
 
   const computeDisplayRect = (
     defect: Defect,
@@ -453,109 +487,62 @@ export function DefectDistributionChart({
       meta &&
       typeof (seqNo as number | undefined) === "number"
     ) {
-      const layout = buildOrientationLayout({
-        orientation,
-        surfaceFilter: surf,
-        topMeta: surf === "top" ? meta : undefined,
-        bottomMeta: surf === "bottom" ? meta : undefined,
-        surfaceGap: 0,
-      });
-      const surfaceLayout = layout.surfaces.find(
-        (s) => s.surface === surf,
-      );
-      const level = surfaceLayout
-        ? getDistributionTileLevel(
-            surfaceLayout.worldWidth,
-            surfaceLayout.worldHeight,
-            plateWidth,
-            perSurfaceHeight,
-          )
-        : getDistributionTileLevel(1, 1, plateWidth, perSurfaceHeight);
+      // 直接使用 mosaic 尺寸，不使用 buildOrientationLayout
+      const mosaicWidth = meta.image_width ?? 0;
+      const mosaicHeight = (meta.frame_count ?? 0) * (meta.image_height ?? 0);
 
-      // Calculate tileSize based on layout to ensure single row if possible
-      let tileSize = Math.max(
-        defaultTileSize ?? 0,
-        meta.image_height ?? 0,
-        512,
-      );
+      if (mosaicWidth > 0 && mosaicHeight > 0) {
+        // 计算瓦片层级
+        const level = getDistributionTileLevel(
+          mosaicWidth,
+          mosaicHeight,
+          plateWidth,
+          perSurfaceHeight,
+        );
 
-      if (surfaceLayout) {
-        const factor = Math.pow(2, level);
-        // Ensure virtualTileSize >= worldHeight to use 1 tile height
-        const minRequired = Math.ceil(surfaceLayout.worldHeight / factor);
-        if (minRequired > tileSize) {
-          tileSize = minRequired;
-        }
-      }
+        let tileSize = Math.max(
+          defaultTileSize ?? 0,
+          meta.image_height ?? 0,
+          512,
+        );
 
-      if (!surfaceLayout) {
-        // no layout available; skip tile rendering
-      } else {
         const virtualTileSize = tileSize * Math.pow(2, level);
         const tilesX = Math.max(
           1,
-          Math.ceil(surfaceLayout.worldWidth / virtualTileSize),
+          Math.ceil(mosaicWidth / virtualTileSize),
         );
         const tilesY = Math.max(
           1,
-          Math.ceil(surfaceLayout.worldHeight / virtualTileSize),
+          Math.ceil(mosaicHeight / virtualTileSize),
         );
 
         for (let row = 0; row < tilesY; row += 1) {
           for (let col = 0; col < tilesX; col += 1) {
-            const x = surfaceLayout.offsetX + col * virtualTileSize;
-            const y = surfaceLayout.offsetY + row * virtualTileSize;
+            const x = col * virtualTileSize;
+            const y = row * virtualTileSize;
             const width =
               col === tilesX - 1
-                ? surfaceLayout.worldWidth - col * virtualTileSize
+                ? mosaicWidth - col * virtualTileSize
                 : virtualTileSize;
             const height =
               row === tilesY - 1
-                ? surfaceLayout.worldHeight - row * virtualTileSize
+                ? mosaicHeight - row * virtualTileSize
                 : virtualTileSize;
-
-            const tile: Tile = {
-              level,
-              row,
-              col,
-              x,
-              y,
-              width,
-              height,
-            };
-
-            const requestInfo = computeTileRequestInfo({
-              surface: surfaceLayout,
-              tile,
-              orientation,
-              virtualTileSize,
-              tileSize,
-            });
-            if (!requestInfo) {
-              continue;
-            }
 
             const url = getTileImageUrl({
               surface: surf,
               seqNo: seqNo as number,
               level,
-              tileX: requestInfo.tileX,
-              tileY: requestInfo.tileY,
+              tileX: col,
+              tileY: row,
               tileSize,
-              view: orientation === "horizontal" ? "horizontal" : undefined,
+              // 分布图不使用 view 参数，因为后端直接返回适合横向布局的瓦片
             });
 
-            const localX = x - surfaceLayout.offsetX;
-            const localY = y - surfaceLayout.offsetY;
-            const left =
-              (localX / surfaceLayout.worldWidth) * plateWidth;
-            const top =
-              (localY / surfaceLayout.worldHeight) * perSurfaceHeight;
-            const displayWidth =
-              (width / surfaceLayout.worldWidth) * plateWidth;
-            const displayHeight =
-              (height / surfaceLayout.worldHeight) *
-              perSurfaceHeight;
+            const left = (x / mosaicWidth) * plateWidth;
+            const top = (y / mosaicHeight) * perSurfaceHeight;
+            const displayWidth = (width / mosaicWidth) * plateWidth;
+            const displayHeight = (height / mosaicHeight) * perSurfaceHeight;
 
             tileImages.push(
               <img
@@ -862,27 +849,138 @@ export function DefectDistributionChart({
     );
   };
 
+  // 右键菜单状态
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    surface?: Surface;
+    tileX?: number;
+    tileY?: number;
+    level?: number;
+    tileWidth?: number;
+    tileHeight?: number;
+  } | null>(null);
+
+  // 关闭右键菜单
+  const closeContextMenu = useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
+  // 打开缺陷图片
+  const handleOpenImage = useCallback((seqNo: number) => {
+    const surface = contextMenu?.surface || "top";
+
+    if (!seqNo) {
+      closeContextMenu();
+      return;
+    }
+
+    // 计算图像URL（使用默认的缺陷图像URL或大图URL）
+    const baseUrl = env.getApiBaseUrl();
+    const imageUrl = `${baseUrl}/images/crop?surface=${surface}&seq_no=${seqNo}&fmt=JPEG&scale=1`;
+
+    window.open(imageUrl, "_blank");
+    closeContextMenu();
+  }, [contextMenu, closeContextMenu]);
+
+  const jumpToImageUrl = useCallback(() => {
+    if (typeof seqNo === "number") {
+      handleOpenImage(seqNo);
+    }
+    closeContextMenu();
+  }, [seqNo, handleOpenImage, closeContextMenu]);
+
+  const toggleScaleMode = useCallback(() => {
+    if (setDistributionScaleMode) {
+      const newMode: DistributionScaleMode = distributionScaleMode === "stretch" ? "fit" : "stretch";
+      setDistributionScaleMode(newMode);
+    }
+    closeContextMenu();
+  }, [distributionScaleMode, setDistributionScaleMode, closeContextMenu]);
+
+  // 处理右键点击事件
+  const handleContextMenu = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+    });
+  }, []);
+
   return (
-    <div className="h-full flex flex-col" ref={containerRef}>
+    <div
+      ref={containerRef}
+      className="flex flex-col"
+      style={{ 
+        height: `${calculateFinalDimensions.height}px`,
+        minHeight: `${calculateFinalDimensions.height}px`
+      }}
+    >
 
       {/* 横向滚动容器 - 支持横向滚动查看长钢板 */}
       <div
         className="flex-1 overflow-x-auto overflow-y-hidden"
         onWheel={handleWheel}
+        // onContextMenu={handleContextMenu}  // 暂时禁用右键菜单
       >
         <div className="flex flex-col gap-0 h-full">
           {surface === "all" ? (
             <>
-              {renderPlate("top", calculateFinalDimensions.height / 2)}
-              {renderPlate("bottom", calculateFinalDimensions.height / 2)}
+              {renderPlate("top", calculateFinalDimensions.perSurfaceHeight ?? calculateFinalDimensions.height / 2)}
+              {renderPlate("bottom", calculateFinalDimensions.perSurfaceHeight ?? calculateFinalDimensions.height / 2)}
             </>
           ) : (
             renderPlate(
               surface === "top" ? "top" : "bottom",
-              calculateFinalDimensions.height,
+              calculateFinalDimensions.perSurfaceHeight ?? calculateFinalDimensions.height,
             )
           )}
         </div>
+      </div>
+
+      {/* 右键菜单 */}
+      {contextMenu && (
+        <div
+          className="fixed bg-[#1e293b] text-white rounded shadow-xl z-50 p-2 border border-[#30363d]"
+          style={{
+            left: `${contextMenu.x}px`,
+            top: `${contextMenu.y}px`,
+            transform: "translate(4px, 4px)",
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="text-xs font-semibold mb-1 text-[#e0e0e0]">分布图选项</div>
+          <button
+            onClick={toggleScaleMode}
+            className="w-full text-left px-2 py-1 text-xs hover:bg-[#30363d] rounded"
+          >
+            {distributionScaleMode === "stretch" ? "切换到等比模式" : "切换到拉伸模式"}
+          </button>
+          <button
+            onClick={jumpToImageUrl}
+            className="w-full text-left px-2 py-1 text-xs hover:bg-[#30363d] rounded"
+          >
+            跳转到高分辨率图像
+          </button>
+          <button
+            onClick={closeContextMenu}
+            className="w-full text-left px-2 py-1 text-xs hover:bg-[#30363d] rounded"
+          >
+            取消
+          </button>
+        </div>
+      )}
+      <div
+        className="absolute top-0 right-0 p-2 text-[10px] text-muted-foreground pointer-events-none"
+        title="缩放模式：拉伸模式会将分布图拉伸到容器宽度，等比模式保持比例"
+      >
+            {distributionScaleMode === "stretch" ? "拉伸模式" : "等比模式"}
+      </div>
+      <div
+        className="absolute bottom-0 right-0 p-2 text-[10px] text-muted-foreground pointer-events-none"
+      >
+        右键查看选项
       </div>
     </div>
   );

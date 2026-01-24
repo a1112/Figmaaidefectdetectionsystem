@@ -255,16 +255,20 @@ export default function TraditionalMode() {
     const element = distributionPlateRef.current;
     if (!element) return;
     const updateSize = () => {
-      setDistributionPlateSize({
-        width: element.offsetWidth,
-        height: element.offsetHeight,
-      });
+      const width = element.offsetWidth;
+      const height = element.offsetHeight;
+      if (width > 0 && height > 0) {
+        setDistributionPlateSize({ width, height });
+      }
     };
+    // 使用 setTimeout 确保在布局完成后执行
+    const timer = setTimeout(updateSize, 0);
     updateSize();
     const resizeObserver = new ResizeObserver(updateSize);
     resizeObserver.observe(element);
     window.addEventListener("resize", updateSize);
     return () => {
+      clearTimeout(timer);
       resizeObserver.disconnect();
       window.removeEventListener("resize", updateSize);
     };
@@ -274,16 +278,20 @@ export default function TraditionalMode() {
     const element = bottomDistributionPlateRef.current;
     if (!element) return;
     const updateSize = () => {
-      setBottomDistributionPlateSize({
-        width: element.offsetWidth,
-        height: element.offsetHeight,
-      });
+      const width = element.offsetWidth;
+      const height = element.offsetHeight;
+      if (width > 0 && height > 0) {
+        setBottomDistributionPlateSize({ width, height });
+      }
     };
+    // 使用 setTimeout 确保在布局完成后执行
+    const timer = setTimeout(updateSize, 0);
     updateSize();
     const resizeObserver = new ResizeObserver(updateSize);
     resizeObserver.observe(element);
     window.addEventListener("resize", updateSize);
     return () => {
+      clearTimeout(timer);
       resizeObserver.disconnect();
       window.removeEventListener("resize", updateSize);
     };
@@ -448,6 +456,8 @@ export default function TraditionalMode() {
   );
   const [defectSeverityByName, setDefectSeverityByName] = useState<Record<string, number>>({});
   const [defectSeverityByClassId, setDefectSeverityByClassId] = useState<Record<number, number>>({});
+  // 用于 LargeImageViewer 缺陷标注的缺陷类别（包含 id）
+  const [defectClassOptions, setDefectClassOptions] = useState<{ id: number; name: string; color?: string }[]>([]);
 
   // Defect Chart Data
   const defectChartData = useMemo(() => {
@@ -980,13 +990,16 @@ export default function TraditionalMode() {
     }
 
     if (distributionScaleMode === "stretch") {
+      // 横向拉伸模式：让宽度填满容器，高度按比例计算
+      const drawWidth = distributionPlateSize.width;
+      const drawHeight = drawWidth * (mosaicHeight / mosaicWidth);
       return {
         mosaicWidth,
         mosaicHeight,
-        drawWidth: distributionPlateSize.width,
-        drawHeight: distributionPlateSize.height,
+        drawWidth,
+        drawHeight,
         offsetX: 0,
-        offsetY: 0,
+        offsetY: (distributionPlateSize.height - drawHeight) / 2,
         containerWidth: distributionPlateSize.width,
         containerHeight: distributionPlateSize.height,
       };
@@ -1025,13 +1038,16 @@ export default function TraditionalMode() {
     }
 
     if (distributionScaleMode === "stretch") {
+      // 横向拉伸模式：让宽度填满容器，高度按比例计算
+      const drawWidth = bottomDistributionPlateSize.width;
+      const drawHeight = drawWidth * (mosaicHeight / mosaicWidth);
       return {
         mosaicWidth,
         mosaicHeight,
-        drawWidth: bottomDistributionPlateSize.width,
-        drawHeight: bottomDistributionPlateSize.height,
+        drawWidth,
+        drawHeight,
         offsetX: 0,
-        offsetY: 0,
+        offsetY: (bottomDistributionPlateSize.height - drawHeight) / 2,
         containerWidth: bottomDistributionPlateSize.width,
         containerHeight: bottomDistributionPlateSize.height,
       };
@@ -1683,6 +1699,26 @@ export default function TraditionalMode() {
             }
             setDefectSeverityByName(severityByName);
             setDefectSeverityByClassId(severityByClassId);
+            // 设置 LargeImageViewer 需要的缺陷类别格式（包含 id）
+            const classOptions = meta.defect_classes.items.map((item: any) => {
+              const label = item?.desc?.toString()?.trim() ||
+                            item?.name?.toString()?.trim() ||
+                            item?.tag?.toString()?.trim() ||
+                            "未知缺陷";
+              const classId = Number(item?.class ?? item?.id ?? item?.num ?? item?.value ?? 0);
+              const red = normalize(item?.color?.red ?? 0);
+              const green = normalize(item?.color?.green ?? 0);
+              const blue = normalize(item?.color?.blue ?? 0);
+              return {
+                id: Number.isFinite(classId) ? classId : 0,
+                name: label,
+                color: `#${toHex(red)}${toHex(green)}${toHex(blue)}`,
+              };
+            });
+            const dedupedClassOptions = classOptions.filter((item, index, self) => {
+              return self.findIndex((opt) => opt.name === item.name) === index;
+            });
+            setDefectClassOptions(dedupedClassOptions);
           }
           await loadPlatesWithCriteria({}, 50, false);
         } catch (error) {
@@ -1981,9 +2017,22 @@ export default function TraditionalMode() {
     },
     [setActiveNav, setImgOffset, setImgScale, setSelectedDefectId],
   );
+  // 防止滚轮事件在短时间内重复触发（解决双选中问题）
+  const wheelHandlerTimeoutRef = useRef<number | null>(null);
+  const lastWheelHandlerTimeRef = useRef<number>(0);
+  const WHEEL_HANDLER_DEBOUNCE = 100; // 100ms 防抖
+
   const handleDistributionWheel = useCallback(
     (event: React.WheelEvent<HTMLDivElement>, defects: DefectItem[]) => {
       if (!defects.length) return;
+
+      // 防抖：防止在短时间内重复触发
+      const now = Date.now();
+      if (now - lastWheelHandlerTimeRef.current < WHEEL_HANDLER_DEBOUNCE) {
+        return;
+      }
+      lastWheelHandlerTimeRef.current = now;
+
       event.preventDefault();
       event.stopPropagation();
       const delta = event.deltaY !== 0 ? event.deltaY : event.deltaX;
@@ -3449,52 +3498,51 @@ export default function TraditionalMode() {
       )}
     </AnimatePresence>
 
-    {/* Central Map Strip (Vertical) */}
+    {/* Central Map Strip (Horizontal) */}
         <AnimatePresence>
-          {(
-            <motion.div
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 180, opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              transition={{ duration: 0.3, ease: "easeInOut" }}
-              className="bg-[#0d1117] flex flex-col border border-[#30363d] overflow-hidden whitespace-nowrap"
-            >
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 160, opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="bg-[#0d1117] flex flex-col border border-[#30363d] overflow-hidden whitespace-nowrap"
+          >
              <div className="h-6 bg-[#161b22] border-b border-[#30363d] flex items-center justify-between px-1 text-[9px]">
                <span>
                  {surfaceFilter === 'bottom'
                    ? '下表分布'
                    : surfaceFilter === 'top'
                      ? '上表分布'
-                     : '纵向分布'}
+                     : '横向分布'}
                </span>
                <div className="flex gap-1">
                  <ZoomIn className="w-3 h-3" />
                  <ZoomOut className="w-3 h-3" />
                </div>
              </div>
-             <div className="flex-1 relative flex justify-center bg-[#161b22]/30">
+             <div className="flex-1 relative flex items-center justify-center bg-[#161b22]/30 overflow-x-auto overflow-y-hidden">
                {/* Viewport Indicator */}
                {activeNav === "图像分析" && (surfaceFilter === 'all' || surfaceFilter === 'top') && (
-                 <div 
-                   className="absolute left-0 right-0 border-2 border-[#58a6ff] bg-[#58a6ff]/20 pointer-events-none z-10"
+                 <div
+                   className="absolute top-0 bottom-0 border-2 border-[#58a6ff] bg-[#58a6ff]/20 pointer-events-none z-10"
                    style={distributionViewportStyle}
                  />
                )}
-               {/* Ruler */}
-               <div className="absolute left-0 top-0 bottom-0 w-4 border-r border-[#30363d]/50 flex flex-col justify-between py-2 text-[8px] text-[#8b949e]">
-                 <span>-900</span>
-                 <span>0毫米</span>
-                 <span>900</span>
+               {/* Ruler - Horizontal */}
+               <div className="absolute left-0 right-0 h-4 border-b border-[#30363d]/50 flex justify-between px-2 text-[8px] text-[#8b949e]">
+                 <span>0mm</span>
+                 <span>长度</span>
+                 <span>尾</span>
                </div>
                {/* Map Grid */}
-             <div 
-               className="w-full h-full relative cursor-pointer group flex justify-center"
+             <div
+               className="h-full w-full relative cursor-pointer group flex items-center"
                onMouseDown={handleDistributionInteraction}
                onMouseMove={handleDistributionInteraction}
                onWheel={(e) => handleDistributionWheel(e, topDistributionDefects)}
              >
-               {/* Plate Visual Representation (Vertical Strip) */}
-               <div ref={distributionPlateRef} className="w-[80%] h-full bg-[#161b22] relative border-x border-[#30363d]">
+               {/* Plate Visual Representation (Horizontal Strip) */}
+               <div ref={distributionPlateRef} className="h-[70%] w-full bg-[#161b22] relative border-y border-[#30363d]">
                  {distributionTilePlan && distributionSurface && analysisSeqNo != null && (
                    <div className="absolute inset-0 pointer-events-none">
                      {distributionTilePlan.tiles.map((tile) => {
@@ -3530,11 +3578,11 @@ export default function TraditionalMode() {
                      })}
                    </div>
                  )}
-                 {/* Grid lines inside plate */}
-                 <div className="w-px h-full bg-[#30363d]/50 absolute left-1/2 -translate-x-1/2" />
-                 <div className="w-full h-px bg-[#30363d]/20 absolute top-[25%]" />
-                 <div className="w-full h-px bg-[#30363d]/20 absolute top-[50%]" />
-                 <div className="w-full h-px bg-[#30363d]/20 absolute top-[75%]" />
+                 {/* Grid lines inside plate - Vertical for horizontal layout */}
+                 <div className="h-px w-full bg-[#30363d]/50 absolute top-1/2 -translate-y-1/2" />
+                 <div className="h-full w-px bg-[#30363d]/20 absolute left-[25%]" />
+                 <div className="h-full w-px bg-[#30363d]/20 absolute left-[50%]" />
+                 <div className="h-full w-px bg-[#30363d]/20 absolute left-[75%]" />
                  {selectedTopDistributionDefect && (() => {
                    const surfaceMeta = surfaceImages.find(
                      (info) => info.surface === selectedTopDistributionDefect.surface,
@@ -3642,12 +3690,11 @@ export default function TraditionalMode() {
              </div>
                {/* Side label */}
                <div className="absolute right-0 top-1/2 -rotate-90 origin-right text-[10px] text-[#8b949e] tracking-widest whitespace-nowrap translate-x-12">
-                 纵向分布
+                 横向分布
                </div>
              </div>
              <div className="h-4 bg-[#161b22] text-[8px] flex items-center px-1 text-[#8b949e]">444.0</div>
           </motion.div>
-        )}
       </AnimatePresence>
 
         {/* Center Panel: Image Viewer */}
@@ -4007,6 +4054,7 @@ export default function TraditionalMode() {
                                 ? "scroll"
                                 : "zoom"
                             }
+                            defectClasses={defectClassOptions}
                           />
                         ) : (
                           <div className="absolute inset-0 flex items-center justify-center text-[11px] text-[#8b949e]">
@@ -4057,6 +4105,7 @@ export default function TraditionalMode() {
                                 ? "scroll"
                                 : "zoom"
                             }
+                            defectClasses={defectClassOptions}
                           />
                         ) : (
                           <div className="absolute inset-0 flex items-center justify-center text-[11px] text-[#8b949e]">
@@ -4083,8 +4132,8 @@ export default function TraditionalMode() {
                           surface: defect.surface,
                         });
                         return (
-                          <motion.div 
-                            key={`${defect.id}-${index}`}
+                          <motion.div
+                            key={defect.id}
                             whileHover={{ scale: 1.05, zIndex: 30 }}
                             onClick={() => {
                               setSelectedDefectId(defect.id);
@@ -4155,6 +4204,7 @@ export default function TraditionalMode() {
                           onPointerLeave={handleMapPointerLeave}
                           cursor={mapCursor}
                           panMargin={200}
+                          defectClasses={defectClassOptions}
                         />
                         {showMapCrop && currentDefect && (
                           <img
@@ -4268,8 +4318,8 @@ export default function TraditionalMode() {
                           plateLength > 0 ? Math.max(0, plateLength - (yMm + hMm)) : undefined;
 
                         return (
-                          <div 
-                            key={`${defect.id}-${idx}`}
+                          <div
+                            key={defect.id}
                             onClick={() => {
                               setSelectedDefectId(defect.id);
                               setActiveNav("缺陷分析");
@@ -4444,13 +4494,13 @@ export default function TraditionalMode() {
           </div>
         </div>
 
-        {/* Right Map Strip (Vertical) */}
+        {/* Right Map Strip (Horizontal) */}
         <AnimatePresence>
           {surfaceFilter !== 'top' && (
             <motion.div
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 180, opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 160, opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.3, ease: "easeInOut" }}
               className="bg-[#0d1117] flex flex-col border border-[#30363d] overflow-hidden whitespace-nowrap"
             >
@@ -4461,21 +4511,21 @@ export default function TraditionalMode() {
                <ZoomOut className="w-3 h-3" />
              </div>
            </div>
-           <div className="flex-1 relative flex justify-center bg-[#161b22]/30">
+           <div className="flex-1 relative flex items-center justify-center bg-[#161b22]/30 overflow-x-auto overflow-y-hidden">
               {/* Viewport Indicator */}
               {activeNav === "图像分析" && (surfaceFilter === 'all' || surfaceFilter === 'bottom') && (
-                 <div 
-                   className="absolute left-0 right-0 border-2 border-[#58a6ff] bg-[#58a6ff]/20 pointer-events-none z-10"
+                 <div
+                   className="absolute top-0 bottom-0 border-2 border-[#58a6ff] bg-[#58a6ff]/20 pointer-events-none z-10"
                    style={bottomDistributionViewportStyle}
                  />
                )}
               <div
-                className="w-full h-full relative flex justify-center"
+                className="h-full w-full relative flex items-center"
                 onWheel={(e) =>
                   handleDistributionWheel(e, bottomDistributionDefects)
                 }
               >
-                <div ref={bottomDistributionPlateRef} className="w-[80%] h-full bg-[#161b22] relative border-x border-[#30363d]">
+                <div ref={bottomDistributionPlateRef} className="h-[70%] w-full bg-[#161b22] relative border-y border-[#30363d]">
                   {bottomDistributionTilePlan && analysisSeqNo != null && (
                     <div className="absolute inset-0 pointer-events-none">
                       {bottomDistributionTilePlan.tiles.map((tile) => {
@@ -4511,10 +4561,11 @@ export default function TraditionalMode() {
                       })}
                     </div>
                   )}
-                  <div className="w-px h-full bg-[#30363d]/50 absolute left-1/2 -translate-x-1/2" />
-                  <div className="w-full h-px bg-[#30363d]/20 absolute top-[25%]" />
-                  <div className="w-full h-px bg-[#30363d]/20 absolute top-[50%]" />
-                  <div className="w-full h-px bg-[#30363d]/20 absolute top-[75%]" />
+                  {/* Grid lines inside plate - Vertical for horizontal layout */}
+                  <div className="h-px w-full bg-[#30363d]/50 absolute top-1/2 -translate-y-1/2" />
+                  <div className="h-full w-px bg-[#30363d]/20 absolute left-[25%]" />
+                  <div className="h-full w-px bg-[#30363d]/20 absolute left-[50%]" />
+                  <div className="h-full w-px bg-[#30363d]/20 absolute left-[75%]" />
                   {selectedBottomDistributionDefect && (() => {
                     const surfaceMeta = surfaceImages.find(
                       (info) => info.surface === selectedBottomDistributionDefect.surface,

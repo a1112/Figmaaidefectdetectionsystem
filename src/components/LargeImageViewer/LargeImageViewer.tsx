@@ -281,6 +281,58 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
       }
     }, 100); // 延迟100ms执行，避免影响渲染
   }, [annotationContext, tileSize, preheatThrottle, globalPreheatManager]);
+
+  // 缩放时预热指定层级的瓦片
+  const triggerTilePreheatForLevel = useCallback((targetLevel: number) => {
+    const surface = annotationContext?.lineKey?.includes('top') ? 'top' : 'bottom';
+    const seqNo = annotationContext?.seqNo || 0;
+
+    if (seqNo <= 0) return;
+
+    // 计算当前视口对应的世界坐标区域
+    const { x, y, scale } = transform.current;
+    const viewX = -x / scale;
+    const viewY = -y / scale;
+    const viewW = containerSize.width / scale;
+    const viewH = containerSize.height / scale;
+
+    // 计算目标层级的虚拟瓦片大小
+    const virtualTileSize = tileSize * Math.pow(2, targetLevel);
+
+    // 计算目标层级下视口覆盖的瓦片范围
+    const startCol = Math.floor(viewX / virtualTileSize);
+    const startRow = Math.floor(viewY / virtualTileSize);
+    const endCol = Math.ceil((viewX + viewW) / virtualTileSize);
+    const endRow = Math.ceil((viewY + viewH) / virtualTileSize);
+
+    // 预热范围扩大一些，提供更好的体验
+    const padding = 1;
+    const tiles: TileInfo[] = [];
+
+    for (let row = startRow - padding; row <= endRow + padding; row++) {
+      for (let col = startCol - padding; col <= endCol + padding; col++) {
+        if (row < 0 || col < 0) continue;
+        tiles.push({
+          level: targetLevel,
+          tileX: col,
+          tileY: row,
+          tileSize: tileSize,
+        });
+      }
+    }
+
+    if (tiles.length > 0) {
+      globalPreheatManager.preheatFromVisibleTiles({
+        surface: surface as Surface,
+        seqNo,
+        visibleTiles: tiles,
+        view: annotationContext?.view,
+        immediate: true, // 立即预热
+      }).catch(error => {
+        console.warn('[Zoom Preheat] Failed:', error);
+      });
+    }
+  }, [annotationContext, tileSize, containerSize, transform]);
   const [drawMode, setDrawMode] = useState<"none" | "view" | "measure" | "mark">("none");
   const [showScrollbars, setShowScrollbars] = useState(false);
   const [showMeasureData, setShowMeasureData] = useState(true);
@@ -1003,6 +1055,19 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
 
     const newScale = clamp(current.scale * factor, minScale, maxScale);
 
+    // 缩放预热：检测缩放方向，提前预热下一层级的瓦片
+    const currentLevel = computePreferredLevel(current.scale);
+    const newLevel = computePreferredLevel(newScale);
+
+    // 如果缩小（level 变大），预热更高层级的瓦片
+    if (newLevel > currentLevel) {
+      triggerTilePreheatForLevel(newLevel);
+    }
+    // 如果放大（level 变小），预热当前层级的瓦片
+    else if (newLevel < currentLevel) {
+      triggerTilePreheatForLevel(newLevel);
+    }
+
     const rect = frontCanvasRef.current?.getBoundingClientRect();
     if (!rect) return;
 
@@ -1017,7 +1082,7 @@ export const LargeImageViewer: React.FC<LargeImageViewerProps> = ({
 
     transform.current = clampTransform({ x: newX, y: newY, scale: newScale });
     setTick(t => t + 1);
-  }, [getConstraints, clampTransform, wheelMode, lockScale]);
+  }, [getConstraints, clampTransform, wheelMode, lockScale, computePreferredLevel, triggerTilePreheatForLevel]);
 
   useEffect(() => {
     const canvas = frontCanvasRef.current;

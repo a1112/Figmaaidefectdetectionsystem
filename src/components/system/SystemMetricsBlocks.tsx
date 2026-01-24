@@ -53,12 +53,29 @@ export const DiskUsagePanel = ({
 }: {
   disks: SystemDiskUsage[] | undefined;
   maxHeightClass?: string;
-}) => (
+}) => {
+  // 计算综合统计
+  const totalUsed = disks?.reduce((sum, disk) => sum + disk.used_bytes, 0) ?? 0;
+  const totalCapacity = disks?.reduce((sum, disk) => sum + disk.total_bytes, 0) ?? 0;
+  const overallPercent = totalCapacity > 0 ? (totalUsed / totalCapacity) * 100 : 0;
+
+  return (
   <div className="bg-muted/30 border border-border/50 p-3">
-    <SectionHeader
-      icon={<HardDrive className="w-4 h-4 text-purple-400" />}
-      title="磁盘使用率"
-    />
+    <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center gap-2">
+        <HardDrive className="w-4 h-4 text-purple-400" />
+        <h4 className="font-bold text-xs uppercase tracking-wide">磁盘使用率</h4>
+      </div>
+      {disks && disks.length > 0 && (
+        <div className="text-right">
+          <div className="text-[10px] text-muted-foreground">总计</div>
+          <div className="text-xs font-mono">
+            {formatBytes(totalUsed)} / {formatBytes(totalCapacity)}
+            <span className="ml-1 text-muted-foreground">({overallPercent.toFixed(1)}%)</span>
+          </div>
+        </div>
+      )}
+    </div>
     <div className={cn("space-y-2 overflow-y-auto pr-1", maxHeightClass)}>
       {disks && disks.length > 0 ? (
         disks.map((disk) => (
@@ -79,7 +96,8 @@ export const DiskUsagePanel = ({
       )}
     </div>
   </div>
-);
+  );
+};
 
 export const ServerResourcesPanel = ({
   resources,
@@ -259,7 +277,7 @@ export const NetworkStatusPanel = ({
               <span
                 className={cn(
                   "h-2 w-2 rounded-full",
-                  item.is_up ? "bg-green-500" : "bg-muted-foreground",
+                  item.is_up ? "bg-green-500" : "bg-red-500",
                 )}
               />
               <span className="font-mono">{item.name}</span>

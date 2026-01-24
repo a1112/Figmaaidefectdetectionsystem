@@ -284,6 +284,24 @@ export function DefectImageView({
         fmt: "JPEG",
       });
 
+      // 首先尝试用低层级的瓦片撑场面
+      const drewFallback = tryDrawFallbackTile({
+        ctx,
+        tile,
+        orientation: imageOrientation,
+        cache: tileImageCache,
+        cacheKeyPrefix: imageOrientation,
+        surface: surfaceLayout.surface,
+        seqNo,
+        tileX: requestInfo.tileX,
+        tileY: requestInfo.tileY,
+        tileSize: tileSizeArg,
+        maxLevel: maxTileLevel,
+        imageScale,
+        useTransparentBackground: false,
+      });
+
+      // 如果当前层级的瓦片已经加载完成，覆盖 fallback
       if (cached && cached.complete) {
         drawTileImage({
           ctx,
@@ -292,21 +310,7 @@ export function DefectImageView({
           orientation: imageOrientation,
         });
       } else {
-        const drewFallback = tryDrawFallbackTile({
-          ctx,
-          tile,
-          orientation: imageOrientation,
-          cache: tileImageCache,
-          cacheKeyPrefix: imageOrientation,
-          surface: surfaceLayout.surface,
-          seqNo,
-          tileX: requestInfo.tileX,
-          tileY: requestInfo.tileY,
-          tileSize: tileSizeArg,
-          maxLevel: maxTileLevel,
-          imageScale,
-          useTransparentBackground: true,
-        });
+        // 当前层级瓦片未加载，开始加载
         if (!tileImageLoading.has(cacheKey)) {
           tileImageLoading.add(cacheKey);
           const img = new Image();
@@ -319,6 +323,8 @@ export function DefectImageView({
             tileImageLoading.delete(cacheKey);
           };
         }
+
+        // 如果没有 fallback 可用，显示占位符
         if (!drewFallback) {
           ctx.fillStyle = "#e2e8f0";
           ctx.fillRect(tile.x, tile.y, tile.width, tile.height);

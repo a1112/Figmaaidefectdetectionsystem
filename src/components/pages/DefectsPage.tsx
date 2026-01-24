@@ -56,6 +56,7 @@ interface DefectsPageProps {
   showDistributionImages: boolean;
   showTileBorders: boolean;
   distributionScaleMode: DistributionScaleMode;
+  setDistributionScaleMode?: (mode: DistributionScaleMode) => void;
   onDefectHover?: (defect: Defect, position: { screenX: number; screenY: number }) => void;
   onDefectHoverEnd?: () => void;
 }
@@ -88,6 +89,7 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
   showDistributionImages,
   showTileBorders,
   distributionScaleMode,
+  setDistributionScaleMode,
   onDefectHover,
   onDefectHoverEnd,
 }) => {
@@ -249,6 +251,7 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
               showDistributionImages={showDistributionImages}
               showTileBorders={showTileBorders}
               distributionScaleMode={distributionScaleMode}
+              setDistributionScaleMode={setDistributionScaleMode}
               seqNo={
                 selectedPlate
                   ? parseInt(selectedPlate.serialNumber, 10)

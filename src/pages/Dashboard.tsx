@@ -1246,6 +1246,9 @@ export function Dashboard() {
                     showDistributionImages={showDistributionImages}
                     showTileBorders={showTileBorders}
                     distributionScaleMode={distributionScaleMode}
+                    setDistributionScaleMode={(value) =>
+                      updateSetting("distributionScaleMode", value)
+                    }
                     onDefectHover={handleDefectHover}
                     onDefectHoverEnd={handleDefectHoverEnd}
                   />

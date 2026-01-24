@@ -50,13 +50,32 @@ export function DefectHoverTooltip({
     const maxHeight = tooltipHeight;
     let left = screenX + offset;
     let top = screenY + offset;
+    let positionAbove = false;
+
     if (typeof window !== "undefined") {
       const maxLeft = Math.max(0, window.innerWidth - maxWidth - 12);
-      const maxTop = Math.max(0, window.innerHeight - maxHeight - 12);
       left = Math.min(left, maxLeft);
-      top = Math.min(top, maxTop);
+
+      // 检查是否应该显示在鼠标上方
+      const spaceBelow = window.innerHeight - screenY - offset - 12;
+      const spaceAbove = screenY - offset - 12;
+
+      if (spaceBelow < maxHeight && spaceAbove > spaceBelow) {
+        // 显示在鼠标上方
+        positionAbove = true;
+        top = screenY - maxHeight - offset;
+      } else {
+        // 显示在鼠标下方，但确保不超出屏幕
+        const maxTop = Math.max(0, window.innerHeight - maxHeight - 12);
+        top = Math.min(top, maxTop);
+      }
+
+      // 确保不超出顶部
+      if (top < 12) {
+        top = 12;
+      }
     }
-    return { left, top };
+    return { left, top, positionAbove };
   }, [cardWidth, tooltipHeight, screenX, screenY, offset]);
 
   const displayX = Math.round(defect.xMm ?? defect.x);
