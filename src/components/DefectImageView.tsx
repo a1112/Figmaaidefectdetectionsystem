@@ -1,6 +1,40 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { AlertCircle } from "lucide-react";
 import { env } from "../config/env";
+
+// ==================== 节流工具 ====================
+
+function useThrottle<T extends (...args: unknown[]) => void>(
+  fn: T,
+  delay: number,
+): T {
+  const lastRun = useRef(Date.now());
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  return useCallback(
+    ((...args: Parameters<T>) => {
+      const now = Date.now();
+      const timeSinceLastRun = now - lastRun.current;
+
+      if (timeSinceLastRun >= delay) {
+        // 如果已经过了节流间隔，立即执行
+        lastRun.current = now;
+        fn(...args);
+      } else {
+        // 否则在剩余延迟后执行
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
+        const remainingDelay = delay - timeSinceLastRun;
+        timeoutRef.current = setTimeout(() => {
+          lastRun.current = Date.now();
+          fn(...args);
+        }, remainingDelay);
+      }
+    }) as T,
+    [fn, delay],
+  );
+}
 import type {
   Defect,
   SteelPlate,
@@ -493,6 +527,24 @@ export function DefectImageView({
     );
   }
 
+  // 节流处理 onPointerMove，避免频繁触发
+  const throttledOnPointerMove = useMemo(
+    () =>
+      useThrottle(
+        (info: { worldX: number; worldY: number; screenX: number; screenY: number }) => {
+          const hit = hitTestDefect(info.worldX, info.worldY);
+          setCursor(hit ? "pointer" : "grab");
+          if (hit && onDefectHover) {
+            onDefectHover(hit, { screenX: info.screenX, screenY: info.screenY });
+          } else {
+            onDefectHoverEnd?.();
+          }
+        },
+        50, // 50ms 节流间隔
+      ),
+    [hitTestDefect, onDefectHover, onDefectHoverEnd],
+  );
+
   return (
     <LargeImageViewer
       imageWidth={layout.worldWidth}
@@ -507,15 +559,7 @@ export function DefectImageView({
       focusTarget={focusTarget}
       centerTarget={centerTarget ?? null}
       onViewportChange={(info) => onViewportChange?.(info)}
-      onPointerMove={(info) => {
-        const hit = hitTestDefect(info.worldX, info.worldY);
-        setCursor(hit ? "pointer" : "grab");
-        if (hit && onDefectHover) {
-          onDefectHover(hit, { screenX: info.screenX, screenY: info.screenY });
-        } else {
-          onDefectHoverEnd?.();
-        }
-      }}
+      onPointerMove={throttledOnPointerMove}
       onPointerLeave={() => {
         setCursor("grab");
         onDefectHoverEnd?.();

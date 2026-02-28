@@ -81,9 +81,13 @@ const DEFAULT_DEFECT_TYPES = [
 const NAV_ITEMS = ["缺陷分析", "图像分析"];
 const DEFAULT_DEFECT_CROP_EXPAND = 100;
 
-const mapTileImageCache = new Map<string, HTMLImageElement>();
+// LRU 图像缓存导入
+import { getOrCreateLRUCache } from "../../utils/lruImageCache";
+
+// 使用 LRU 缓存，限制最大缓存数量防止内存泄漏
+const mapTileImageCache = getOrCreateLRUCache("TraditionalMode-Map", 500);
 const mapTileImageLoading = new Set<string>();
-const analysisTileImageCache = new Map<string, HTMLImageElement>();
+const analysisTileImageCache = getOrCreateLRUCache("TraditionalMode-Analysis", 500);
 const analysisTileImageLoading = new Set<string>();
 
 function LiveClock({ formatTime }: { formatTime: (date: Date) => string }) {

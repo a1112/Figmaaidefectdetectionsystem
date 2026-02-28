@@ -263,19 +263,41 @@ export default function CacheDebug() {
 
   useEffect(() => {
     let timer: number | null = null;
-    void loadData();
-    timer = window.setInterval(loadData, 5000);
+    const cancelled = { current: false };
+
+    const doLoadData = async () => {
+      if (cancelled.current) return;
+      await loadData();
+    };
+
+    void doLoadData();
+    timer = window.setInterval(doLoadData, 5000);
+
     return () => {
-      if (timer) window.clearInterval(timer);
+      cancelled.current = true;
+      if (timer !== null) {
+        window.clearInterval(timer);
+      }
     };
   }, [pageSize]);
 
   useEffect(() => {
     let timer: number | null = null;
-    void loadCacheStatus();
-    timer = window.setInterval(loadCacheStatus, 3000);
+    const cancelled = { current: false };
+
+    const doLoadCacheStatus = async () => {
+      if (cancelled.current) return;
+      await loadCacheStatus();
+    };
+
+    void doLoadCacheStatus();
+    timer = window.setInterval(doLoadCacheStatus, 3000);
+
     return () => {
-      if (timer) window.clearInterval(timer);
+      cancelled.current = true;
+      if (timer !== null) {
+        window.clearInterval(timer);
+      }
     };
   }, []);
 
@@ -369,7 +391,10 @@ export default function CacheDebug() {
       return;
     }
     let timer: number | null = null;
+    const cancelled = { current: false };
+
     const loadLogs = async () => {
+      if (cancelled.current) return;
       try {
         await loadLogsOnce(activeTab);
       } catch (error) {
@@ -378,8 +403,12 @@ export default function CacheDebug() {
     };
     void loadLogs();
     timer = window.setInterval(loadLogs, 2000);
+
     return () => {
-      if (timer) window.clearInterval(timer);
+      cancelled.current = true;
+      if (timer !== null) {
+        window.clearInterval(timer);
+      }
     };
   }, [logAutoRefresh, activeTab]);
 

@@ -1,4 +1,5 @@
 import { AlertTriangle, Circle, Target } from "lucide-react";
+import { useCallback, memo } from "react";
 import type { Defect } from "../types/app.types";
 import { useNewItemKeys } from "../hooks/useNewItems";
 
@@ -24,7 +25,8 @@ export function DefectList({
   onDefectHoverEnd,
 }: DefectListProps) {
   const newDefectKeys = useNewItemKeys(defects, (defect) => defect.id);
-  const getSeverityColor = (severity: string) => {
+
+  const getSeverityColor = useCallback((severity: string) => {
     switch (severity) {
       case "high":
         return "text-red-500 border-red-500/50 bg-red-500/10";
@@ -35,9 +37,9 @@ export function DefectList({
       default:
         return "text-muted-foreground border-border bg-muted/50";
     }
-  };
+  }, []);
 
-  const getDefectColor = (type: string) => {
+  const getDefectColor = useCallback((type: string) => {
     if (defectColors && defectColors[type]) {
       return defectColors[type];
     }
@@ -46,7 +48,7 @@ export function DefectList({
       border: "border-primary/40",
       text: "text-primary",
     };
-  };
+  }, [defectColors]);
 
   return (
     <div className="h-full flex flex-col">
@@ -190,3 +192,5 @@ export function DefectList({
     </div>
   );
 }
+
+export const DefectListMemo = memo(DefectList);

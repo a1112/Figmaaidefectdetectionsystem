@@ -4,6 +4,83 @@
  */
 
 import { env } from "../config/env";
+
+// ==================== 缓存和请求去重 ====================
+
+interface CachedEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
+interface PendingRequest<T> {
+  promise: Promise<T>;
+  timestamp: number;
+}
+
+// 内存缓存：使用 Map 存储，支持 TTL 过期
+const memoryCache = new Map<string, CachedEntry<unknown>>();
+const DEFAULT_CACHE_TTL = 5000; // 5秒缓存
+
+// 请求去重：防止短时间内重复请求相同资源
+const pendingRequests = new Map<string, PendingRequest<unknown>>();
+const REQUEST_DEDUP_TTL = 2000; // 2秒内相同请求去重
+
+function generateCacheKey(prefix: string, params: Record<string, unknown>): string {
+  const sortedParams = Object.keys(params)
+    .sort()
+    .map((k) => `${k}=${String(params[k])}`)
+    .join("&");
+  return `${prefix}?${sortedParams}`;
+}
+
+function getFromCache<T>(key: string, ttl: number = DEFAULT_CACHE_TTL): T | null {
+  const entry = memoryCache.get(key) as CachedEntry<T> | undefined;
+  if (!entry) return null;
+
+  const now = Date.now();
+  if (now - entry.timestamp > ttl) {
+    memoryCache.delete(key);
+    return null;
+  }
+
+  return entry.data;
+}
+
+function setCache<T>(key: string, data: T): void {
+  memoryCache.set(key, { data, timestamp: Date.now() });
+}
+
+async function withDedup<T>(
+  key: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const existing = pendingRequests.get(key);
+  if (existing && Date.now() - existing.timestamp < REQUEST_DEDUP_TTL) {
+    return existing.promise as Promise<T>;
+  }
+
+  const promise = fn();
+  pendingRequests.set(key, { promise, timestamp: Date.now() });
+
+  try {
+    return await promise;
+  } finally {
+    pendingRequests.delete(key);
+  }
+}
+
+// 清除缓存（用于手动刷新）
+export function clearApiCache(pattern?: string): void {
+  if (pattern) {
+    for (const key of memoryCache.keys()) {
+      if (key.startsWith(pattern)) {
+        memoryCache.delete(key);
+      }
+    }
+  } else {
+    memoryCache.clear();
+  }
+}
 import type {
   SteelListResponse,
   DefectResponse,
@@ -194,6 +271,7 @@ export async function getDefects(
 /**
  * 获取指定钢板的缺陷列表（保留后端原始字段）
  * 对应后端 /api/defects/{seq_no} 响应。
+ * 带有内存缓存和请求去重优化。
  */
 export async function getDefectsRaw(
   seqNo: number,
@@ -204,60 +282,77 @@ export async function getDefectsRaw(
     return response;
   }
 
-  // 生产模式：调用真实 API
-  try {
-    const baseUrl = env.getApiBaseUrl();
-    const url = `${baseUrl}/defects/${seqNo}`;
-    console.log(`🌐 [生产模式] 请求缺陷数据: ${url}`);
+  // 生成缓存键
+  const cacheKey = generateCacheKey("defects", { seqNo });
 
-    const response = await fetch(url);
+  // 尝试从缓存获取
+  const cached = getFromCache<DefectResponse>(cacheKey);
+  if (cached) {
+    console.log(`📦 [缓存命中] 缺陷数据: seqNo=${seqNo}`);
+    return cached;
+  }
 
-    if (!response.ok) {
-      const contentType = response.headers.get("content-type");
-      let errorMessage = `API Error: ${response.status} ${response.statusText}`;
+  // 使用请求去重
+  return withDedup(cacheKey, async () => {
+    // 生产模式：调用真实 API
+    try {
+      const baseUrl = env.getApiBaseUrl();
+      const url = `${baseUrl}/defects/${seqNo}`;
+      console.log(`🌐 [生产模式] 请求缺陷数据: ${url}`);
 
-      if (contentType && contentType.includes("text/html")) {
-        errorMessage +=
-          "\n\n⚠️ 后端返回了 HTML 页面而不是 JSON 数据";
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        const contentType = response.headers.get("content-type");
+        let errorMessage = `API Error: ${response.status} ${response.statusText}`;
+
+        if (contentType && contentType.includes("text/html")) {
+          errorMessage +=
+            "\n\n⚠️ 后端返回了 HTML 页面而不是 JSON 数据";
+        }
+
+        throw new Error(errorMessage);
       }
 
-      throw new Error(errorMessage);
+      const contentType = response.headers.get("content-type");
+      if (
+        !contentType ||
+        !contentType.includes("application/json")
+      ) {
+        throw new Error(
+          `服务器返回了非 JSON 数据 (Content-Type: ${contentType})`,
+        );
+      }
+
+      const data: DefectResponse = await response.json();
+
+      // 缓存结果
+      setCache(cacheKey, data);
+
+      return data;
+    } catch (error) {
+      console.error("❌ 加载缺陷数据失败:", error);
+
+      if (env.getMode() === "cors" && error instanceof TypeError && error.message === "Failed to fetch") {
+        const baseUrl = env.getApiBaseUrl();
+        const rootUrl = baseUrl.replace(/\/api$/, "");
+        throw new Error(
+          `无法连接到远程服务器。请尝试在新标签页访问 ${rootUrl}/api/health 并接受证书。`
+        );
+      }
+
+      if (
+        error instanceof SyntaxError &&
+        error.message.includes("JSON")
+      ) {
+        throw new Error(
+          "后端返回了无效的响应，请确保后端服务器正在运行",
+        );
+      }
+
+      throw error;
     }
-
-    const contentType = response.headers.get("content-type");
-    if (
-      !contentType ||
-      !contentType.includes("application/json")
-    ) {
-      throw new Error(
-        `服务器返回了非 JSON 数据 (Content-Type: ${contentType})`,
-      );
-    }
-
-    const data: DefectResponse = await response.json();
-    return data;
-  } catch (error) {
-    console.error("❌ 加载缺陷数据失败:", error);
-
-    if (env.getMode() === "cors" && error instanceof TypeError && error.message === "Failed to fetch") {
-      const baseUrl = env.getApiBaseUrl();
-      const rootUrl = baseUrl.replace(/\/api$/, "");
-      throw new Error(
-        `无法连接到远程服务器。请尝试在新标签页访问 ${rootUrl}/api/health 并接受证书。`
-      );
-    }
-
-    if (
-      error instanceof SyntaxError &&
-      error.message.includes("JSON")
-    ) {
-      throw new Error(
-        "后端返回了无效的响应，请确保后端服务器正在运行",
-      );
-    }
-
-    throw error;
-  }
+  });
 }
 
 /**

@@ -16,8 +16,10 @@ import type { Tile } from "../components/LargeImageViewer/utils";
 
 // 实时更新导入
 import { useRealtimeUpdates } from "../hooks/useRealtimeUpdates";
+import { getOrCreateLRUCache } from "../utils/lruImageCache";
 
-const tileImageCache = new Map<string, HTMLImageElement>();
+// 使用 LRU 缓存，限制最大缓存数量防止内存泄漏
+const tileImageCache = getOrCreateLRUCache("ImagesTab", 500);
 const tileImageLoading = new Set<string>();
 
 interface ImagesTabProps {
@@ -122,7 +124,7 @@ export function ImagesTab({
     onNewDataDetected: (latestSeqNo: number, tileCount: number) => {
       setNewDataNotification({ show: true, seqNo: latestSeqNo });
       console.log(`🚀 检测到新数据: 序号 ${latestSeqNo}, 瓦片数 ${tileCount}`);
-      
+
       // 如果当前选择的不是最新卷，自动选择最新卷
       if (selectedPlate) {
         const currentSeqNo = parseInt(selectedPlate.serialNumber, 10);
@@ -137,6 +139,45 @@ export function ImagesTab({
       }
     },
   });
+
+  // 实时更新定时器管理（将 useEffect 从 JSX 中移出）
+  useEffect(() => {
+    if (!env.isProduction() || !realtimeEnabled) {
+      // 清理任何现有定时器
+      if (realtimeCheckTimerRef.current !== null) {
+        window.clearInterval(realtimeCheckTimerRef.current);
+        realtimeCheckTimerRef.current = null;
+      }
+      return;
+    }
+
+    console.log("🚀 启动实时更新功能");
+
+    // 清理之前的定时器（如果存在）
+    if (realtimeCheckTimerRef.current !== null) {
+      window.clearInterval(realtimeCheckTimerRef.current);
+    }
+
+    // 启动新的定时器
+    const cancelled = { current: false };
+    realtimeCheckTimerRef.current = window.setInterval(async () => {
+      if (cancelled.current) return;
+      await manualCheck();
+    }, 5000);
+
+    console.log("✅ 实时更新已启动");
+
+    // 清理函数
+    return () => {
+      cancelled.current = true;
+      if (realtimeCheckTimerRef.current !== null) {
+        window.clearInterval(realtimeCheckTimerRef.current);
+        realtimeCheckTimerRef.current = null;
+        console.log("🛑 实时更新已停止");
+      }
+    };
+  }, [realtimeEnabled, manualCheck]);
+
   const plateWidth = selectedPlate?.dimensions.width ?? 0;
   const plateLength = selectedPlate?.dimensions.length ?? 0;
   const distLeft = hoveredDefect ? Math.round(hoveredDefect.x) : null;
@@ -529,31 +570,6 @@ export function ImagesTab({
           );
          })()}
       </div>
-      
-      {/* 实时更新初始化 */}
-      {useEffect(() => {
-        if (env.isProduction() && realtimeEnabled) {
-          console.log("🚀 启动实时更新功能");
-          
-          // 启动实时更新
-          const startUpdates = () => {
-            realtimeCheckTimerRef.current = window.setInterval(async () => {
-              await manualCheck();
-            }, 5000);
-            console.log("✅ 实时更新已启动");
-          };
-          
-          startUpdates();
-          
-          // 清理函数
-          return () => {
-            if (realtimeCheckTimerRef.current) {
-              clearInterval(realtimeCheckTimerRef.current);
-              console.log("🛑 实时更新已停止");
-            }
-          };
-        }
-      }, [realtimeEnabled, manualCheck])}
     </div>
   );
 }

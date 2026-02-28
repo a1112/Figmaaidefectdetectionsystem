@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 
 export interface MapViewportProps {
@@ -7,6 +7,20 @@ export interface MapViewportProps {
 }
 
 export const MapViewport: React.FC<MapViewportProps> = ({ worldWidth, worldHeight }) => {
+  const handleZoomIn = useCallback(() => {
+    // zoomIn is provided by TransformWrapper's render prop
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    // zoomOut is provided by TransformWrapper's render prop
+  }, []);
+
+  const handleResetTransform = useCallback(() => {
+    // resetTransform is provided by TransformWrapper's render prop
+  }, []);
+
+  const gridElements = useMemo(() => renderGrid(worldWidth, worldHeight), [worldWidth, worldHeight]);
+
   return (
     <div className="w-full h-full bg-black/80 border border-border overflow-hidden relative">
       <TransformWrapper
@@ -48,7 +62,7 @@ export const MapViewport: React.FC<MapViewportProps> = ({ worldWidth, worldHeigh
                   background: '#111',
                 }}
               >
-                {renderGrid(worldWidth, worldHeight)}
+                {gridElements}
               </div>
             </TransformComponent>
           </>

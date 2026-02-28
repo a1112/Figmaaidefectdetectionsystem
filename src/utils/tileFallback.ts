@@ -63,7 +63,8 @@ export function tryDrawFallbackTile(params: {
   ctx: CanvasRenderingContext2D;
   tile: { x: number; y: number; width: number; height: number; level: number };
   orientation: ImageOrientation;
-  cache: Map<string, HTMLImageElement>;
+  // 使用更通用的接口类型，支持 Map 和 LRU 缓存
+  cache: Pick<Map<string, HTMLImageElement>, 'get'>;
   cacheKeyPrefix: string;
   surface: Surface;
   seqNo: number;

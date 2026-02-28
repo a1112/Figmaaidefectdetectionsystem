@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { env } from "../config/env";
 import { listSteels } from "../api/client";
 import type { SteelItem } from "../api/types";
@@ -26,7 +26,7 @@ export const useSteelPlates = (
   >(null);
 
   // 加载钢板列表的函数（提取出来以便重用）
-  const loadSteelPlates = async () => {
+  const loadSteelPlates = useCallback(async () => {
     setIsLoadingSteels(true);
     setSteelsLoadError(null);
 
@@ -105,7 +105,7 @@ export const useSteelPlates = (
     } finally {
       setIsLoadingSteels(false);
     }
-  };
+  }, [selectedPlateId, setSelectedPlateId, history, setHistory]);
 
   // 初始加载钢板列表
   useEffect(() => {
@@ -126,7 +126,7 @@ export const useSteelPlates = (
         "app_mode_change",
         handleModeChange,
       );
-  }, []);
+  }, [loadSteelPlates]);
 
   return {
     steelPlates,

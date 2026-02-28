@@ -129,32 +129,38 @@ export const useSystemMetrics = (options: UseSystemMetricsOptions = {}) => {
   useEffect(() => {
     if (!enabled) return;
 
+    // 用于取消所有异步操作的标志（使用对象包装以便可变）
+    const cancelled = { current: false };
+    const cleanupFns: Array<() => void> = [];
+
     if (!isLive) {
-      let active = true;
       let current = createMockPayload(metrics ?? undefined);
       setMetrics(current);
       pushHistory(current);
 
       const timer = window.setInterval(() => {
-        if (!active) return;
+        if (cancelled.current) return;
         current = createMockPayload(current);
         setMetrics(current);
         pushHistory(current);
       }, mockIntervalMs);
+      cleanupFns.push(() => window.clearInterval(timer));
 
       return () => {
-        active = false;
-        window.clearInterval(timer);
+        cleanupFns.forEach(fn => fn());
       };
     }
 
     let pollingTimer: number | null = null;
     let wsActive = true;
+
     const startPolling = () => {
-      if (pollingTimer !== null) return;
+      if (pollingTimer !== null || cancelled.current) return;
       pollingTimer = window.setInterval(async () => {
+        if (cancelled.current) return;
         try {
           const info = await getSystemInfo();
+          if (cancelled.current) return;
           const payload: SystemMetricsPayload = {
             timestamp: new Date().toISOString(),
             resources: info.resources,
@@ -170,30 +176,56 @@ export const useSystemMetrics = (options: UseSystemMetricsOptions = {}) => {
       }, mockIntervalMs);
     };
 
+    const stopPolling = () => {
+      if (pollingTimer !== null) {
+        window.clearInterval(pollingTimer);
+        pollingTimer = null;
+      }
+    };
+
     const ws = new WebSocket(getSystemMetricsWsUrl());
-    ws.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data) as SystemMetricsPayload;
+
+    const safeSetMetrics = (payload: SystemMetricsPayload) => {
+      if (!cancelled.current) {
         setMetrics(payload);
         pushHistory(payload);
+      }
+    };
+
+    ws.onmessage = (event) => {
+      if (cancelled.current) return;
+      try {
+        const payload = JSON.parse(event.data) as SystemMetricsPayload;
+        safeSetMetrics(payload);
       } catch {
         // ignore malformed payloads
       }
     };
+
     ws.onerror = () => {
-      if (!wsActive) return;
+      if (cancelled.current || !wsActive) return;
+      stopPolling();
       startPolling();
     };
+
     ws.onclose = () => {
-      if (!wsActive) return;
+      if (cancelled.current || !wsActive) return;
+      stopPolling();
       startPolling();
     };
 
     return () => {
+      // 设置取消标志，防止任何异步操作继续执行
+      cancelled.current = true;
       wsActive = false;
-      ws.close();
-      if (pollingTimer !== null) {
-        window.clearInterval(pollingTimer);
+      stopPolling();
+      // 安全关闭 WebSocket
+      try {
+        if (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN) {
+          ws.close();
+        }
+      } catch {
+        // 忽略关闭时的错误
       }
     };
   }, [enabled, isLive, mockIntervalMs, historySize]);

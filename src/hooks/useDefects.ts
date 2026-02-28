@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { env } from '../config/env';
 import { getDefects } from '../api/client';
 import type { DefectItem } from '../api/types';
@@ -11,56 +11,51 @@ export const useDefects = (selectedPlateId: string | null, steelPlates: SteelPla
   const [plateDefects, setPlateDefects] = useState<Defect[]>([]);
   const [isLoadingDefects, setIsLoadingDefects] = useState(false);
 
-  // 当选中钢板时，加载该钢板的缺陷数据
-  useEffect(() => {
+  // 使用 useCallback 包装加载函数，仅依赖 selectedPlateId
+  // 注意：不依赖 steelPlates，避免钢板列表更新时重复请求
+  const loadPlateDefects = useCallback(async () => {
     if (!selectedPlateId) {
       setPlateDefects([]);
       return;
     }
 
-    const loadPlateDefects = async () => {
-      setIsLoadingDefects(true);
-      
-      try {
-        // 从 plateId 中提取 seq_no（去除前导零）
-        const selectedPlate = steelPlates.find(p => p.serialNumber === selectedPlateId);
-        if (!selectedPlate) {
-          console.warn('未找到选中的钢板:', selectedPlateId);
-          setPlateDefects([]);
-          return;
-        }
+    setIsLoadingDefects(true);
 
-        const seqNo = parseInt(selectedPlate.serialNumber, 10);
-        console.log(`🔍 加载钢板 ${selectedPlateId} (seq_no: ${seqNo}) 的缺陷数据...`);
-        
-        const defectItems: DefectItem[] = await getDefects(seqNo);
-        
-        // 将 DefectItem 转换为 Defect 格式
-        const mapped: Defect[] = defectItems.map(item => ({
-          id: item.id,
-          type: item.type,
-          severity: item.severity,
-          x: item.x,
-          y: item.y,
-          width: item.width,
-          height: item.height,
-          confidence: item.confidence,
-          surface: item.surface,
-          imageIndex: item.imageIndex,
-        }));
-        
-        setPlateDefects(mapped);
-        console.log(`✅ 成功加载 ${mapped.length} 个缺陷 (${env.getMode()} 模式)`);
-      } catch (error) {
-        console.error('❌ 加载缺陷数据失败:', error);
-        setPlateDefects([]);
-      } finally {
-        setIsLoadingDefects(false);
-      }
-    };
+    try {
+      // 直接使用 seq_no（钢板编号作为序列号）
+      const seqNo = parseInt(selectedPlateId, 10);
+      console.log(`🔍 加载钢板 ${selectedPlateId} (seq_no: ${seqNo}) 的缺陷数据...`);
 
+      const defectItems: DefectItem[] = await getDefects(seqNo);
+
+      // 将 DefectItem 转换为 Defect 格式
+      const mapped: Defect[] = defectItems.map(item => ({
+        id: item.id,
+        type: item.type,
+        severity: item.severity,
+        x: item.x,
+        y: item.y,
+        width: item.width,
+        height: item.height,
+        confidence: item.confidence,
+        surface: item.surface,
+        imageIndex: item.imageIndex,
+      }));
+
+      setPlateDefects(mapped);
+      console.log(`✅ 成功加载 ${mapped.length} 个缺陷 (${env.getMode()} 模式)`);
+    } catch (error) {
+      console.error('❌ 加载缺陷数据失败:', error);
+      setPlateDefects([]);
+    } finally {
+      setIsLoadingDefects(false);
+    }
+  }, [selectedPlateId]);
+
+  // 当选中钢板或钢板列表变化时，加载该钢板的缺陷数据
+  useEffect(() => {
     loadPlateDefects();
-  }, [selectedPlateId, steelPlates]);
+  }, [loadPlateDefects]);
 
   return {
     plateDefects,
