@@ -582,7 +582,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                     </p>
                   </div>
                 ) : (
-                  "未登录"
+                  "用户未登录"
                 )}
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-border" />

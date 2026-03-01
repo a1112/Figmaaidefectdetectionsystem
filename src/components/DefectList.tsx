@@ -2,6 +2,7 @@ import { AlertTriangle, Circle, Target } from "lucide-react";
 import { useCallback, memo } from "react";
 import type { Defect } from "../types/app.types";
 import { useNewItemKeys } from "../hooks/useNewItems";
+import { getDefectSelectionKey } from "../utils/defectSelection";
 
 interface DefectListProps {
   defects: Defect[];
@@ -10,7 +11,9 @@ interface DefectListProps {
     [key: string]: { bg: string; border: string; text: string };
   };
   selectedDefectId?: string | null;
+  selectedDefectSurface?: "top" | "bottom" | null;
   onDefectSelect?: (id: string | null) => void;
+  onDefectSelectDetail?: (defect: Defect | null) => void;
   onDefectHover?: (defect: Defect, position: { screenX: number; screenY: number }) => void;
   onDefectHoverEnd?: () => void;
 }
@@ -20,11 +23,15 @@ export function DefectList({
   surface,
   defectColors,
   selectedDefectId,
+  selectedDefectSurface,
   onDefectSelect,
+  onDefectSelectDetail,
   onDefectHover,
   onDefectHoverEnd,
 }: DefectListProps) {
-  const newDefectKeys = useNewItemKeys(defects, (defect) => defect.id);
+  const newDefectKeys = useNewItemKeys(defects, (defect) =>
+    getDefectSelectionKey({ id: defect.id, surface: defect.surface }),
+  );
 
   const getSeverityColor = useCallback((severity: string) => {
     switch (severity) {
@@ -140,11 +147,16 @@ export function DefectList({
         <div className="space-y-1">
           {defects.map((defect, index) => {
             const typeColor = getDefectColor(defect.type);
-            const isSelected = selectedDefectId === defect.id;
+            const isSelected =
+              selectedDefectId === defect.id &&
+              (selectedDefectSurface ? selectedDefectSurface === defect.surface : true);
             return (
             <div
-              key={`${defect.id}-${index}`}
-              onClick={() => onDefectSelect?.(defect.id)}
+              key={`${defect.surface}-${defect.id}-${index}`}
+              onClick={() => {
+                onDefectSelectDetail?.(defect);
+                onDefectSelect?.(defect.id);
+              }}
               onMouseEnter={(e) =>
                 onDefectHover?.(defect, { screenX: e.clientX, screenY: e.clientY })
               }
@@ -156,7 +168,7 @@ export function DefectList({
                 isSelected
                   ? "border-primary bg-primary/10"
                   : "border-border"
-              } ${newDefectKeys.has(String(defect.id)) ? "list-enter" : ""}`}
+              } ${newDefectKeys.has(getDefectSelectionKey({ id: defect.id, surface: defect.surface })) ? "list-enter" : ""}`}
             >
               <span className="text-muted-foreground font-mono w-8">
                 #{index + 1}

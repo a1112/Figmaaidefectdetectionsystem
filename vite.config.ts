@@ -55,26 +55,26 @@ export default defineConfig({
       outDir: 'build',
     },
     server: {
-      port: 3000,
+      port: 3122,
       open: true,
       host: '0.0.0.0',
       allowedHosts: true,
 
       proxy: {
         '/config': {
-          target: 'http://localhost:80',
+          target: 'http://localhost:8120',
           changeOrigin: true,
           secure: false,
           ws: true,
         },
         '/api': {
-          target: 'http://localhost:80',
+          target: 'http://localhost:8120',
           changeOrigin: true,
           secure: false,
           ws: true,
         },
         '/small--api': {
-          target: 'http://localhost:80',
+          target: 'http://localhost:8120',
           changeOrigin: true,
           secure: false,
           ws: true,

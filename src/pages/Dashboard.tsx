@@ -111,6 +111,7 @@ export function Dashboard() {
   const [selectedDefectId, setSelectedDefectId] = useState<
     string | null
   >(null); // 选中的缺陷ID
+  const [selectedDefectSurface, setSelectedDefectSurface] = useState<"top" | "bottom" | null>(null);
   const [hoveredDefect, setHoveredDefect] = useState<{
     defect: Defect;
     screenX: number;
@@ -444,7 +445,7 @@ export function Dashboard() {
           if (isHealthy) {
             env.setMode("production");
             if (!storedOrientation) {
-              handleImageOrientationChange("vertical");
+              handleImageOrientationChange("horizontal");
             }
           }
         }
@@ -1236,7 +1237,9 @@ export function Dashboard() {
                       setManualConfirmStatus
                     }
                     selectedDefectId={selectedDefectId}
+                    selectedDefectSurface={selectedDefectSurface}
                     setSelectedDefectId={setSelectedDefectId}
+                    setSelectedDefectSurface={setSelectedDefectSurface}
                     searchCriteria={searchCriteria}
                     filterCriteria={filterCriteria}
                     surfaceImageInfo={surfaceImageInfo}

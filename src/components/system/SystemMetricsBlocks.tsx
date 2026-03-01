@@ -30,6 +30,12 @@ export const formatPercent = (value: number | null) => {
   return `${value.toFixed(1)}%`;
 };
 
+export const formatMegabytes = (value: number | null) => {
+  if (value === null || Number.isNaN(value)) return "N/A";
+  const mb = value / (1024 * 1024);
+  return `${mb.toFixed(mb >= 100 ? 0 : 1)} M`;
+};
+
 export const formatRate = (value: number | null) => {
   if (value === null || Number.isNaN(value)) return "N/A";
   return `${formatBytes(value)}/s`;
@@ -226,9 +232,16 @@ export const ServerResourcesPanel = ({
               </RechartsAreaChart>
             </ChartContainer>
             <div className="bg-background/50 border border-border/30 p-2 text-xs">
-              <div className="text-muted-foreground mb-1">内存使用率</div>
-              <div className="font-mono font-bold">
-                {formatPercent(resources?.memory_percent ?? null)}
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">内存使用率</span>
+                <span className="font-mono font-bold">
+                  {formatPercent(resources?.memory_percent ?? null)}
+                  <span className="mx-1 text-muted-foreground">|</span>
+                  {formatMegabytes(resources?.memory_used_bytes ?? null)}
+                  {resources?.memory_total_bytes !== null && resources?.memory_total_bytes !== undefined
+                    ? ` / ${formatMegabytes(resources.memory_total_bytes)}`
+                    : ""}
+                </span>
               </div>
             </div>
           </div>
@@ -239,6 +252,11 @@ export const ServerResourcesPanel = ({
                 <span className="text-muted-foreground">内存使用率</span>
                 <span className="font-mono font-bold">
                   {formatPercent(resources?.memory_percent ?? null)}
+                  <span className="mx-1 text-muted-foreground">|</span>
+                  {formatMegabytes(resources?.memory_used_bytes ?? null)}
+                  {resources?.memory_total_bytes !== null && resources?.memory_total_bytes !== undefined
+                    ? ` / ${formatMegabytes(resources.memory_total_bytes)}`
+                    : ""}
                 </span>
               </div>
               <Progress value={resources?.memory_percent ?? 0} />

@@ -493,6 +493,7 @@ export function getTileImageUrl(params: {
   tileSize?: number;
   fmt?: string;
   view?: string;
+  orientation?: "horizontal" | "vertical";
   prefetch?: {
     mode: "defect";
     x: number;
@@ -508,6 +509,7 @@ export function getTileImageUrl(params: {
     tileY,
     fmt = "JPEG",
     view,
+    orientation,
     prefetch,
   } = params;
 
@@ -535,6 +537,9 @@ export function getTileImageUrl(params: {
   }
   if (typeof tileSize === "number") {
     search.set("tile_size", tileSize.toString());
+  }
+  if (orientation) {
+    search.set("orientation", orientation);
   }
   search.set("scale", env.getImageScale().toString());
   if (prefetch?.mode === "defect") {

@@ -17,7 +17,7 @@ import type {
   SearchCriteria,
   FilterCriteria,
 } from "../SearchDialog";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 interface DefectsPageProps {
   isMobileDevice: boolean;
@@ -47,7 +47,9 @@ interface DefectsPageProps {
   manualConfirmStatus: ManualConfirmStatus;
   setManualConfirmStatus: (status: ManualConfirmStatus) => void;
   selectedDefectId: string | null;
+  selectedDefectSurface: "top" | "bottom" | null;
   setSelectedDefectId: (id: string | null) => void;
+  setSelectedDefectSurface: (surface: "top" | "bottom" | null) => void;
   searchCriteria: SearchCriteria;
   filterCriteria: FilterCriteria;
   imageOrientation: ImageOrientation;
@@ -80,7 +82,9 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
   manualConfirmStatus,
   setManualConfirmStatus,
   selectedDefectId,
+  selectedDefectSurface,
   setSelectedDefectId,
+  setSelectedDefectSurface,
   searchCriteria,
   filterCriteria,
   imageOrientation,
@@ -110,9 +114,23 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
   const selectedDefect =
     selectedDefectId && filteredDefectsByControls.length > 0
       ? filteredDefectsByControls.find(
-          (d) => d.id === selectedDefectId,
+          (d) =>
+            d.id === selectedDefectId &&
+            (selectedDefectSurface ? d.surface === selectedDefectSurface : true),
         ) || null
       : null;
+  const selectedDefectByIdOnly = useMemo(
+    () =>
+      selectedDefectId
+        ? filteredDefectsByControls.find((d) => d.id === selectedDefectId) ?? null
+        : null,
+    [filteredDefectsByControls, selectedDefectId],
+  );
+
+  const handleDefectSelectDetail = (defect: Defect | null) => {
+    setSelectedDefectId(defect?.id ?? null);
+    setSelectedDefectSurface(defect?.surface ?? null);
+  };
 
   const [viewportInfo, setViewportInfo] = useState<ViewportInfo | null>(null);
   const [viewerSurface, setViewerSurface] = useState<"top" | "bottom">("top");
@@ -125,6 +143,11 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
       setViewerSurface(next);
     }
   }, [selectedDefect?.surface]);
+
+  useEffect(() => {
+    if (!selectedDefectId || selectedDefect || !selectedDefectByIdOnly) return;
+    setSelectedDefectSurface(selectedDefectByIdOnly.surface);
+  }, [selectedDefectId, selectedDefect, selectedDefectByIdOnly, setSelectedDefectSurface]);
 
   return (
     <div className="h-full flex flex-col space-y-2">
@@ -213,6 +236,7 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
                   viewerSurface={viewerSurface}
                   imageViewMode={imageViewMode}
                   selectedDefectId={selectedDefectId}
+                  selectedDefectSurface={selectedDefectSurface}
                   onDefectSelect={setSelectedDefectId}
                   onDefectHover={onDefectHover}
                   onDefectHoverEnd={onDefectHoverEnd}
@@ -239,7 +263,9 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
               defectColors={defectColors}
               surfaceImageInfo={surfaceImageInfo}
               selectedDefectId={selectedDefectId}
+              selectedDefectSurface={selectedDefectSurface}
               onDefectSelect={setSelectedDefectId}
+              onDefectSelectDetail={handleDefectSelectDetail}
               onDefectHover={onDefectHover}
               onDefectHoverEnd={onDefectHoverEnd}
               viewportInfo={viewportInfo}
@@ -326,7 +352,9 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
                 surface={surfaceFilter}
                 defectColors={defectColors}
                 selectedDefectId={selectedDefectId}
+                selectedDefectSurface={selectedDefectSurface}
                 onDefectSelect={setSelectedDefectId}
+                onDefectSelectDetail={handleDefectSelectDetail}
                 onDefectHover={onDefectHover}
                 onDefectHoverEnd={onDefectHoverEnd}
               />
@@ -337,7 +365,9 @@ export const DefectsPage: React.FC<DefectsPageProps> = ({
               <DefectNavigationBar
                 defects={filteredDefectsByControls}
                 selectedDefectId={selectedDefectId}
+                selectedDefectSurface={selectedDefectSurface}
                 onDefectSelect={setSelectedDefectId}
+                onDefectSelectDetail={handleDefectSelectDetail}
               />
             </div>
           </div>

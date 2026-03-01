@@ -21,7 +21,9 @@ interface DefectDistributionChartProps {
   };
   surfaceImageInfo?: SurfaceImageInfo[] | null;
   selectedDefectId?: string | null;
+  selectedDefectSurface?: "top" | "bottom" | null;
   onDefectSelect?: (id: string | null) => void;
+  onDefectSelectDetail?: (defect: Defect | null) => void;
   onDefectHover?: (defect: Defect, position: { screenX: number; screenY: number }) => void;
   onDefectHoverEnd?: () => void;
   seqNo?: number;
@@ -104,7 +106,9 @@ export function DefectDistributionChart({
   defectColors,
   surfaceImageInfo,
   selectedDefectId,
+  selectedDefectSurface,
   onDefectSelect,
+  onDefectSelectDetail,
   onDefectHover,
   onDefectHoverEnd,
   seqNo,
@@ -213,7 +217,11 @@ export function DefectDistributionChart({
       const delta = event.deltaY !== 0 ? event.deltaY : event.deltaX;
       const direction = delta > 0 ? 1 : -1;
       const currentIndex = selectedDefectId
-        ? visibleDefects.findIndex((defect) => defect.id === selectedDefectId)
+        ? visibleDefects.findIndex(
+            (defect) =>
+              defect.id === selectedDefectId &&
+              (selectedDefectSurface ? defect.surface === selectedDefectSurface : true),
+          )
         : -1;
       const nextIndex =
         currentIndex < 0
@@ -224,10 +232,11 @@ export function DefectDistributionChart({
             visibleDefects.length;
       const nextDefect = visibleDefects[nextIndex];
       if (nextDefect) {
+        onDefectSelectDetail?.(nextDefect);
         onDefectSelect(nextDefect.id);
       }
     },
-    [onDefectSelect, selectedDefectId, visibleDefects],
+    [onDefectSelect, onDefectSelectDetail, selectedDefectId, selectedDefectSurface, visibleDefects],
   );
 
   const findMetaForSurface = (
@@ -310,36 +319,20 @@ export function DefectDistributionChart({
         containerWidth > 0
           ? containerWidth
           : Math.max(topWidth, bottomWidth);
-
-      // 根据宽度计算对应的高度，保持宽高比
-      const calculateHeightFromWidth = (
-        meta: SurfaceImageInfo | undefined,
-        width: number,
-      ): number => {
-        if (!meta) return plateHeight;
-        const frameCount = meta.frame_count || 1;
-        const imageWidth = meta.image_width || 1;
-        const imageHeight = meta.image_height || 1;
-        // plateWidth / plateHeight = (imageHeight * frameCount) / imageWidth
-        // plateHeight = plateWidth * imageWidth / (imageHeight * frameCount)
-        return width * imageWidth / (imageHeight * frameCount);
-      };
-
+      // 拉伸模式只拉伸宽度，高度保持固定，避免撑开布局高度。
       if (surface === "all") {
         finalTopWidth = targetWidth;
         finalBottomWidth = targetWidth;
-        const topHeight = calculateHeightFromWidth(topMeta, targetWidth);
-        const bottomHeight = calculateHeightFromWidth(bottomMeta, targetWidth);
-        finalPerSurfaceHeight = Math.max(topHeight, bottomHeight);
-        finalHeight = finalPerSurfaceHeight * 2;
+        finalPerSurfaceHeight = perSurfaceHeight;
+        finalHeight = baseHeight;
       } else if (surface === "top") {
         finalTopWidth = targetWidth;
-        finalPerSurfaceHeight = calculateHeightFromWidth(topMeta, targetWidth);
-        finalHeight = finalPerSurfaceHeight;
+        finalPerSurfaceHeight = perSurfaceHeight;
+        finalHeight = baseHeight;
       } else {
         finalBottomWidth = targetWidth;
-        finalPerSurfaceHeight = calculateHeightFromWidth(bottomMeta, targetWidth);
-        finalHeight = finalPerSurfaceHeight;
+        finalPerSurfaceHeight = perSurfaceHeight;
+        finalHeight = baseHeight;
       }
 
       return {
@@ -454,7 +447,8 @@ export function DefectDistributionChart({
     };
   };
 
-  const orientation: ImageOrientation = _imageOrientation ?? "horizontal";
+  // 分布图固定横向显示，不跟随主图方向切换。
+  const orientation: ImageOrientation = "horizontal";
 
   const renderPlate = (
     surf: Surface,
@@ -478,7 +472,11 @@ export function DefectDistributionChart({
       : calculateFinalDimensions.bottomWidth;
     const frameCount = meta?.frame_count || 1;
     const selectedDefect = selectedDefectId
-      ? plateDefects.find((defect) => defect.id === selectedDefectId)
+      ? plateDefects.find(
+          (defect) =>
+            defect.id === selectedDefectId &&
+            (selectedDefectSurface ? defect.surface === selectedDefectSurface : true),
+        )
       : undefined;
 
     const tileImages: JSX.Element[] = [];
@@ -536,6 +534,7 @@ export function DefectDistributionChart({
               tileX: col,
               tileY: row,
               tileSize,
+              orientation: "horizontal",
               // 分布图不使用 view 参数，因为后端直接返回适合横向布局的瓦片
             });
 
@@ -810,13 +809,16 @@ export function DefectDistributionChart({
               plateWidth,
             );
             const borderColor = getDefectBorderColor(defect.type);
-            const isSelected = selectedDefectId === defect.id;
+            const isSelected =
+              selectedDefectId === defect.id &&
+              (selectedDefectSurface ? selectedDefectSurface === defect.surface : true);
 
             return (
               <div
-                key={defect.id}
+                key={`${defect.surface}-${defect.id}`}
                 onClick={(e) => {
                   e.stopPropagation();
+                  onDefectSelectDetail?.(defect);
                   onDefectSelect?.(defect.id);
                 }}
                 onMouseEnter={(e) =>

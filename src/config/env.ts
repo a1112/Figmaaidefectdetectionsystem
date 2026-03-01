@@ -214,11 +214,18 @@ class EnvironmentConfig {
   }
 
   getConfigBaseUrl(): string {
-    if (this.mode === "development") {
-      return "";
-    }
     if (this.mode === "cors") {
       return this.getCorsBaseUrl().replace(/\/+$/, "");
+    }
+    // 本地开发环境使用相对路径，通过 Vite 代理
+    if (typeof window !== "undefined" &&
+        (window.location.hostname === "localhost" ||
+         window.location.hostname === "127.0.0.1" ||
+         window.location.hostname === "::1")) {
+      return "";
+    }
+    if (this.mode === "development") {
+      return "";
     }
     if (this.isDesktopShell()) {
       return this.getLocalBaseUrl();
@@ -230,18 +237,24 @@ class EnvironmentConfig {
    * 获取 API 基础路径
    */
   getApiBaseUrl(): string {
-    // 开发模式使用 mock
-    if (this.mode === "development") {
-      return "";
-    }
-
-    // 跨域模式：使用指定远程地址
+    // 跨域模式优先：必须使用远程地址，不能被 localhost 分支覆盖
     if (this.mode === "cors") {
       const base = this.getCorsApiBaseUrl();
       if (this.lineName) {
         return `${base}/${encodeURIComponent(this.lineName)}`;
       }
       return base;
+    }
+    // 本地开发环境使用相对路径，通过 Vite 代理
+    if (typeof window !== "undefined" &&
+        (window.location.hostname === "localhost" ||
+         window.location.hostname === "127.0.0.1" ||
+         window.location.hostname === "::1")) {
+      return "/api";  // 返回 /api 以触发 Vite 代理
+    }
+    // 开发模式使用 mock
+    if (this.mode === "development") {
+      return "";
     }
 
     // Windows + nginx 测试环境下：

@@ -67,6 +67,7 @@ import {
 } from "../../utils/imageOrientation";
 import type { ImageOrientation } from "../../types/app.types";
 import { useNewItemKeys } from "../../hooks/useNewItems";
+import { getDefectSelectionKey } from "../../utils/defectSelection";
 
 // Separate Clock component to prevent full page re-renders every second
 const DEFAULT_DEFECT_TYPES = [
@@ -304,6 +305,7 @@ export default function TraditionalMode() {
   // Image Analysis State
   const [analysisScrollState, setAnalysisScrollState] = useState({ top: 0, height: 1, clientHeight: 1 });
   const [selectedDefectId, setSelectedDefectId] = useState<string | null>(null);
+  const [selectedDefectSurface, setSelectedDefectSurface] = useState<"top" | "bottom" | null>(null);
   const [topCenterTarget, setTopCenterTarget] = useState<{ x: number; y: number } | null>(null);
   const [bottomCenterTarget, setBottomCenterTarget] = useState<{ x: number; y: number } | null>(null);
   const topViewportRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
@@ -493,6 +495,7 @@ export default function TraditionalMode() {
   const [isDefectListOpen, setIsDefectListOpen] = useState(true);
   const [isImmersiveMode, setIsImmersiveMode] = useState(false);
   const [isMapMode, setIsMapMode] = useState(false);
+  const [isGridView, setIsGridView] = useState(false);
   const [companyName, setCompanyName] = useState("北京科技大学设计研究院有限公司");
   const [mapViewport, setMapViewport] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const [mapCursor, setMapCursor] = useState("grab");
@@ -725,7 +728,44 @@ export default function TraditionalMode() {
       selectedDefectTypes.includes(defect.type),
     );
   }, [plateDefects, selectedDefectTypes]);
-  const newDefectKeys = useNewItemKeys(visibleDefects, (defect) => defect.id);
+  const newDefectKeys = useNewItemKeys(visibleDefects, (defect) =>
+    getDefectSelectionKey({ id: defect.id, surface: defect.surface }),
+  );
+  const isDefectSelected = useCallback(
+    (defect: Pick<DefectItem, "id" | "surface">) =>
+      selectedDefectId === defect.id &&
+      (selectedDefectSurface ? selectedDefectSurface === defect.surface : true),
+    [selectedDefectId, selectedDefectSurface],
+  );
+
+  // 兜底清理：切换视图/筛选时，避免悬浮卡片残留
+  useEffect(() => {
+    setHoveredDefect(null);
+  }, [activeNav, isGridView, isMapMode, surfaceFilter, selectedPlate?.serialNumber]);
+
+  // 当前悬停缺陷不在可见列表中时，自动关闭悬浮卡片
+  useEffect(() => {
+    if (!hoveredDefect) return;
+    const exists = visibleDefects.some(
+      (defect) =>
+        defect.id === hoveredDefect.defect.id &&
+        defect.surface === hoveredDefect.defect.surface,
+    );
+    if (!exists) {
+      setHoveredDefect(null);
+    }
+  }, [hoveredDefect, visibleDefects]);
+
+  // 鼠标离开窗口/窗口失焦时，清理悬浮卡片
+  useEffect(() => {
+    const clearHover = () => setHoveredDefect(null);
+    window.addEventListener("mouseleave", clearHover);
+    window.addEventListener("blur", clearHover);
+    return () => {
+      window.removeEventListener("mouseleave", clearHover);
+      window.removeEventListener("blur", clearHover);
+    };
+  }, []);
   const distributionDefects = useMemo(() => {
     if (surfaceFilter === "all") return visibleDefects;
     return visibleDefects.filter((defect) => defect.surface === surfaceFilter);
@@ -744,12 +784,12 @@ export default function TraditionalMode() {
   }, [visibleDefects, distributionDefects, surfaceFilter]);
   const selectedTopDistributionDefect = useMemo(() => {
     if (!selectedDefectId) return undefined;
-    return topDistributionDefects.find((defect) => defect.id === selectedDefectId);
-  }, [selectedDefectId, topDistributionDefects]);
+    return topDistributionDefects.find((defect) => isDefectSelected(defect));
+  }, [selectedDefectId, topDistributionDefects, isDefectSelected]);
   const selectedBottomDistributionDefect = useMemo(() => {
     if (!selectedDefectId) return undefined;
-    return bottomDistributionDefects.find((defect) => defect.id === selectedDefectId);
-  }, [selectedDefectId, bottomDistributionDefects]);
+    return bottomDistributionDefects.find((defect) => isDefectSelected(defect));
+  }, [selectedDefectId, bottomDistributionDefects, isDefectSelected]);
 
 
   const analysisOrientation: ImageOrientation = "vertical";
@@ -980,10 +1020,12 @@ export default function TraditionalMode() {
   }, [surfaceImages]);
   const distributionDraw = useMemo(() => {
     if (!distributionMeta) return null;
+    // 使用原始马赛克尺寸（后端会根据 orientation 参数处理横向转换）
     const mosaicWidth = distributionMeta.image_width ?? 0;
     const mosaicHeight =
       (distributionMeta.frame_count ?? 0) *
       (distributionMeta.image_height ?? 0);
+
     if (
       !mosaicWidth ||
       !mosaicHeight ||
@@ -1028,10 +1070,12 @@ export default function TraditionalMode() {
   }, [distributionMeta, distributionPlateSize, distributionScaleMode]);
   const bottomDistributionDraw = useMemo(() => {
     if (!bottomDistributionMeta) return null;
+    // 使用原始马赛克尺寸（后端会根据 orientation 参数处理横向转换）
     const mosaicWidth = bottomDistributionMeta.image_width ?? 0;
     const mosaicHeight =
       (bottomDistributionMeta.frame_count ?? 0) *
       (bottomDistributionMeta.image_height ?? 0);
+
     if (
       !mosaicWidth ||
       !mosaicHeight ||
@@ -1414,11 +1458,11 @@ export default function TraditionalMode() {
         defectsInTile.forEach(({ defect, rect }) => {
           ctx.strokeStyle = analysisSeverityColor(defect.severity);
           ctx.lineWidth =
-            defect.id === selectedDefectId ? 3 / scale : 1.5 / scale;
+            isDefectSelected(defect) ? 3 / scale : 1.5 / scale;
           ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
         });
       },
-    [analysisSeqNo, analysisOrientation, analysisSeverityColor, selectedDefectId],
+    [analysisSeqNo, analysisOrientation, analysisSeverityColor, selectedDefectId, isDefectSelected],
   );
   const renderTopTile = useMemo(
     () => createAnalysisTileRenderer(topLayout, topDefectRects, topMaxTileLevel),
@@ -1622,7 +1666,6 @@ export default function TraditionalMode() {
   // 3D Model Control State
   const [rotX, setRotX] = useState(-12);
   const [rotY, setRotY] = useState(-18);
-  const [isGridView, setIsGridView] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [lastPos, setLastPos] = useState({ x: 0, y: 0 });
 
@@ -1816,7 +1859,7 @@ export default function TraditionalMode() {
 
   useEffect(() => {
     if (activeNav !== "图像分析" || !selectedDefectId) return;
-    const defect = visibleDefects.find((d) => d.id === selectedDefectId);
+    const defect = visibleDefects.find((d) => isDefectSelected(d));
     if (!defect) return;
     if (defect.surface === "top" && topLayout.surfaces.length > 0) {
       const rect = topDefectRects.find((item) => item.defect.id === defect.id)?.rect;
@@ -1836,15 +1879,17 @@ export default function TraditionalMode() {
         });
       }
     }
-  }, [activeNav, selectedDefectId, visibleDefects, topLayout, bottomLayout, topDefectRects, bottomDefectRects]);
+  }, [activeNav, selectedDefectId, visibleDefects, topLayout, bottomLayout, topDefectRects, bottomDefectRects, isDefectSelected]);
 
   useEffect(() => {
     if (!selectedDefectId) return;
-    const exists = visibleDefects.some((d) => d.id === selectedDefectId);
+    const exists = visibleDefects.some((d) => isDefectSelected(d));
     if (!exists) {
-      setSelectedDefectId(visibleDefects[0]?.id ?? null);
+      const fallback = visibleDefects[0];
+      setSelectedDefectId(fallback?.id ?? null);
+      setSelectedDefectSurface(fallback?.surface ?? null);
     }
-  }, [selectedDefectId, visibleDefects]);
+  }, [selectedDefectId, visibleDefects, isDefectSelected]);
 
   useEffect(() => {
     if (activeNav !== "图像分析" || surfaceFilter !== "all") {
@@ -1987,24 +2032,25 @@ export default function TraditionalMode() {
   const currentDefect = useMemo(() => {
     if (!visibleDefects || visibleDefects.length === 0) return null;
     if (selectedDefectId) {
-      const found = visibleDefects.find(d => d.id === selectedDefectId);
+      const found = visibleDefects.find((d) => isDefectSelected(d));
       if (found) return found;
     }
     return visibleDefects[0];
-  }, [visibleDefects, selectedDefectId]);
+  }, [visibleDefects, selectedDefectId, isDefectSelected]);
   const currentDefectIndex = useMemo(() => {
     if (!visibleDefects || visibleDefects.length === 0) return -1;
     if (selectedDefectId) {
-      const index = visibleDefects.findIndex((d) => d.id === selectedDefectId);
+      const index = visibleDefects.findIndex((d) => isDefectSelected(d));
       if (index >= 0) return index;
     }
     return 0;
-  }, [visibleDefects, selectedDefectId]);
+  }, [visibleDefects, selectedDefectId, isDefectSelected]);
   const selectDefectAt = useCallback(
     (index: number) => {
       const next = visibleDefects[index];
       if (!next) return;
       setSelectedDefectId(next.id);
+      setSelectedDefectSurface(next.surface);
       setActiveNav("缺陷分析");
       setImgScale(1);
       setImgOffset({ x: 0, y: 0 });
@@ -2015,11 +2061,12 @@ export default function TraditionalMode() {
     (nextDefect?: DefectItem | null) => {
       if (!nextDefect) return;
       setSelectedDefectId(nextDefect.id);
+      setSelectedDefectSurface(nextDefect.surface);
       setActiveNav("缺陷分析");
       setImgScale(1);
       setImgOffset({ x: 0, y: 0 });
     },
-    [setActiveNav, setImgOffset, setImgScale, setSelectedDefectId],
+    [setActiveNav, setImgOffset, setImgScale, setSelectedDefectId, setSelectedDefectSurface],
   );
   // 防止滚轮事件在短时间内重复触发（解决双选中问题）
   const wheelHandlerTimeoutRef = useRef<number | null>(null);
@@ -2042,7 +2089,7 @@ export default function TraditionalMode() {
       const delta = event.deltaY !== 0 ? event.deltaY : event.deltaX;
       const direction = delta > 0 ? 1 : -1;
       const currentIndex = selectedDefectId
-        ? defects.findIndex((defect) => defect.id === selectedDefectId)
+        ? defects.findIndex((defect) => isDefectSelected(defect))
         : -1;
       const nextIndex =
         currentIndex < 0
@@ -2052,7 +2099,7 @@ export default function TraditionalMode() {
           : (currentIndex + direction + defects.length) % defects.length;
       selectDefectById(defects[nextIndex]);
     },
-    [selectDefectById, selectedDefectId],
+    [selectDefectById, selectedDefectId, isDefectSelected],
   );
 
   const updateDefectImageMetrics = useCallback(() => {
@@ -2462,12 +2509,12 @@ export default function TraditionalMode() {
 
         ctx.save();
         ctx.strokeStyle = severityColor(defect.severity);
-        ctx.lineWidth = defect.id === selectedDefectId ? 3 / scale : 1.5 / scale;
+        ctx.lineWidth = isDefectSelected(defect) ? 3 / scale : 1.5 / scale;
         ctx.strokeRect(rectX, rectY, rectW, rectH);
         ctx.restore();
       });
     },
-    [mapSurface, mapFrameHeight, visibleDefects, selectedDefectId],
+    [mapSurface, mapFrameHeight, visibleDefects, selectedDefectId, isDefectSelected],
   );
 
   // Dynamic Scale Calculation based on Actual Dimensions
@@ -2780,7 +2827,7 @@ export default function TraditionalMode() {
                           </p>
                         </div>
                       ) : (
-                        "未登录"
+                        "用户未登录"
                       )}
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator className="bg-[#30363d]" />
@@ -3062,19 +3109,21 @@ export default function TraditionalMode() {
                   <div className="flex-1 min-h-0 pt-1">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
+                        layout="vertical"
                         data={defectChartData}
-                        margin={{ top: 15, right: 10, left: 10, bottom: 5 }}
+                        margin={{ top: 15, right: 30, left: 85, bottom: 5 }}
                         barSize={16}
                       >
-                        <CartesianGrid strokeDasharray="2 2" vertical={false} stroke="#30363d" opacity={0.2} />
-                        <XAxis 
-                          dataKey="name" 
+                        <CartesianGrid strokeDasharray="2 2" horizontal={false} stroke="#30363d" opacity={0.2} />
+                        <XAxis type="number" hide />
+                        <YAxis
+                          dataKey="name"
+                          type="category"
                           axisLine={false}
                           tickLine={false}
-                          tick={{ fill: '#8b949e', fontSize: 8 }}
-                          interval={0}
+                          tick={{ fill: '#8b949e', fontSize: 10 }}
+                          width={80}
                         />
-                        <YAxis hide />
                         <Tooltip 
                           cursor={{ fill: '#ffffff', opacity: 0.05 }}
                           contentStyle={{ 
@@ -3085,10 +3134,10 @@ export default function TraditionalMode() {
                             padding: '2px 6px'
                           }}
                         />
-                        <Bar 
-                          dataKey="count" 
-                          radius={[1, 1, 0, 0]}
-                          label={{ position: 'top', fill: '#8b949e', fontSize: 8, offset: 4 }}
+                        <Bar
+                          dataKey="count"
+                          radius={[0, 1, 1, 0]}
+                          label={{ position: 'right', fill: '#8b949e', fontSize: 8, offset: 4 }}
                         >
                           {defectChartData.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={entry.color} />
@@ -3558,6 +3607,7 @@ export default function TraditionalMode() {
                          tileY: tile.tileY,
                          tileSize: distributionTilePlan.tileSize,
                          fmt: "JPEG",
+                         orientation: "horizontal",
                        });
                        return (
                          <img
@@ -3665,6 +3715,7 @@ export default function TraditionalMode() {
                         }
                         onClick={() => {
                           setSelectedDefectId(defect.id);
+                          setSelectedDefectSurface(defect.surface);
                           setActiveNav("缺陷分析");
                           setImgScale(1);
                           setImgOffset({ x: 0, y: 0 });
@@ -4137,10 +4188,11 @@ export default function TraditionalMode() {
                         });
                         return (
                           <motion.div
-                            key={defect.id}
+                            key={`${defect.surface}-${defect.id}`}
                             whileHover={{ scale: 1.05, zIndex: 30 }}
                             onClick={() => {
                               setSelectedDefectId(defect.id);
+                              setSelectedDefectSurface(defect.surface);
                               setIsGridView(false);
                             }}
                             onMouseEnter={(e) =>
@@ -4159,7 +4211,9 @@ export default function TraditionalMode() {
                             }
                             onMouseLeave={() => setHoveredDefect(null)}
                               className={`aspect-square bg-[#161b22] border border-[#30363d] relative group cursor-pointer overflow-hidden ${
-                                newDefectKeys.has(String(defect.id)) ? "list-enter" : ""
+                                newDefectKeys.has(
+                                  getDefectSelectionKey({ id: defect.id, surface: defect.surface }),
+                                ) ? "list-enter" : ""
                               }`}
                           >
                             <img 
@@ -4323,9 +4377,10 @@ export default function TraditionalMode() {
 
                         return (
                           <div
-                            key={defect.id}
+                            key={`${defect.surface}-${defect.id}`}
                             onClick={() => {
                               setSelectedDefectId(defect.id);
+                              setSelectedDefectSurface(defect.surface);
                               setActiveNav("缺陷分析");
                               // 点击缺陷时，重置视图以便聚焦当前缺陷
                               setImgScale(1);
@@ -4347,8 +4402,10 @@ export default function TraditionalMode() {
                             }
                             onMouseLeave={() => setHoveredDefect(null)}
                               className={`p-2 bg-[#0d1117] border rounded-sm transition-colors cursor-pointer group ${
-                                selectedDefectId === defect.id ? 'border-[#58a6ff] bg-[#58a6ff]/5' : 'border-[#30363d] hover:border-[#58a6ff]/50'
-                              } ${newDefectKeys.has(String(defect.id)) ? "list-enter" : ""}`}
+                                isDefectSelected(defect) ? 'border-[#58a6ff] bg-[#58a6ff]/5' : 'border-[#30363d] hover:border-[#58a6ff]/50'
+                              } ${newDefectKeys.has(
+                                getDefectSelectionKey({ id: defect.id, surface: defect.surface }),
+                              ) ? "list-enter" : ""}`}
                           >
                             <div className="flex justify-between items-start mb-1">
                               <div className="flex items-center gap-1">
@@ -4541,6 +4598,7 @@ export default function TraditionalMode() {
                           tileY: tile.tileY,
                           tileSize: bottomDistributionTilePlan.tileSize,
                           fmt: "JPEG",
+                          orientation: "horizontal",
                         });
                         return (
                           <img
@@ -4649,6 +4707,7 @@ export default function TraditionalMode() {
                         }
                         onClick={() => {
                           setSelectedDefectId(defect.id);
+                          setSelectedDefectSurface(defect.surface);
                           setActiveNav("缺陷分析");
                           setImgScale(1);
                           setImgOffset({ x: 0, y: 0 });

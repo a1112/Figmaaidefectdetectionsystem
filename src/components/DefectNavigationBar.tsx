@@ -6,18 +6,23 @@ import {
   Pause,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
+import type { Surface } from "../api/types";
 
 interface DefectNavigationBarProps {
-  defects: Array<{ id: string }>;
+  defects: Array<{ id: string; surface: Surface }>;
   selectedDefectId: string | null;
+  selectedDefectSurface?: Surface | null;
   onDefectSelect: (id: string | null) => void;
+  onDefectSelectDetail?: (defect: { id: string; surface: Surface } | null) => void;
   className?: string;
 }
 
 export function DefectNavigationBar({
   defects,
   selectedDefectId,
+  selectedDefectSurface,
   onDefectSelect,
+  onDefectSelectDetail,
   className = "",
 }: DefectNavigationBarProps) {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -25,7 +30,11 @@ export function DefectNavigationBar({
 
   // 获取当前选中缺陷的索引
   const currentIndex = selectedDefectId
-    ? defects.findIndex((d) => d.id === selectedDefectId)
+    ? defects.findIndex(
+        (d) =>
+          d.id === selectedDefectId &&
+          (selectedDefectSurface ? d.surface === selectedDefectSurface : true),
+      )
     : -1;
 
   const totalDefects = defects.length;
@@ -33,18 +42,21 @@ export function DefectNavigationBar({
   // 导航函数
   const goToFirst = () => {
     if (defects.length > 0) {
+      onDefectSelectDetail?.(defects[0]);
       onDefectSelect(defects[0].id);
     }
   };
 
   const goToPrevious = () => {
     if (currentIndex > 0) {
+      onDefectSelectDetail?.(defects[currentIndex - 1]);
       onDefectSelect(defects[currentIndex - 1].id);
     }
   };
 
   const goToNext = () => {
     if (currentIndex < totalDefects - 1) {
+      onDefectSelectDetail?.(defects[currentIndex + 1]);
       onDefectSelect(defects[currentIndex + 1].id);
     } else if (isPlaying) {
       // 如果正在播放，循环到第一个
