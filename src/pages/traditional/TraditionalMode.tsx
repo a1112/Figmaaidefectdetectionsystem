@@ -2535,15 +2535,15 @@ export default function TraditionalMode() {
   }, [selectedPlate]);
 
   return (
-    <div className="h-screen w-full bg-[#0a0f14] text-[#d1d5db] flex flex-col font-sans overflow-hidden select-none relative">
+    <div className="h-screen w-full bg-background text-foreground flex flex-col font-sans overflow-hidden select-none relative">
       <style>{`
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
         .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #0d1117; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #58a6ff; }
-        
+        .custom-scrollbar::-webkit-scrollbar-track { background: hsl(var(--muted)); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 2px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: hsl(var(--primary)); }
+
         .preserve-3d { transform-style: preserve-3d; }
 
         @keyframes steel-idle-float {
@@ -2594,39 +2594,39 @@ export default function TraditionalMode() {
             animate={{ height: 40, opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
-            className={`bg-[#161b22] border-b border-[#30363d] flex items-center px-3 shrink-0 overflow-hidden relative ${useElectronDragRegion ? "electron-drag" : ""}`}
+            className={`bg-muted border-b border-border flex items-center px-3 shrink-0 overflow-hidden relative ${useElectronDragRegion ? "electron-drag" : ""}`}
             onMouseDown={handleTauriDragStart}
             onDoubleClick={handleDragDoubleClick}
           >
             <div
               className={`flex items-center gap-4 ${canDrag ? "electron-no-drag" : ""}`}
             >
-              <div className="flex items-center gap-2 pr-4 border-r border-[#30363d] relative">
+              <div className="flex items-center gap-2 pr-4 border-r border-border relative">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button 
-                      className="flex items-center gap-1 group transition-colors px-1 py-0.5 rounded hover:bg-[#30363d] data-[state=open]:bg-[#30363d] outline-none"
+                      className="flex items-center gap-1 group transition-colors px-1 py-0.5 rounded hover:bg-muted-foreground/20 data-[state=open]:bg-muted-foreground/20 outline-none"
                     >
-                      <span className="text-sm font-bold tracking-widest text-[#58a6ff] group-hover:text-white">北科工研</span>
-                      <ChevronDown className="w-3 h-3 text-[#58a6ff] transition-transform group-data-[state=open]:rotate-180" />
+                      <span className="text-sm font-bold tracking-widest text-primary group-hover:text-foreground">北科工研</span>
+                      <ChevronDown className="w-3 h-3 text-primary transition-transform group-data-[state=open]:rotate-180" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-48 bg-[#161b22] border-[#30363d] text-[#d1d5db] p-0 z-50">
-                    <DropdownMenuLabel className="px-3 py-2 text-[10px] text-[#8b949e] border-b border-[#30363d] mb-1 font-bold">系统主菜单</DropdownMenuLabel>
-                    <DropdownMenuItem onClick={() => navigate("/")} className="px-3 py-2 text-[11px] focus:bg-[#58a6ff] focus:text-white cursor-pointer">
+                  <DropdownMenuContent align="start" className="w-48 bg-muted border-border text-foreground p-0 z-50">
+                    <DropdownMenuLabel className="px-3 py-2 text-[10px] text-muted-foreground border-b border-border mb-1 font-bold">系统主菜单</DropdownMenuLabel>
+                    <DropdownMenuItem onClick={() => navigate("/")} className="px-3 py-2 text-[11px] focus:bg-primary focus:text-primary-foreground cursor-pointer">
                       <Home className="w-3.5 h-3.5 mr-2" /> 现代仪表盘
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => navigate("/BackendManagement")} className="px-3 py-2 text-[11px] focus:bg-[#58a6ff] focus:text-white cursor-pointer">
+                    <DropdownMenuItem onClick={() => navigate("/BackendManagement")} className="px-3 py-2 text-[11px] focus:bg-primary focus:text-primary-foreground cursor-pointer">
                       <Shield className="w-3.5 h-3.5 mr-2" /> 后台管理系统
                     </DropdownMenuItem>
-                    <DropdownMenuItem className="px-3 py-2 text-[11px] focus:bg-[#58a6ff] focus:text-white cursor-pointer">
+                    <DropdownMenuItem className="px-3 py-2 text-[11px] focus:bg-primary focus:text-primary-foreground cursor-pointer">
                       <Box className="w-3.5 h-3.5 mr-2" /> 数据导出工具
                     </DropdownMenuItem>
-                    <DropdownMenuItem className="px-3 py-2 text-[11px] focus:bg-[#58a6ff] focus:text-white cursor-pointer">
+                    <DropdownMenuItem className="px-3 py-2 text-[11px] focus:bg-primary focus:text-primary-foreground cursor-pointer">
                       <Terminal className="w-3.5 h-3.5 mr-2" /> 系统日志查看
                     </DropdownMenuItem>
-                    <div className="border-t border-[#30363d] mt-1 pt-1 pb-1">
-                      <DropdownMenuItem onClick={() => navigate("/")} className="px-3 py-2 text-[11px] text-[#f85149] focus:bg-[#f85149] focus:text-white cursor-pointer">
+                    <div className="border-t border-border mt-1 pt-1 pb-1">
+                      <DropdownMenuItem onClick={() => navigate("/")} className="px-3 py-2 text-[11px] text-destructive focus:bg-destructive focus:text-primary-foreground cursor-pointer">
                         <LogOut className="w-3.5 h-3.5 mr-2" /> 退出传统仪表盘
                       </DropdownMenuItem>
                     </div>
@@ -2637,36 +2637,36 @@ export default function TraditionalMode() {
                 {showMainMenu && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setShowMainMenu(false)} />
-                    <div className="absolute top-full left-0 mt-1 w-48 bg-[#161b22] border border-[#30363d] shadow-2xl z-50 py-1 flex flex-col animate-in fade-in zoom-in duration-100 origin-top-left">
-                      <div className="px-3 py-2 text-[10px] text-[#8b949e] border-b border-[#30363d] mb-1 font-bold">系统主菜单</div>
+                    <div className="absolute top-full left-0 mt-1 w-48 bg-muted border border-border shadow-2xl z-50 py-1 flex flex-col animate-in fade-in zoom-in duration-100 origin-top-left">
+                      <div className="px-3 py-2 text-[10px] text-muted-foreground border-b border-border mb-1 font-bold">系统主菜单</div>
                       <button 
                         onClick={() => navigate("/")}
-                        className="px-3 py-2 text-[11px] flex items-center gap-2 hover:bg-[#58a6ff] hover:text-white transition-colors text-left"
+                        className="px-3 py-2 text-[11px] flex items-center gap-2 hover:bg-primary hover:text-foreground transition-colors text-left"
                       >
                         <Home className="w-3.5 h-3.5" /> 现代仪表盘
                       </button>
                       <button 
                         onClick={() => { navigate("/BackendManagement"); setShowMainMenu(false); }}
-                        className="px-3 py-2 text-[11px] flex items-center gap-2 hover:bg-[#58a6ff] hover:text-white transition-colors text-left"
+                        className="px-3 py-2 text-[11px] flex items-center gap-2 hover:bg-primary hover:text-foreground transition-colors text-left"
                       >
                         <Shield className="w-3.5 h-3.5" /> 后台管理系统
                       </button>
                       <button 
-                        className="px-3 py-2 text-[11px] flex items-center gap-2 hover:bg-[#58a6ff] hover:text-white transition-colors text-left"
+                        className="px-3 py-2 text-[11px] flex items-center gap-2 hover:bg-primary hover:text-foreground transition-colors text-left"
                         onClick={() => setShowMainMenu(false)}
                       >
                         <Box className="w-3.5 h-3.5" /> 数��导出工具
                       </button>
                       <button 
-                        className="px-3 py-2 text-[11px] flex items-center gap-2 hover:bg-[#58a6ff] hover:text-white transition-colors text-left"
+                        className="px-3 py-2 text-[11px] flex items-center gap-2 hover:bg-primary hover:text-foreground transition-colors text-left"
                         onClick={() => setShowMainMenu(false)}
                       >
                         <Terminal className="w-3.5 h-3.5" /> 系统日志查看
                       </button>
-                      <div className="border-t border-[#30363d] mt-1 pt-1">
+                      <div className="border-t border-border mt-1 pt-1">
                         <button 
                           onClick={() => navigate("/")}
-                          className="px-3 py-2 text-[11px] flex items-center gap-2 text-[#f85149] hover:bg-[#f85149] hover:text-white transition-colors text-left w-full"
+                          className="px-3 py-2 text-[11px] flex items-center gap-2 text-destructive hover:bg-[#f85149] hover:text-foreground transition-colors text-left w-full"
                         >
                           <LogOut className="w-3.5 h-3.5" /> 退出传统仪表盘
                         </button>
@@ -2682,8 +2682,8 @@ export default function TraditionalMode() {
                     onClick={() => setActiveNav(item)}
                     className={`px-3 h-10 text-[11px] font-bold transition-all border-b-2 ${
                       activeNav === item 
-                        ? "text-[#58a6ff] border-[#58a6ff] bg-[#58a6ff]/10" 
-                        : "text-[#8b949e] border-transparent hover:text-white"
+                        ? "text-primary border-primary bg-[#58a6ff]/10" 
+                        : "text-muted-foreground border-transparent hover:text-foreground"
                     }`}
                   >
                     {item}
@@ -2695,36 +2695,36 @@ export default function TraditionalMode() {
             <div className={`flex items-center gap-6 flex-1 justify-center ${canDrag ? "electron-no-drag" : ""}`}>
               <button
                 onClick={() => setIsDataSourceOpen(true)}
-                className="flex items-center gap-2 group cursor-pointer hover:bg-[#30363d]/30 px-4 py-1 rounded transition-colors"
+                className="flex items-center gap-2 group cursor-pointer hover:bg-muted-foreground/20/30 px-4 py-1 rounded transition-colors"
               >
-                <span className="text-[14px] font-bold text-[#f0f6fc] tracking-[0.2em]">
+                <span className="text-[14px] font-bold text-foreground tracking-[0.2em]">
                   {currentLine || companyName}
                 </span>
-                <ChevronDown className={`w-4 h-4 text-[#8b949e] transition-transform ${isDataSourceOpen ? 'rotate-180' : ''} group-hover:text-[#58a6ff]`} />
+                <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isDataSourceOpen ? 'rotate-180' : ''} group-hover:text-primary`} />
               </button>
             </div>
 
             <div className={`shrink-0 flex items-center gap-2 text-[11px] ${canDrag ? "electron-no-drag" : ""}`}>
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#30363d]/30 text-[#8b949e] border border-[#30363d]">
+                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#30363d]/30 text-muted-foreground border border-border">
                   <div className="text-[9px] uppercase font-bold opacity-60">CAM TEMP</div>
-                  <span className="font-mono text-[11px] text-[#c9d1d9]">42.8°C</span>
+                  <span className="font-mono text-[11px] text-card-foreground">42.8°C</span>
                 </div>
-                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#30363d]/30 text-[#8b949e] border border-[#30363d]">
+                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#30363d]/30 text-muted-foreground border border-border">
                   <div className="text-[9px] uppercase font-bold opacity-60">LINK SPD</div>
-                  <span className="font-mono text-[11px] text-[#c9d1d9]">10Gbps</span>
+                  <span className="font-mono text-[11px] text-card-foreground">10Gbps</span>
                 </div>
-                <div className="flex items-center gap-2 px-2 py-0.5 rounded bg-[#238636]/20 text-[#3fb950] border border-[#238636]/30">
+                <div className="flex items-center gap-2 px-2 py-0.5 rounded bg-success/20 text-success border border-success/30">
                   <div className="w-1.5 h-1.5 rounded-full bg-[#3fb950] animate-pulse" />
                     <span className="font-mono">{systemStatusLabel}</span>
                 </div>
               </div>
-              <div className="flex items-center gap-3 text-[#8b949e]">
+              <div className="flex items-center gap-3 text-muted-foreground">
                 <LiveClock formatTime={formatTime} />
                 {isWebOnly && (
                   <button
                     onClick={() => navigate("/download")}
-                    className="text-[#8b949e] hover:text-[#58a6ff] transition-colors"
+                    className="text-muted-foreground hover:text-primary transition-colors"
                     title="下载中心"
                   >
                     <Download className="w-4 h-4" />
@@ -2732,7 +2732,7 @@ export default function TraditionalMode() {
                 )}
                 <button
                   onClick={() => navigate("/reports")}
-                  className="text-[#8b949e] hover:text-[#58a6ff] transition-colors"
+                  className="text-muted-foreground hover:text-primary transition-colors"
                   title="报表"
                 >
                   <BarChart3 className="w-4 h-4" />
@@ -2740,7 +2740,7 @@ export default function TraditionalMode() {
                 <button
                   ref={diagnosticButtonRef}
                   onClick={() => setIsDiagnosticOpen(true)}
-                  className="text-[#8b949e] hover:text-[#58a6ff] transition-colors"
+                  className="text-muted-foreground hover:text-primary transition-colors"
                   title="系统诊断"
                 >
                   <Activity className="w-4 h-4" />
@@ -2748,7 +2748,7 @@ export default function TraditionalMode() {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
-                      className="text-[#8b949e] hover:text-[#58a6ff] transition-colors"
+                      className="text-muted-foreground hover:text-primary transition-colors"
                       title="工具"
                     >
                       <Wrench className="w-4 h-4" />
@@ -2756,22 +2756,22 @@ export default function TraditionalMode() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
                     align="end"
-                    className="w-48 bg-[#161b22] border-[#30363d] text-[#c9d1d9]"
+                    className="w-48 bg-muted border-border text-card-foreground"
                   >
-                    <DropdownMenuLabel className="text-[#8b949e] font-normal">
+                    <DropdownMenuLabel className="text-muted-foreground font-normal">
                       工具
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator className="bg-[#30363d]" />
                       <DropdownMenuItem
                         onClick={() => navigate("/cache")}
-                        className="cursor-pointer focus:bg-[#21262d] focus:text-[#f0f6fc] text-xs flex items-center gap-2"
+                        className="cursor-pointer focus:bg-secondary focus:text-foreground text-xs flex items-center gap-2"
                       >
                         <Database className="w-3.5 h-3.5" />
                         缓存调试
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => navigate("/status")}
-                        className="cursor-pointer focus:bg-[#21262d] focus:text-[#f0f6fc] text-xs flex items-center gap-2"
+                        className="cursor-pointer focus:bg-secondary focus:text-foreground text-xs flex items-center gap-2"
                       >
                         <Activity className="w-3.5 h-3.5" />
                         状态
@@ -2779,7 +2779,7 @@ export default function TraditionalMode() {
                       {testModelEnabled && (
                         <DropdownMenuItem
                           onClick={() => navigate("/test_model")}
-                          className="cursor-pointer focus:bg-[#21262d] focus:text-[#f0f6fc] text-xs flex items-center gap-2"
+                          className="cursor-pointer focus:bg-secondary focus:text-foreground text-xs flex items-center gap-2"
                       >
                         <FlaskConical className="w-3.5 h-3.5" />
                         模拟运行测试
@@ -2789,17 +2789,17 @@ export default function TraditionalMode() {
                 </DropdownMenu>
                 <button
                   onClick={() => setIsSettingsOpen(true)}
-                  className="text-[#8b949e] hover:text-white transition-colors"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
                   title="系统设置"
                 >
                   <Settings className="w-4 h-4" />
                 </button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="relative inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full p-0 shadow-sm shadow-black/30 focus:outline-none hover:text-white transition-colors">
-                      <Avatar className="h-6 w-6 shrink-0 rounded-full cursor-pointer border border-[#30363d]">
+                    <button className="relative inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full p-0 shadow-sm shadow-black/30 focus:outline-none hover:text-foreground transition-colors">
+                      <Avatar className="h-6 w-6 shrink-0 rounded-full cursor-pointer border border-border">
                         <AvatarImage src="" alt="@user" />
-                        <AvatarFallback className="bg-[#30363d] text-[#c9d1d9] leading-none text-center rounded-full text-[10px]">
+                        <AvatarFallback className="bg-[#30363d] text-card-foreground leading-none text-center rounded-full text-[10px]">
                           {currentUser ? (
                             currentUser.username[0].toUpperCase()
                           ) : (
@@ -2814,15 +2814,15 @@ export default function TraditionalMode() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
                     align="end"
-                    className="w-56 bg-[#161b22] border-[#30363d] text-[#c9d1d9]"
+                    className="w-56 bg-muted border-border text-card-foreground"
                   >
-                    <DropdownMenuLabel className="text-[#8b949e] font-normal">
+                    <DropdownMenuLabel className="text-muted-foreground font-normal">
                       {currentUser ? (
                         <div className="flex flex-col space-y-1 py-1">
-                          <p className="text-sm font-medium leading-none text-[#f0f6fc]">
+                          <p className="text-sm font-medium leading-none text-foreground">
                             {currentUser.username}
                           </p>
-                          <p className="text-xs leading-none text-[#8b949e]">
+                          <p className="text-xs leading-none text-muted-foreground">
                             {currentUser.role}
                           </p>
                         </div>
@@ -2832,14 +2832,14 @@ export default function TraditionalMode() {
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator className="bg-[#30363d]" />
                     <DropdownMenuItem
-                      className="cursor-pointer focus:bg-[#30363d] focus:text-[#f0f6fc] text-xs"
+                      className="cursor-pointer focus:bg-[#30363d] focus:text-foreground text-xs"
                     >
                       <Settings className="mr-2 h-3.5 w-3.5" />
                       <span>用户设置</span>
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => setIsDataSourceOpen(true)}
-                      className="cursor-pointer focus:bg-[#30363d] focus:text-[#f0f6fc] text-xs"
+                      className="cursor-pointer focus:bg-[#30363d] focus:text-foreground text-xs"
                     >
                       <Database className="mr-2 h-3.5 w-3.5" />
                       <span>切换数据源</span>
@@ -2852,7 +2852,7 @@ export default function TraditionalMode() {
                           saveUser(null);
                           toast.success("已退出登录");
                         }}
-                        className="cursor-pointer focus:bg-[#30363d] focus:text-[#f85149] text-[#f85149] text-xs"
+                        className="cursor-pointer focus:bg-[#30363d] focus:text-destructive text-destructive text-xs"
                       >
                         <LogOut className="mr-2 h-3.5 w-3.5" />
                         <span>退出登录</span>
@@ -2860,7 +2860,7 @@ export default function TraditionalMode() {
                     ) : (
                       <DropdownMenuItem
                         onClick={() => setIsLoginOpen(true)}
-                        className="cursor-pointer focus:bg-[#30363d] focus:text-[#f0f6fc] text-xs"
+                        className="cursor-pointer focus:bg-[#30363d] focus:text-foreground text-xs"
                       >
                         <LogIn className="mr-2 h-3.5 w-3.5" />
                         <span>登录</span>
@@ -2870,7 +2870,7 @@ export default function TraditionalMode() {
                 </DropdownMenu>
               </div>
               {hasWindowControls && (
-                <div className="flex items-center gap-1 text-[#c9d1d9]">
+                <div className="flex items-center gap-1 text-card-foreground">
                   <button
                     className="p-1.5 hover:bg-white/10 rounded"
                     onClick={() => {
@@ -2966,16 +2966,16 @@ export default function TraditionalMode() {
               animate={{ width: 340, opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
               transition={{ duration: 0.3, ease: "easeInOut" }}
-              className="flex flex-col gap-0.5 bg-[#0d1117] overflow-hidden"
+              className="flex flex-col gap-0.5 bg-card overflow-hidden"
             >
               {/* List Tabs */}
-              <div className="h-8 flex gap-0.5 bg-[#161b22] p-0.5">
+              <div className="h-8 flex gap-0.5 bg-muted p-0.5">
                 <button 
                   onClick={() => setSidebarTab('records')}
                   className={`flex-1 flex items-center justify-center gap-1.5 text-[11px] font-bold transition-colors ${
                     sidebarTab === 'records' 
-                      ? 'bg-[#0d1117] text-[#58a6ff] border border-[#58a6ff]/30 shadow-[0_0_10px_rgba(88,166,255,0.1)]' 
-                      : 'text-[#8b949e] hover:bg-[#1f242b] hover:text-[#c9d1d9]'
+                      ? 'bg-card text-primary border border-primary/30 shadow-[0_0_10px_rgba(88,166,255,0.1)]' 
+                      : 'text-muted-foreground hover:bg-[#1f242b] hover:text-card-foreground'
                   }`}
                 >
                   <Database className="w-3.5 h-3.5" />
@@ -2985,8 +2985,8 @@ export default function TraditionalMode() {
                   onClick={() => setSidebarTab('defects')}
                   className={`flex-1 flex items-center justify-center gap-1.5 text-[11px] font-bold transition-colors ${
                     sidebarTab === 'defects' 
-                      ? 'bg-[#0d1117] text-[#f85149] border border-[#f85149]/30 shadow-[0_0_10px_rgba(248,81,73,0.1)]' 
-                      : 'text-[#8b949e] hover:bg-[#1f242b] hover:text-[#c9d1d9]'
+                      ? 'bg-card text-destructive border border-[#f85149]/30 shadow-[0_0_10px_rgba(248,81,73,0.1)]' 
+                      : 'text-muted-foreground hover:bg-[#1f242b] hover:text-card-foreground'
                   }`}
                 >
                   <AlertCircle className="w-3.5 h-3.5" />
@@ -2994,7 +2994,7 @@ export default function TraditionalMode() {
                 </button>
               </div>
 
-          <div className="h-32 bg-[#0d1117] relative flex items-center justify-center overflow-hidden border-b border-[#30363d]">
+          <div className="h-32 bg-card relative flex items-center justify-center overflow-hidden border-b border-border">
             <AnimatePresence mode="wait">
               {sidebarTab === 'records' ? (
                 <motion.div
@@ -3030,10 +3030,10 @@ export default function TraditionalMode() {
                            <div className="absolute left-0 -top-0.5 w-px h-1 bg-[#58a6ff]" />
                            <div className="absolute right-0 -top-0.5 w-px h-1 bg-[#58a6ff]" />
                          </div>
-                         <span className="text-[9px] text-[#58a6ff] font-bold mt-0.5 whitespace-nowrap">W {selectedPlate?.dimensions.width || 0}mm</span>
+                         <span className="text-[9px] text-primary font-bold mt-0.5 whitespace-nowrap">W {selectedPlate?.dimensions.width || 0}mm</span>
                       </div>
                       <div className="absolute -left-12 top-0 bottom-0 flex items-center gap-1">
-                         <span className="text-[9px] text-[#58a6ff] font-bold whitespace-nowrap">T {(box.actualT ?? 10).toFixed(1)}</span>
+                         <span className="text-[9px] text-primary font-bold whitespace-nowrap">T {(box.actualT ?? 10).toFixed(1)}</span>
                          <div className="h-full w-px bg-[#58a6ff]" />
                       </div>
                     </div>
@@ -3058,12 +3058,12 @@ export default function TraditionalMode() {
                            <div className="absolute left-0 -top-0.5 w-px h-1 bg-[#58a6ff]" />
                            <div className="absolute right-0 -top-0.5 w-px h-1 bg-[#58a6ff]" />
                          </div>
-                         <span className="text-[9px] text-[#58a6ff] font-bold whitespace-nowrap">L {selectedPlate?.dimensions.length || 0}</span>
+                         <span className="text-[9px] text-primary font-bold whitespace-nowrap">L {selectedPlate?.dimensions.length || 0}</span>
                       </div>
                     </div>
 
                     {/* BOTTOM FACE */}
-                    <div className="absolute bg-[#161b22]"
+                    <div className="absolute bg-muted"
                          style={{ 
                            width: `${box.w}px`, 
                            height: `${box.d}px`, 
@@ -3074,7 +3074,7 @@ export default function TraditionalMode() {
                          }} />
 
                     {/* RIGHT SIDE FACE */}
-                    <div className="absolute bg-[#21262d] border-l border-white/5"
+                    <div className="absolute bg-secondary border-l border-white/5"
                          style={{ 
                            width: `${box.d}px`, 
                            height: `${box.h}px`, 
@@ -3087,7 +3087,7 @@ export default function TraditionalMode() {
                     </div>
 
                     {/* LEFT SIDE FACE */}
-                    <div className="absolute bg-[#21262d] border-r border-white/5"
+                    <div className="absolute bg-secondary border-r border-white/5"
                          style={{ 
                            width: `${box.d}px`, 
                            height: `${box.h}px`, 
@@ -3152,9 +3152,9 @@ export default function TraditionalMode() {
           </div>
 
           {/* Search Area - Upgraded with Independent Query Tabs */}
-          <div className="bg-[#161b22] flex flex-col border-b border-[#30363d]">
+          <div className="bg-muted flex flex-col border-b border-border">
             {/* Query Tabs */}
-            <div className="h-7 flex gap-[1px] bg-[#0d1117] p-[1px]">
+            <div className="h-7 flex gap-[1px] bg-card p-[1px]">
               {[
                 { id: "SN", label: "流水号" },
                 { id: "ID", label: "板号" },
@@ -3165,8 +3165,8 @@ export default function TraditionalMode() {
                   onClick={() => setQueryTab(tab.id)}
                   className={`flex-1 text-[10px] font-bold transition-all ${
                     queryTab === tab.id 
-                      ? "bg-[#161b22] text-[#58a6ff] border-t border-x border-[#30363d]" 
-                      : "text-[#8b949e] hover:bg-[#161b22]/50"
+                      ? "bg-muted text-primary border-t border-x border-border" 
+                      : "text-muted-foreground hover:bg-muted/50"
                   }`}
                 >
                   {tab.label}
@@ -3177,7 +3177,7 @@ export default function TraditionalMode() {
             <div className="p-2.5 space-y-2.5">
               {queryTab === "SN" && (
                 <div className="flex flex-col gap-1 animate-in fade-in slide-in-from-left-1 duration-200">
-                  <label className="text-[9px] text-[#8b949e] pl-1 font-bold flex items-center gap-1">
+                  <label className="text-[9px] text-muted-foreground pl-1 font-bold flex items-center gap-1">
                     <Terminal className="w-2.5 h-2.5" /> 精确流水号查���
                   </label>
                     <input 
@@ -3190,14 +3190,14 @@ export default function TraditionalMode() {
                         }))
                       }
                       placeholder="输入完整流水号 (如: SN20260104...)"
-                    className="h-8 bg-[#0d1117] border border-[#30363d] text-[11px] px-2 text-[#c9d1d9] focus:border-[#58a6ff] outline-none transition-colors w-full" 
+                    className="h-8 bg-card border border-border text-[11px] px-2 text-card-foreground focus:border-primary outline-none transition-colors w-full" 
                   />
                 </div>
               )}
 
               {queryTab === "ID" && (
                 <div className="flex flex-col gap-1 animate-in fade-in slide-in-from-right-1 duration-200">
-                  <label className="text-[9px] text-[#8b949e] pl-1 font-bold flex items-center gap-1">
+                  <label className="text-[9px] text-muted-foreground pl-1 font-bold flex items-center gap-1">
                     <FileText className="w-2.5 h-2.5" /> 钢板唯一标识查询
                   </label>
                     <input 
@@ -3210,37 +3210,37 @@ export default function TraditionalMode() {
                         }))
                       }
                       placeholder="输入钢板 ID (如: H2255043...)"
-                    className="h-8 bg-[#0d1117] border border-[#30363d] text-[11px] px-2 text-[#c9d1d9] focus:border-[#58a6ff] outline-none transition-colors w-full" 
+                    className="h-8 bg-card border border-border text-[11px] px-2 text-card-foreground focus:border-primary outline-none transition-colors w-full" 
                   />
                 </div>
               )}
 
               {queryTab === "TIME" && (
                 <div className="flex flex-col gap-1 animate-in fade-in slide-in-from-bottom-1 duration-200 relative">
-                  <label className="text-[9px] text-[#8b949e] pl-1 font-bold flex items-center gap-1">
+                  <label className="text-[9px] text-muted-foreground pl-1 font-bold flex items-center gap-1">
                     <Clock className="w-2.5 h-2.5" /> 生产时间区间回溯
                   </label>
                   <div className="flex flex-col gap-[2px]">
                     <button 
                       onClick={() => setActivePicker(activePicker === 'start' ? null : 'start')}
-                      className="flex items-center gap-2 h-7 bg-[#0d1117] border border-[#30363d] px-2 hover:border-[#58a6ff] transition-colors group"
+                      className="flex items-center gap-2 h-7 bg-card border border-border px-2 hover:border-primary transition-colors group"
                     >
-                      <span className="text-[9px] text-[#8b949e] w-8 text-left">开始</span>
-                      <span className="flex-1 text-[10px] text-[#c9d1d9] text-left">
+                      <span className="text-[9px] text-muted-foreground w-8 text-left">开始</span>
+                      <span className="flex-1 text-[10px] text-card-foreground text-left">
                         {startDate || "请选择起始时间"}
                       </span>
-                      <Calendar className="w-3 h-3 text-[#30363d] group-hover:text-[#58a6ff]" />
+                      <Calendar className="w-3 h-3 text-[#30363d] group-hover:text-primary" />
                     </button>
                     
                     <button 
                       onClick={() => setActivePicker(activePicker === 'end' ? null : 'end')}
-                      className="flex items-center gap-2 h-7 bg-[#0d1117] border border-[#30363d] px-2 hover:border-[#58a6ff] transition-colors group"
+                      className="flex items-center gap-2 h-7 bg-card border border-border px-2 hover:border-primary transition-colors group"
                     >
-                      <span className="text-[9px] text-[#8b949e] w-8 text-left">结束</span>
-                      <span className="flex-1 text-[10px] text-[#c9d1d9] text-left">
+                      <span className="text-[9px] text-muted-foreground w-8 text-left">结束</span>
+                      <span className="flex-1 text-[10px] text-card-foreground text-left">
                         {endDate || "请选择结束时间"}
                       </span>
-                      <Calendar className="w-3 h-3 text-[#30363d] group-hover:text-[#58a6ff]" />
+                      <Calendar className="w-3 h-3 text-[#30363d] group-hover:text-primary" />
                     </button>
                   </div>
 
@@ -3250,11 +3250,11 @@ export default function TraditionalMode() {
                       <div className="fixed inset-0 z-[60] backdrop-blur-[2px] bg-black/20" onClick={() => { setActivePicker(null); setPickerPos({x: 0, y: 0}); }} />
                       <div 
                         style={{ transform: `translate(${pickerPos.x}px, ${pickerPos.y}px)` }}
-                        className="absolute top-full left-4 -right-4 mt-1 bg-[#161b22]/95 backdrop-blur-md border border-[#30363d] shadow-[0_10px_40px_rgba(0,0,0,0.7)] z-[70] p-4 animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-200 origin-top-left rounded-sm"
+                        className="absolute top-full left-4 -right-4 mt-1 bg-muted/95 backdrop-blur-md border border-border shadow-[0_10px_40px_rgba(0,0,0,0.7)] z-[70] p-4 animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-200 origin-top-left rounded-sm"
                       >
                         <div className="flex flex-col gap-4">
                           <div 
-                            className="flex items-center justify-between border-b border-[#30363d] pb-2 cursor-move active:cursor-grabbing select-none"
+                            className="flex items-center justify-between border-b border-border pb-2 cursor-move active:cursor-grabbing select-none"
                             onMouseDown={(e) => {
                               setIsDraggingPicker(true);
                               setPickerDragStart({ x: e.clientX - pickerPos.x, y: e.clientY - pickerPos.y });
@@ -3262,14 +3262,14 @@ export default function TraditionalMode() {
                           >
                             <div className="flex items-center gap-2">
                               <div className="w-1 h-3 bg-[#58a6ff] rounded-full" />
-                              <span className="text-[11px] font-bold text-[#f0f6fc] tracking-wider">
+                              <span className="text-[11px] font-bold text-foreground tracking-wider">
                                 设定{activePicker === 'start' ? '起始' : '截止'}时刻
                               </span>
                             </div>
                             <button 
                               onMouseDown={(e) => e.stopPropagation()} 
                               onClick={() => { setActivePicker(null); setPickerPos({x: 0, y: 0}); }} 
-                              className="text-[#8b949e] hover:text-white transition-colors"
+                              className="text-muted-foreground hover:text-foreground transition-colors"
                             >
                               <Square className="w-3.5 h-3.5" />
                             </button>
@@ -3284,9 +3284,9 @@ export default function TraditionalMode() {
                                    if (activePicker === 'start') setStartDate(e.target.value);
                                    else setEndDate(e.target.value);
                                  }}
-                                 className="w-full h-9 bg-[#0d1117] border border-[#30363d] text-[12px] text-[#c9d1d9] px-3 outline-none focus:border-[#58a6ff] focus:ring-1 focus:ring-[#58a6ff]/30 transition-all rounded-sm appearance-none custom-datetime-input"
+                                 className="w-full h-9 bg-card border border-border text-[12px] text-card-foreground px-3 outline-none focus:border-primary focus:ring-1 focus:ring-[#58a6ff]/30 transition-all rounded-sm appearance-none custom-datetime-input"
                                />
-                               <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#58a6ff]/50">
+                               <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-primary/50">
                                  <Clock className="w-3.5 h-3.5" />
                                </div>
                              </div>
@@ -3299,7 +3299,7 @@ export default function TraditionalMode() {
                                    if (activePicker === 'start') setStartDate(str);
                                    else setEndDate(str);
                                  }}
-                                 className="h-7 bg-[#21262d] text-[10px] font-bold text-[#c9d1d9] hover:bg-[#30363d] hover:text-white border border-[#30363d] transition-colors flex items-center justify-center gap-1.5"
+                                 className="h-7 bg-secondary text-[10px] font-bold text-card-foreground hover:bg-muted-foreground/20 hover:text-foreground border border-border transition-colors flex items-center justify-center gap-1.5"
                                >
                                  <RefreshCcw className="w-3 h-3" />
                                  设为当前
@@ -3309,7 +3309,7 @@ export default function TraditionalMode() {
                                    if (activePicker === 'start') setStartDate("");
                                    else setEndDate("");
                                  }}
-                                 className="h-7 bg-[#21262d] text-[10px] font-bold text-[#f85149] hover:bg-[#f85149]/10 border border-[#30363d] hover:border-[#f85149]/50 transition-colors flex items-center justify-center gap-1.5"
+                                 className="h-7 bg-secondary text-[10px] font-bold text-destructive hover:bg-[#f85149]/10 border border-border hover:border-[#f85149]/50 transition-colors flex items-center justify-center gap-1.5"
                                >
                                  <AlertCircle className="w-3 h-3" />
                                  重置清除
@@ -3317,10 +3317,10 @@ export default function TraditionalMode() {
                              </div>
                           </div>
 
-                          <div className="pt-2 border-t border-[#30363d]">
+                          <div className="pt-2 border-t border-border">
                             <button 
                               onClick={() => setActivePicker(null)}
-                              className="w-full h-8 bg-[#238636] hover:bg-[#2ea043] text-white text-[11px] font-bold transition-all shadow-lg flex items-center justify-center gap-2"
+                              className="w-full h-8 bg-success hover:bg-[#2ea043] text-primary-foreground text-[11px] font-bold transition-all shadow-lg flex items-center justify-center gap-2"
                             >
                               应用��更
                             </button>
@@ -3328,7 +3328,7 @@ export default function TraditionalMode() {
                         </div>
                         
                         {/* Decorative Corner */}
-                        <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 border-[#58a6ff]/20 pointer-events-none" />
+                        <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 border-primary/20 pointer-events-none" />
                       </div>
                     </>
                   )}
@@ -3341,13 +3341,13 @@ export default function TraditionalMode() {
                     setIsQueryActive(true);
                     await loadPlatesWithCriteria(searchCriteria, refreshLimit, true);
                   }}
-                  className="flex-1 h-8 bg-[#238636]/20 border border-[#238636]/40 text-[#3fb950] text-[11px] font-bold hover:bg-[#238636]/40 transition-all flex items-center justify-center gap-2"
+                  className="flex-1 h-8 bg-success/20 border border-success/40 text-success text-[11px] font-bold hover:bg-success/40 transition-all flex items-center justify-center gap-2"
                 >
                   <Search className="w-3.5 h-3.5" /> 检索数据库
                 </button>
                 <button
                   onClick={() => setIsFilterDialogOpen(true)}
-                  className="w-10 h-8 bg-[#21262d] border border-[#30363d] text-[#8b949e] flex items-center justify-center hover:bg-[#30363d] transition-colors">
+                  className="w-10 h-8 bg-secondary border border-border text-muted-foreground flex items-center justify-center hover:bg-muted-foreground/20 transition-colors">
                   <RefreshCcw className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -3355,7 +3355,7 @@ export default function TraditionalMode() {
           </div>
 
           {/* Current Selection Card - Redesigned for Industrial Sophistication */}
-          <div className="bg-[#161b22] p-2 border-y border-[#30363d] relative overflow-hidden group">
+          <div className="bg-muted p-2 border-y border-border relative overflow-hidden group">
             {/* Top glass reflection effect */}
             <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-[#58a6ff]/50 to-transparent" />
             
@@ -3363,14 +3363,14 @@ export default function TraditionalMode() {
               <div className="flex flex-col">
                 <div className="flex items-center gap-1.5 mb-0.5">
                   <div className="w-1.5 h-1.5 rounded-full bg-[#58a6ff] shadow-[0_0_8px_#58a6ff]" />
-                  <span className="text-[9px] font-bold text-[#c9d1d9] uppercase tracking-wider">检测目标</span>
+                  <span className="text-[9px] font-bold text-card-foreground uppercase tracking-wider">检测目标</span>
                 </div>
-                <div className="text-[16px] font-black text-[#f0f6fc] font-mono tracking-tighter">
+                <div className="text-[16px] font-black text-foreground font-mono tracking-tighter">
                   {selectedPlate?.plateId || "WAITING..."}
                 </div>
               </div>
-              <div className="px-2 py-0.5 rounded bg-[#58a6ff]/20 border border-[#58a6ff]/40">
-                <span className="text-[11px] font-bold text-[#58a6ff] font-mono">
+              <div className="px-2 py-0.5 rounded bg-[#58a6ff]/20 border border-primary/40">
+                <span className="text-[11px] font-bold text-primary font-mono">
                   {selectedPlate?.level ? (
                     {
                       '1': '一等', '2': '二等', '3': '三等', '4': '四等',
@@ -3382,53 +3382,53 @@ export default function TraditionalMode() {
             </div>
 
             {/* Compact Row-based Info - 2 Columns Layout with Larger Text */}
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 px-2 py-2.5 bg-[#0d1117]/50 rounded-sm border border-[#30363d]/30">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 px-2 py-2.5 bg-card/50 rounded-sm border border-border/30">
               <div className="flex items-center gap-1.5 text-[13px]">
-                <span className="text-[#c9d1d9] shrink-0">序号:</span>
-                <span className="text-[#f0f6fc] font-mono font-bold truncate">
+                <span className="text-card-foreground shrink-0">序号:</span>
+                <span className="text-foreground font-mono font-bold truncate">
                   {selectedPlate?.serialNumber || "---"}
                 </span>
               </div>
               <div className="flex items-center gap-1.5 text-[13px]">
-                <span className="text-[#c9d1d9] shrink-0">钢种:</span>
-                <span className="text-[#f0f6fc] font-bold truncate">
+                <span className="text-card-foreground shrink-0">钢种:</span>
+                <span className="text-foreground font-bold truncate">
                   {selectedPlate?.steelGrade || "---"}
                 </span>
               </div>
               <div className="flex items-center gap-1.5 text-[13px]">
-                <span className="text-[#c9d1d9] shrink-0">规格:</span>
-                <span className="text-[#58a6ff] font-mono font-bold truncate">
+                <span className="text-card-foreground shrink-0">规格:</span>
+                <span className="text-primary font-mono font-bold truncate">
                   {selectedPlate?.dimensions?.width || 0}×{(selectedPlate?.dimensions?.thickness ?? 10).toFixed(1)}
                 </span>
               </div>
               <div className="flex items-center gap-1.5 text-[13px]">
-                <span className="text-[#c9d1d9] shrink-0">缺陷:</span>
-                <span className="text-[#f85149] font-mono font-bold">
+                <span className="text-card-foreground shrink-0">缺陷:</span>
+                <span className="text-destructive font-mono font-bold">
                   {selectedPlate?.defectCount || 0} pts
                 </span>
               </div>
             </div>
 
             {/* Bottom timestamp bar - Highly Visible */}
-            <div className="mt-2 pt-1.5 border-t border-[#30363d] flex justify-between items-center px-1">
+            <div className="mt-2 pt-1.5 border-t border-border flex justify-between items-center px-1">
               <div className="flex items-center gap-1.5">
-                <Clock className="w-3 h-3 text-[#58a6ff]" />
-                <span className="text-[10px] text-[#f0f6fc] font-mono font-bold bg-[#30363d]/50 px-1.5 py-0.5 rounded-sm">
+                <Clock className="w-3 h-3 text-primary" />
+                <span className="text-[10px] text-foreground font-mono font-bold bg-[#30363d]/50 px-1.5 py-0.5 rounded-sm">
                   {selectedPlate ? new Date(selectedPlate.timestamp).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).replace(/\//g, '-') : "----/--/-- --:--:--"}
                 </span>
               </div>
-              <div className="text-[9px] text-[#3fb950] font-bold font-mono">
+              <div className="text-[9px] text-success font-bold font-mono">
                 <TimeSince timestamp={selectedPlate?.timestamp} />
               </div>
             </div>
           </div>
 
           {/* List Statistics */}
-          <div className="h-6 bg-[#161b22] flex items-center justify-between px-2 text-[9px] border-b border-[#30363d]">
+          <div className="h-6 bg-muted flex items-center justify-between px-2 text-[9px] border-b border-border">
             <div className="flex gap-3">
               <span>合计 {plates.length}</span>
-              <span className="text-[#3fb950]">正常 {plates.filter(p => p.level === 'A' || p.level === 'B').length}</span>
-              <span className="text-[#f85149]">报警 {plates.filter(p => p.level === 'D').length}</span>
+              <span className="text-success">正常 {plates.filter(p => p.level === 'A' || p.level === 'B').length}</span>
+              <span className="text-destructive">报警 {plates.filter(p => p.level === 'D').length}</span>
             </div>
             <div className="flex items-center gap-1">
               <AnimatePresence>
@@ -3438,7 +3438,7 @@ export default function TraditionalMode() {
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 5 }}
                     onClick={() => setIsQueryActive(false)}
-                    className="flex items-center gap-1 px-1.5 py-0.5 bg-[#f85149]/10 text-[#f85149] border border-[#f85149]/30 rounded-[1px] hover:bg-[#f85149]/20 transition-colors"
+                    className="flex items-center gap-1 px-1.5 py-0.5 bg-[#f85149]/10 text-destructive border border-[#f85149]/30 rounded-[1px] hover:bg-[#f85149]/20 transition-colors"
                   >
                     <X className="w-2.5 h-2.5" />
                     <span>退出查询</span>
@@ -3452,7 +3452,7 @@ export default function TraditionalMode() {
                   const scrollContainer = document.querySelector('.custom-scrollbar');
                   if (scrollContainer) scrollContainer.scrollTop = 0;
                 }}
-                className="p-1 hover:bg-[#30363d] text-[#8b949e] transition-colors rounded-sm"
+                className="p-1 hover:bg-muted-foreground/20 text-muted-foreground transition-colors rounded-sm"
                 title="回到顶部"
               >
                 <ArrowUpToLine className="w-3 h-3" />
@@ -3460,20 +3460,20 @@ export default function TraditionalMode() {
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="p-1 hover:bg-[#30363d] text-[#8b949e] transition-colors rounded-sm">
+                  <button className="p-1 hover:bg-muted-foreground/20 text-muted-foreground transition-colors rounded-sm">
                     <Filter className="w-3 h-3" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-[#161b22] border-[#30363d] text-[10px] min-w-[100px] p-1 shadow-2xl">
-                  <DropdownMenuLabel className="text-[#8b949e] py-1 px-2 text-[9px] font-bold">列表过滤</DropdownMenuLabel>
+                <DropdownMenuContent align="end" className="bg-muted border-border text-[10px] min-w-[100px] p-1 shadow-2xl">
+                  <DropdownMenuLabel className="text-muted-foreground py-1 px-2 text-[9px] font-bold">列表过滤</DropdownMenuLabel>
                   <DropdownMenuSeparator className="bg-[#30363d]" />
-                  <DropdownMenuItem onClick={() => setListFilter("all")} className={`focus:bg-[#30363d] focus:text-[#f0f6fc] cursor-pointer py-1 px-2 rounded-sm ${listFilter === 'all' ? 'text-[#58a6ff]' : 'text-[#c9d1d9]'}`}>
+                  <DropdownMenuItem onClick={() => setListFilter("all")} className={`focus:bg-[#30363d] focus:text-foreground cursor-pointer py-1 px-2 rounded-sm ${listFilter === 'all' ? 'text-primary' : 'text-card-foreground'}`}>
                     全部结果
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setListFilter("normal")} className={`focus:bg-[#30363d] focus:text-[#f0f6fc] cursor-pointer py-1 px-2 rounded-sm ${listFilter === 'normal' ? 'text-[#58a6ff]' : 'text-[#c9d1d9]'}`}>
+                  <DropdownMenuItem onClick={() => setListFilter("normal")} className={`focus:bg-[#30363d] focus:text-foreground cursor-pointer py-1 px-2 rounded-sm ${listFilter === 'normal' ? 'text-primary' : 'text-card-foreground'}`}>
                     仅看一等/二等
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setListFilter("alert")} className={`focus:bg-[#30363d] focus:text-[#f0f6fc] cursor-pointer py-1 px-2 rounded-sm ${listFilter === 'alert' ? 'text-[#58a6ff]' : 'text-[#c9d1d9]'}`}>
+                  <DropdownMenuItem onClick={() => setListFilter("alert")} className={`focus:bg-[#30363d] focus:text-foreground cursor-pointer py-1 px-2 rounded-sm ${listFilter === 'alert' ? 'text-primary' : 'text-card-foreground'}`}>
                     ��看报警/等外
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -3481,22 +3481,22 @@ export default function TraditionalMode() {
 
               <RotateCw 
                 onClick={handleRefresh}
-                className="w-3 h-3 text-[#58a6ff] cursor-pointer hover:scale-110 transition-transform ml-1 hover:rotate-180 duration-500" 
+                className="w-3 h-3 text-primary cursor-pointer hover:scale-110 transition-transform ml-1 hover:rotate-180 duration-500" 
                 title={`刷新列表 (加载 ${refreshLimit} 条)`}
               />
             </div>
           </div>
 
           {/* Plate List */}
-          <div className="flex-1 overflow-y-auto overflow-x-hidden border border-[#30363d] custom-scrollbar">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden border border-border custom-scrollbar">
             <table className="w-full text-[12px] border-collapse table-fixed">
-              <thead className="sticky top-0 bg-[#161b22] shadow-sm z-10">
-                <tr className="text-[#8b949e] text-left">
-                  <th className="w-[85px] px-1.5 py-2 font-bold border-r border-[#30363d]">钢板号</th>
-                  <th className="w-[65px] px-1.5 py-2 font-bold border-r border-[#30363d]">钢种</th>
-                  <th className="w-[45px] px-1.5 py-2 font-bold border-r border-[#30363d] text-center">长</th>
-                  <th className="w-[45px] px-1.5 py-2 font-bold border-r border-[#30363d] text-center">宽</th>
-                  <th className="w-[45px] px-1.5 py-2 font-bold border-r border-[#30363d] text-center">时间</th>
+              <thead className="sticky top-0 bg-muted shadow-sm z-10">
+                <tr className="text-muted-foreground text-left">
+                  <th className="w-[85px] px-1.5 py-2 font-bold border-r border-border">钢板号</th>
+                  <th className="w-[65px] px-1.5 py-2 font-bold border-r border-border">钢种</th>
+                  <th className="w-[45px] px-1.5 py-2 font-bold border-r border-border text-center">长</th>
+                  <th className="w-[45px] px-1.5 py-2 font-bold border-r border-border text-center">宽</th>
+                  <th className="w-[45px] px-1.5 py-2 font-bold border-r border-border text-center">时间</th>
                   <th className="w-[50px] px-1.5 py-2 font-bold text-center">等级</th>
                 </tr>
               </thead>
@@ -3522,22 +3522,22 @@ export default function TraditionalMode() {
                     className={`cursor-pointer group transition-colors ${
                       selectedPlate?.serialNumber === plate.serialNumber 
                         ? 'bg-[#58a6ff]/15' 
-                        : index % 2 === 0 ? 'bg-[#0d1117]' : 'bg-[#161b22]'
+                        : index % 2 === 0 ? 'bg-card' : 'bg-muted'
                     } hover:bg-[#1f242b]`}
                   >
-                    <td className="px-1.5 py-1.5 border-r border-[#30363d]/50 font-mono font-medium text-[#f0f6fc] truncate">{plate.plateId}</td>
-                    <td className="px-1.5 py-1.5 border-r border-[#30363d]/50 text-[#c9d1d9] truncate">{plate.steelGrade}</td>
-                    <td className="px-1.5 py-1.5 border-r border-[#30363d]/50 text-center text-[#8b949e] font-mono">{plate.dimensions.length}</td>
-                    <td className="px-1.5 py-1.5 border-r border-[#30363d]/50 text-center text-[#8b949e] font-mono">{plate.dimensions.width}</td>
-                    <td className="px-1.5 py-1.5 border-r border-[#30363d]/50 text-[#8b949e] font-mono text-center">
+                    <td className="px-1.5 py-1.5 border-r border-border/50 font-mono font-medium text-foreground truncate">{plate.plateId}</td>
+                    <td className="px-1.5 py-1.5 border-r border-border/50 text-card-foreground truncate">{plate.steelGrade}</td>
+                    <td className="px-1.5 py-1.5 border-r border-border/50 text-center text-muted-foreground font-mono">{plate.dimensions.length}</td>
+                    <td className="px-1.5 py-1.5 border-r border-border/50 text-center text-muted-foreground font-mono">{plate.dimensions.width}</td>
+                    <td className="px-1.5 py-1.5 border-r border-border/50 text-muted-foreground font-mono text-center">
                       {new Date(plate.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </td>
                     <td className="px-1 py-1.5 text-center">
                       <span className={`px-1.5 py-0.5 rounded-sm font-bold text-[11px] ${
-                        plate.level === 'A' ? 'bg-[#3fb950]/20 text-[#3fb950] border border-[#3fb950]/30' :
-                        plate.level === 'B' ? 'bg-[#58a6ff]/20 text-[#58a6ff] border border-[#58a6ff]/30' :
-                        plate.level === 'C' ? 'bg-[#d29922]/20 text-[#d29922] border border-[#d29922]/30' :
-                        'bg-[#f85149]/20 text-[#f85149] border border-[#f85149]/30'
+                        plate.level === 'A' ? 'bg-[#3fb950]/20 text-success border border-[#3fb950]/30' :
+                        plate.level === 'B' ? 'bg-[#58a6ff]/20 text-primary border border-primary/30' :
+                        plate.level === 'C' ? 'bg-warning/20 text-warning border border-[#d29922]/30' :
+                        'bg-[#f85149]/20 text-destructive border border-[#f85149]/30'
                       }`}>
                         {plate.level === 'A' ? '一等' : plate.level === 'B' ? '二等' : plate.level === 'C' ? '三等' : '等外'}
                       </span>
@@ -3558,9 +3558,9 @@ export default function TraditionalMode() {
             animate={{ height: 160, opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
-            className="bg-[#0d1117] flex flex-col border border-[#30363d] overflow-hidden whitespace-nowrap"
+            className="bg-card flex flex-col border border-border overflow-hidden whitespace-nowrap"
           >
-             <div className="h-6 bg-[#161b22] border-b border-[#30363d] flex items-center justify-between px-1 text-[9px]">
+             <div className="h-6 bg-muted border-b border-border flex items-center justify-between px-1 text-[9px]">
                <span>
                  {surfaceFilter === 'bottom'
                    ? '下表分布'
@@ -3573,16 +3573,16 @@ export default function TraditionalMode() {
                  <ZoomOut className="w-3 h-3" />
                </div>
              </div>
-             <div className="flex-1 relative flex items-center justify-center bg-[#161b22]/30 overflow-x-auto overflow-y-hidden">
+             <div className="flex-1 relative flex items-center justify-center bg-muted/30 overflow-x-auto overflow-y-hidden">
                {/* Viewport Indicator */}
                {activeNav === "图像分析" && (surfaceFilter === 'all' || surfaceFilter === 'top') && (
                  <div
-                   className="absolute top-0 bottom-0 border-2 border-[#58a6ff] bg-[#58a6ff]/20 pointer-events-none z-10"
+                   className="absolute top-0 bottom-0 border-2 border-primary bg-[#58a6ff]/20 pointer-events-none z-10"
                    style={distributionViewportStyle}
                  />
                )}
                {/* Ruler - Horizontal */}
-               <div className="absolute left-0 right-0 h-4 border-b border-[#30363d]/50 flex justify-between px-2 text-[8px] text-[#8b949e]">
+               <div className="absolute left-0 right-0 h-4 border-b border-border/50 flex justify-between px-2 text-[8px] text-muted-foreground">
                  <span>0mm</span>
                  <span>长度</span>
                  <span>尾</span>
@@ -3595,7 +3595,7 @@ export default function TraditionalMode() {
                onWheel={(e) => handleDistributionWheel(e, topDistributionDefects)}
              >
                {/* Plate Visual Representation (Horizontal Strip) */}
-               <div ref={distributionPlateRef} className="h-[70%] w-full bg-[#161b22] relative border-y border-[#30363d]">
+               <div ref={distributionPlateRef} className="h-[70%] w-full bg-muted relative border-y border-border">
                  {distributionTilePlan && distributionSurface && analysisSeqNo != null && (
                    <div className="absolute inset-0 pointer-events-none">
                      {distributionTilePlan.tiles.map((tile) => {
@@ -3735,7 +3735,7 @@ export default function TraditionalMode() {
                  {/* Viewport Indicator inside plate */}
                  {analysisScrollState.height > 1 && (
                    <motion.div 
-                     className="absolute left-0 w-full border-y-2 border-[#58a6ff] bg-[#58a6ff]/10 backdrop-blur-[1px] pointer-events-none z-20"
+                     className="absolute left-0 w-full border-y-2 border-primary bg-[#58a6ff]/10 backdrop-blur-[1px] pointer-events-none z-20"
                      initial={false}
                      animate={distributionViewportStyle}
                      transition={{ type: "spring", bounce: 0, duration: 0.1 }}
@@ -3744,24 +3744,24 @@ export default function TraditionalMode() {
                </div>
              </div>
                {/* Side label */}
-               <div className="absolute right-0 top-1/2 -rotate-90 origin-right text-[10px] text-[#8b949e] tracking-widest whitespace-nowrap translate-x-12">
+               <div className="absolute right-0 top-1/2 -rotate-90 origin-right text-[10px] text-muted-foreground tracking-widest whitespace-nowrap translate-x-12">
                  横向分布
                </div>
              </div>
-             <div className="h-4 bg-[#161b22] text-[8px] flex items-center px-1 text-[#8b949e]">444.0</div>
+             <div className="h-4 bg-muted text-[8px] flex items-center px-1 text-muted-foreground">444.0</div>
           </motion.div>
       </AnimatePresence>
 
         {/* Center Panel: Image Viewer */}
         <div className="flex-1 flex flex-col gap-0.5">
           {/* Viewer Controls with Integrated Distribution Map */}
-          <div className="h-8 bg-[#161b22] border border-[#30363d] flex items-center justify-between px-2 shrink-0 gap-4 relative">
+          <div className="h-8 bg-muted border border-border flex items-center justify-between px-2 shrink-0 gap-4 relative">
             <div className="flex items-center gap-2 shrink-0">
               <div className="flex gap-0.5 items-center">
                 {activeNav === "缺陷分析" && (
                   <>
                     <button 
-                      className={`p-1 transition-colors ${isGridView ? 'bg-[#30363d] text-[#58a6ff]' : 'hover:bg-[#30363d] text-[#8b949e]'}`}
+                      className={`p-1 transition-colors ${isGridView ? 'bg-[#30363d] text-primary' : 'hover:bg-muted-foreground/20 text-muted-foreground'}`}
                       onClick={() => setIsGridView(!isGridView)}
                       title="列表模式"
                     >
@@ -3770,8 +3770,8 @@ export default function TraditionalMode() {
                     <button
                       className={`p-1 transition-colors ${
                         isMapMode
-                          ? 'bg-[#30363d] text-[#58a6ff]'
-                          : 'hover:bg-[#30363d] text-[#8b949e]'
+                          ? 'bg-[#30363d] text-primary'
+                          : 'hover:bg-muted-foreground/20 text-muted-foreground'
                       }`}
                       onClick={() => setIsMapMode(!isMapMode)}
                       title="地图模式 (Shift)"
@@ -3785,8 +3785,8 @@ export default function TraditionalMode() {
                     <button
                       className={`p-1 transition-colors ${
                         isWidthLockEnabled
-                          ? 'bg-[#30363d] text-[#58a6ff]'
-                          : 'hover:bg-[#30363d] text-[#8b949e]'
+                          ? 'bg-[#30363d] text-primary'
+                          : 'hover:bg-muted-foreground/20 text-muted-foreground'
                       }`}
                       onClick={() => setIsWidthLockEnabled((prev) => !prev)}
                       title={isWidthLockEnabled ? "关闭宽度锁定" : "开启宽度锁定"}
@@ -3798,8 +3798,8 @@ export default function TraditionalMode() {
                         onClick={() => setIsAnalysisSyncEnabled((prev) => !prev)}
                         className={`p-1 transition-colors ${
                           isAnalysisSyncEnabled
-                            ? 'bg-[#30363d] text-[#58a6ff]'
-                            : 'hover:bg-[#30363d] text-[#8b949e]'
+                            ? 'bg-[#30363d] text-primary'
+                            : 'hover:bg-muted-foreground/20 text-muted-foreground'
                         }`}
                         title={isAnalysisSyncEnabled ? "关闭同步锁定" : "开启同步锁定"}
                       >
@@ -3812,7 +3812,7 @@ export default function TraditionalMode() {
                 
                 <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 z-10">
                   <button 
-                    className="p-1 hover:bg-[#30363d] text-[#c9d1d9] transition-colors disabled:opacity-30 disabled:hover:bg-transparent rounded-sm"
+                    className="p-1 hover:bg-muted-foreground/20 text-card-foreground transition-colors disabled:opacity-30 disabled:hover:bg-transparent rounded-sm"
                     onClick={() => {
                       const idx = plates.findIndex(p => p.plateId === selectedPlate?.plateId);
                       if (idx > 0) setSelectedPlate(plates[idx - 1]);
@@ -3823,12 +3823,12 @@ export default function TraditionalMode() {
                     <ChevronLeft className="w-4 h-4" />
                   </button>
                   <div className="px-2 min-w-[100px] text-center">
-                    <span className="text-[14px] font-mono font-bold text-[#58a6ff] tracking-tight leading-none">
+                    <span className="text-[14px] font-mono font-bold text-primary tracking-tight leading-none">
                       {selectedPlate?.plateId || "H2255043006"}
                     </span>
                   </div>
                   <button 
-                    className="p-1 hover:bg-[#30363d] text-[#c9d1d9] transition-colors disabled:opacity-30 disabled:hover:bg-transparent rounded-sm"
+                    className="p-1 hover:bg-muted-foreground/20 text-card-foreground transition-colors disabled:opacity-30 disabled:hover:bg-transparent rounded-sm"
                     onClick={() => {
                       const idx = plates.findIndex(p => p.plateId === selectedPlate?.plateId);
                       if (idx < plates.length - 1) setSelectedPlate(plates[idx + 1]);
@@ -3840,7 +3840,7 @@ export default function TraditionalMode() {
                   </button>
                 </div>
               </div>
-              <span className="text-[12px] font-bold text-[#f0f6fc] tracking-tight ml-2 leading-none flex items-center">
+              <span className="text-[12px] font-bold text-foreground tracking-tight ml-2 leading-none flex items-center">
                 BN1D2 3.780 1530 I) {
                   surfaceFilter === 'all' ? '全表面' : surfaceFilter === 'top' ? '上表面' : '下表面'
                 } 28/66
@@ -3852,15 +3852,15 @@ export default function TraditionalMode() {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button 
-                      className="flex items-center gap-1.5 p-1 hover:bg-[#30363d] text-[#8b949e] disabled:opacity-50 mr-1 rounded-sm transition-colors"
+                      className="flex items-center gap-1.5 p-1 hover:bg-muted-foreground/20 text-muted-foreground disabled:opacity-50 mr-1 rounded-sm transition-colors"
                       title="人工判级"
                       disabled={!selectedPlate}
                     >
                       {selectedPlate?.level && (
                         <span className={`text-[12px] font-bold ${
-                          selectedPlate.level === 'D' ? 'text-[#f85149]' : 
+                          selectedPlate.level === 'D' ? 'text-destructive' : 
                           selectedPlate.level === 'C' ? 'text-[#e3b341]' : 
-                          'text-[#3fb950]'
+                          'text-success'
                         }`}>
                           {{ 'A': '一等品', 'B': '二等品', 'C': '三等品', 'D': '等外品' }[selectedPlate.level] || selectedPlate.level}
                         </span>
@@ -3868,9 +3868,9 @@ export default function TraditionalMode() {
                       <Gavel className={`w-3.5 h-3.5 ${(selectedPlate as any)?.isManual ? 'text-[#409eff]' : ''}`} />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="bg-[#161b22] border-[#30363d] text-[12px] min-w-[120px] p-1 shadow-2xl z-[150]">
-                    <DropdownMenuLabel className="text-[#8b949e] py-1 px-2 text-[12px]">
-                      自动判级: <span className="text-[#f0f6fc] font-bold">{selectedPlate?.level || '-'}</span>
+                  <DropdownMenuContent align="end" className="bg-muted border-border text-[12px] min-w-[120px] p-1 shadow-2xl z-[150]">
+                    <DropdownMenuLabel className="text-muted-foreground py-1 px-2 text-[12px]">
+                      自动判级: <span className="text-foreground font-bold">{selectedPlate?.level || '-'}</span>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator className="bg-[#30363d]" />
                     <DropdownMenuItem 
@@ -3878,23 +3878,23 @@ export default function TraditionalMode() {
                          if (!selectedPlate) return;
                          toast.success("已清除判级结果");
                       }}
-                      className="focus:bg-[#30363d] focus:text-[#f0f6fc] cursor-pointer py-1 px-2 rounded-sm text-[#8b949e]"
+                      className="focus:bg-[#30363d] focus:text-foreground cursor-pointer py-1 px-2 rounded-sm text-muted-foreground"
                     >
                       清除级别
                     </DropdownMenuItem>
                     <DropdownMenuItem 
                       onClick={() => toast.success("已标记为重点关注")}
-                      className="focus:bg-[#30363d] focus:text-[#f0f6fc] cursor-pointer py-1 px-2 rounded-sm text-[#d29922]"
+                      className="focus:bg-[#30363d] focus:text-foreground cursor-pointer py-1 px-2 rounded-sm text-warning"
                     >
                       <Target className="w-3 h-3 mr-2 inline" />
                       重点标记
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className="bg-[#30363d]" />
                     {[
-                      { l: 'A', t: '一等品', c: 'text-[#3fb950]' },
-                      { l: 'B', t: '二等品', c: 'text-[#3fb950]' },
+                      { l: 'A', t: '一等品', c: 'text-success' },
+                      { l: 'B', t: '二等品', c: 'text-success' },
                       { l: 'C', t: '三等品', c: 'text-[#e3b341]' },
-                      { l: 'D', t: '等外品', c: 'text-[#f85149]' },
+                      { l: 'D', t: '等外品', c: 'text-destructive' },
                     ].map(item => (
                       <DropdownMenuItem 
                         key={item.l}
@@ -3905,7 +3905,7 @@ export default function TraditionalMode() {
                           setPlates(prev => prev.map(p => p.serialNumber === newPlate.serialNumber ? newPlate : p));
                           toast.success(`已判级为 ${item.t}`);
                         }}
-                        className={`focus:bg-[#30363d] focus:text-[#f0f6fc] cursor-pointer py-1 px-2 rounded-sm ${item.c}`}
+                        className={`focus:bg-[#30363d] focus:text-foreground cursor-pointer py-1 px-2 rounded-sm ${item.c}`}
                       >
                         {item.t} ({item.l})
                       </DropdownMenuItem>
@@ -3914,22 +3914,22 @@ export default function TraditionalMode() {
                 </DropdownMenu>
 
                 <button 
-                  className="p-1 hover:bg-[#30363d] text-[#8b949e]"
+                  className="p-1 hover:bg-muted-foreground/20 text-muted-foreground"
                   onClick={() => { setImgScale(1); setImgOffset({ x: 0, y: 0 }); }}
                 >
                   <RefreshCcw className="w-4 h-4" />
                 </button>
                 <button 
-                  className="p-1 hover:bg-[#30363d] text-[#8b949e]"
+                  className="p-1 hover:bg-muted-foreground/20 text-muted-foreground"
                   onClick={() => setImgScale(prev => Math.min(10, prev * 1.2))}
                 >
                   <ZoomIn className="w-4 h-4" />
                 </button>
-                <span className="text-[12px] px-2 flex items-center bg-[#0d1117] border border-[#30363d] min-w-[45px] justify-center">
+                <span className="text-[12px] px-2 flex items-center bg-card border border-border min-w-[45px] justify-center">
                   {Math.round(imgScale * 100)}%
                 </span>
                 <button 
-                  className="p-1 hover:bg-[#30363d] text-[#8b949e]"
+                  className="p-1 hover:bg-muted-foreground/20 text-muted-foreground"
                   onClick={() => setImgScale(prev => Math.max(0.1, prev * 0.8))}
                 >
                   <ZoomOut className="w-4 h-4" />
@@ -3937,13 +3937,13 @@ export default function TraditionalMode() {
               </div>
               <div className="flex gap-1">
                 <button 
-                  className="p-1 hover:bg-[#30363d] text-[#8b949e]"
+                  className="p-1 hover:bg-muted-foreground/20 text-muted-foreground"
                   onClick={() => setIsImmersiveMode(!isImmersiveMode)}
                   title={isImmersiveMode ? "退出沉浸模式 (F)" : "全屏沉浸模式 (F)"}
                 >
                   {isImmersiveMode ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                 </button>
-                <div className="flex items-center bg-[#0d1117] border border-[#30363d] rounded p-0.5 gap-0.5 ml-2">
+                <div className="flex items-center bg-card border border-border rounded p-0.5 gap-0.5 ml-2">
                   {[
                     { id: 'all', label: '全部' },
                     { id: 'top', label: '上表' },
@@ -3954,8 +3954,8 @@ export default function TraditionalMode() {
                       onClick={() => setSurfaceFilter(item.id as any)}
                       className={`px-2 py-0.5 text-[12px] font-bold rounded transition-all ${
                         surfaceFilter === item.id 
-                          ? "bg-[#58a6ff] text-white" 
-                          : "text-[#8b949e] hover:text-white"
+                          ? "bg-[#58a6ff] text-primary-foreground" 
+                          : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
                       {item.label}
@@ -3967,29 +3967,29 @@ export default function TraditionalMode() {
           </div>
 
           {/* Detail Bar */}
-          <div className="h-8 bg-[#161b22] border border-[#30363d] flex items-center justify-between px-1 shrink-0 overflow-hidden">
+          <div className="h-8 bg-muted border border-border flex items-center justify-between px-1 shrink-0 overflow-hidden">
             <div className="flex items-center gap-1 overflow-x-auto whitespace-nowrap scrollbar-hide flex-1">
               {currentDefect ? (
                 <>
-                  <div className="flex items-center gap-1 bg-[#238636]/10 border border-[#238636]/30 px-2 py-0.5 rounded text-[10px] text-[#3fb950]">
+                  <div className="flex items-center gap-1 bg-success/10 border border-success/30 px-2 py-0.5 rounded text-[10px] text-success">
                     <span>当前缺陷</span><span className="font-bold">{currentDefect.type}</span>
                   </div>
-                  <div className="flex items-center gap-1 bg-[#d29922]/10 border border-[#d29922]/30 px-2 py-0.5 rounded text-[10px] text-[#d29922]">
+                  <div className="flex items-center gap-1 bg-warning/10 border border-[#d29922]/30 px-2 py-0.5 rounded text-[10px] text-warning">
                     <span>置信度</span><span className="font-bold">{(currentDefect.confidence * 100).toFixed(1)}%</span>
                   </div>
                 </>
               ) : (
-                <div className="text-[10px] text-[#8b949e] px-2 italic">无缺陷数据</div>
+                <div className="text-[10px] text-muted-foreground px-2 italic">无缺陷数据</div>
               )}
-              <div className="flex items-center gap-1 bg-[#58a6ff]/10 border border-[#58a6ff]/30 px-2 py-0.5 rounded text-[10px] text-[#58a6ff]">
+              <div className="flex items-center gap-1 bg-[#58a6ff]/10 border border-primary/30 px-2 py-0.5 rounded text-[10px] text-primary">
                 <span>表面</span><span className="font-bold">{surfaceImages[0]?.surface === 'top' ? '上表面' : '下表面'}</span>
               </div>
             </div>
 
-            <div className="flex items-center gap-0.5 ml-2 shrink-0 border-l border-[#30363d] pl-1.5">
+            <div className="flex items-center gap-0.5 ml-2 shrink-0 border-l border-border pl-1.5">
               <button 
                 onClick={() => selectDefectAt(0)}
-                className="h-6 px-2 flex items-center gap-1 text-[10px] text-[#8b949e] hover:text-[#58a6ff] hover:bg-[#30363d] rounded transition-colors" title="跳至开头"
+                className="h-6 px-2 flex items-center gap-1 text-[10px] text-muted-foreground hover:text-primary hover:bg-muted-foreground/20 rounded transition-colors" title="跳至开头"
               >
                 <RefreshCcw className="w-3 h-3" />
                 <span>开头</span>
@@ -3999,7 +3999,7 @@ export default function TraditionalMode() {
                   if (currentDefectIndex <= 0) return;
                   selectDefectAt(currentDefectIndex - 1);
                 }}
-                className="h-6 px-2 flex items-center gap-1 text-[10px] text-[#c9d1d9] hover:bg-[#30363d] rounded transition-colors"
+                className="h-6 px-2 flex items-center gap-1 text-[10px] text-card-foreground hover:bg-muted-foreground/20 rounded transition-colors"
               >
                 <ChevronLeft className="w-3 h-3" />
                 <span>上一个</span>
@@ -4008,8 +4008,8 @@ export default function TraditionalMode() {
                 onClick={() => setIsPlaying(!isPlaying)}
                 className={`h-6 px-2 flex items-center gap-1 text-[10px] rounded border transition-colors ${
                   isPlaying 
-                    ? 'bg-[#f85149]/10 text-[#f85149] border-[#f85149]/30 hover:bg-[#f85149]/20' 
-                    : 'bg-[#58a6ff]/10 text-[#58a6ff] border-[#58a6ff]/30 hover:bg-[#58a6ff]/20'
+                    ? 'bg-[#f85149]/10 text-destructive border-[#f85149]/30 hover:bg-[#f85149]/20' 
+                    : 'bg-[#58a6ff]/10 text-primary border-primary/30 hover:bg-primary/20'
                 }`}
               >
                 {isPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
@@ -4021,24 +4021,24 @@ export default function TraditionalMode() {
                   const nextIndex = Math.min(visibleDefects.length - 1, currentDefectIndex + 1);
                   selectDefectAt(nextIndex);
                 }}
-                className="h-6 px-2 flex items-center gap-1 text-[10px] text-[#c9d1d9] hover:bg-[#30363d] rounded transition-colors"
+                className="h-6 px-2 flex items-center gap-1 text-[10px] text-card-foreground hover:bg-muted-foreground/20 rounded transition-colors"
               >
                 <span>下一个</span>
                 <ChevronRight className="w-3 h-3" />
               </button>
               <div className="w-px h-3 bg-[#30363d] mx-0.5" />
-              <button className="h-6 px-3 text-[10px] text-[#3fb950] font-bold bg-[#238636]/10 border border-[#238636]/40 rounded hover:bg-[#238636]/20 transition-colors">
+              <button className="h-6 px-3 text-[10px] text-success font-bold bg-success/10 border border-success/40 rounded hover:bg-success/20 transition-colors">
                 确认
               </button>
-              <button className="h-6 px-2 text-[10px] text-[#8b949e] border border-[#30363d] rounded hover:bg-[#30363d] transition-colors">
+              <button className="h-6 px-2 text-[10px] text-muted-foreground border border-border rounded hover:bg-muted-foreground/20 transition-colors">
                 自动确认
               </button>
               <button
                 onClick={() => setIsDefectListOpen(!isDefectListOpen)}
                 className={`h-6 w-7 flex items-center justify-center rounded border transition-colors ${
                   isDefectListOpen 
-                    ? 'bg-[#58a6ff]/10 text-[#58a6ff] border-[#58a6ff]/30' 
-                    : 'text-[#8b949e] border-[#30363d] hover:bg-[#30363d]'
+                    ? 'bg-[#58a6ff]/10 text-primary border-primary/30' 
+                    : 'text-muted-foreground border-border hover:bg-muted-foreground/20'
                 }`}
                 title={isDefectListOpen ? "收起缺陷列表 (L)" : "展开缺陷列表 (L)"}
               >
@@ -4050,7 +4050,7 @@ export default function TraditionalMode() {
           {/* Image Display & Defect List Container */}
           <div className="flex-1 flex overflow-hidden">
             <div 
-              className="flex-1 bg-black relative flex items-center justify-center overflow-hidden border border-[#30363d] cursor-crosshair"
+              className="flex-1 bg-black relative flex items-center justify-center overflow-hidden border border-border cursor-crosshair"
               onWheel={activeNav !== "图像分析" && !isGridView && !isMapMode ? handleImageWheel : undefined}
               onMouseDown={activeNav !== "图像分析" && !isGridView && !isMapMode ? handleImageMouseDown : undefined}
               onMouseMove={activeNav !== "图像分析" && !isGridView && !isMapMode ? (e => { handleMouseMove(e); handleImageMouseMove(e); }) : handleMouseMove}
@@ -4064,17 +4064,17 @@ export default function TraditionalMode() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="absolute inset-0 bg-[#0d1117] flex flex-col"
+                    className="absolute inset-0 bg-card flex flex-col"
                   >
                     {(surfaceFilter === "all" || surfaceFilter === "top") && (
                       <div
                         className={`relative w-full overflow-hidden ${
                           surfaceFilter === "all"
-                            ? "flex-1 border-b-2 border-[#30363d]/50"
+                            ? "flex-1 border-b-2 border-border/50"
                             : "h-full"
                         }`}
                       >
-                        <div className="absolute top-2 left-2 px-2 py-0.5 bg-black/60 text-[10px] text-[#58a6ff] font-bold z-10 border border-[#58a6ff]/30 rounded-sm">
+                        <div className="absolute top-2 left-2 px-2 py-0.5 bg-black/60 text-[10px] text-primary font-bold z-10 border border-primary/30 rounded-sm">
                           上表
                         </div>
                         {analysisSeqNo && topLayout.worldWidth > 0 ? (
@@ -4082,7 +4082,7 @@ export default function TraditionalMode() {
                             imageWidth={topLayout.worldWidth}
                             imageHeight={topLayout.worldHeight}
                             tileSize={analysisTileSize}
-                            className="bg-[#0d1117]"
+                            className="bg-card"
                             maxLevel={topMaxTileLevel}
                             prefetchMargin={400}
                             renderTile={renderTopTile}
@@ -4112,7 +4112,7 @@ export default function TraditionalMode() {
                             defectClasses={defectClassOptions}
                           />
                         ) : (
-                          <div className="absolute inset-0 flex items-center justify-center text-[11px] text-[#8b949e]">
+                          <div className="absolute inset-0 flex items-center justify-center text-[11px] text-muted-foreground">
                             缺少上表图像元信息
                           </div>
                         )}
@@ -4125,7 +4125,7 @@ export default function TraditionalMode() {
                           surfaceFilter === "all" ? "flex-1" : "h-full"
                         }`}
                       >
-                        <div className="absolute top-2 left-2 px-2 py-0.5 bg-black/60 text-[10px] text-[#f85149] font-bold z-10 border border-[#f85149]/30 rounded-sm">
+                        <div className="absolute top-2 left-2 px-2 py-0.5 bg-black/60 text-[10px] text-destructive font-bold z-10 border border-[#f85149]/30 rounded-sm">
                           下表
                         </div>
                         {analysisSeqNo && bottomLayout.worldWidth > 0 ? (
@@ -4133,7 +4133,7 @@ export default function TraditionalMode() {
                             imageWidth={bottomLayout.worldWidth}
                             imageHeight={bottomLayout.worldHeight}
                             tileSize={analysisTileSize}
-                            className="bg-[#0d1117]"
+                            className="bg-card"
                             maxLevel={bottomMaxTileLevel}
                             prefetchMargin={400}
                             renderTile={renderBottomTile}
@@ -4163,7 +4163,7 @@ export default function TraditionalMode() {
                             defectClasses={defectClassOptions}
                           />
                         ) : (
-                          <div className="absolute inset-0 flex items-center justify-center text-[11px] text-[#8b949e]">
+                          <div className="absolute inset-0 flex items-center justify-center text-[11px] text-muted-foreground">
                             缺少下表图像元信息
                           </div>
                         )}
@@ -4176,7 +4176,7 @@ export default function TraditionalMode() {
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 1.1 }}
-                    className="absolute inset-0 p-4 overflow-y-auto grid gap-2 bg-[#0d1117] z-20 custom-scrollbar"
+                    className="absolute inset-0 p-4 overflow-y-auto grid gap-2 bg-card z-20 custom-scrollbar"
                     style={{ 
                       gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))` 
                     }}
@@ -4210,7 +4210,7 @@ export default function TraditionalMode() {
                               })
                             }
                             onMouseLeave={() => setHoveredDefect(null)}
-                              className={`aspect-square bg-[#161b22] border border-[#30363d] relative group cursor-pointer overflow-hidden ${
+                              className={`aspect-square bg-muted border border-border relative group cursor-pointer overflow-hidden ${
                                 newDefectKeys.has(
                                   getDefectSelectionKey({ id: defect.id, surface: defect.surface }),
                                 ) ? "list-enter" : ""
@@ -4220,7 +4220,7 @@ export default function TraditionalMode() {
                               src={defectImageUrl}
                               className={`w-full h-full group-hover:opacity-100 transition-opacity ${isImageFit ? 'object-cover' : 'object-contain'}`}
                             />
-                            <div className="absolute inset-x-0 bottom-0 bg-black/80 p-1 text-[8px] text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="absolute inset-x-0 bottom-0 bg-black/80 p-1 text-[8px] text-primary-foreground opacity-0 group-hover:opacity-100 transition-opacity">
                               <div className="truncate font-bold">{defect.type}</div>
                               <div>{(defect.confidence * 100).toFixed(0)}%</div>
                             </div>
@@ -4228,7 +4228,7 @@ export default function TraditionalMode() {
                         );
                       })}
                     {visibleDefects.length === 0 && (
-                      <div className="col-span-full h-full flex flex-col items-center justify-center text-[#8b949e]">
+                      <div className="col-span-full h-full flex flex-col items-center justify-center text-muted-foreground">
                         <LayoutGrid className="w-12 h-12 mb-2 opacity-20" />
                         <span className="text-xs">
                           {plateDefects.length === 0 ? "暂无缺陷数据" : "无匹配缺陷"}
@@ -4242,7 +4242,7 @@ export default function TraditionalMode() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="w-full h-full relative bg-[#0d1117]"
+                    className="w-full h-full relative bg-card"
                   >
                     {mapSeqNo != null && mapWorldWidth > 0 && mapWorldHeight > 0 ? (
                       <>
@@ -4250,7 +4250,7 @@ export default function TraditionalMode() {
                           imageWidth={mapWorldWidth}
                           imageHeight={mapWorldHeight}
                           tileSize={mapTileSize}
-                          className="bg-[#0d1117]"
+                          className="bg-card"
                           initialScale={1}
                           maxLevel={mapMaxLevel}
                           prefetchMargin={400}
@@ -4284,11 +4284,11 @@ export default function TraditionalMode() {
                         )}
                       </>
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-[#8b949e]">
+                      <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                         <span className="text-xs">缺少瓦片元信息</span>
                       </div>
                     )}
-                    <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/60 border border-white/10 text-[9px] text-[#8b949e] font-mono pointer-events-none">
+                    <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/60 border border-white/10 text-[9px] text-muted-foreground font-mono pointer-events-none">
                       MAP MODE
                     </div>
                   </motion.div>
@@ -4332,7 +4332,7 @@ export default function TraditionalMode() {
                     </div>
 
                     {/* Scale Indicator Overlay */}
-                    <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/60 border border-white/10 text-[9px] text-[#8b949e] font-mono pointer-events-none">
+                    <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/60 border border-white/10 text-[9px] text-muted-foreground font-mono pointer-events-none">
                       SCALE: {imgScale.toFixed(2)}x
                     </div>
                   </motion.div>
@@ -4347,17 +4347,17 @@ export default function TraditionalMode() {
                   initial={{ width: 0, opacity: 0 }}
                   animate={{ width: 180, opacity: 1 }}
                   exit={{ width: 0, opacity: 0 }}
-                  className="bg-[#161b22] border-l border-[#30363d] flex flex-col"
+                  className="bg-muted border-l border-border flex flex-col"
                 >
-                  <div className="h-8 border-b border-[#30363d] flex items-center px-3 justify-between shrink-0">
-                    <span className="text-[11px] font-bold text-[#f0f6fc]">
+                  <div className="h-8 border-b border-border flex items-center px-3 justify-between shrink-0">
+                    <span className="text-[11px] font-bold text-foreground">
                       缺陷列表 ({visibleDefects.length}
                       {visibleDefects.length !== plateDefects.length
                         ? `/${plateDefects.length}`
                         : ""}
                       )
                     </span>
-                    <Activity className="w-3 h-3 text-[#58a6ff]" />
+                    <Activity className="w-3 h-3 text-primary" />
                   </div>
                   
                     <div className="flex-1 overflow-y-auto custom-scrollbar p-1.5 space-y-1">
@@ -4401,34 +4401,34 @@ export default function TraditionalMode() {
                               })
                             }
                             onMouseLeave={() => setHoveredDefect(null)}
-                              className={`p-2 bg-[#0d1117] border rounded-sm transition-colors cursor-pointer group ${
-                                isDefectSelected(defect) ? 'border-[#58a6ff] bg-[#58a6ff]/5' : 'border-[#30363d] hover:border-[#58a6ff]/50'
+                              className={`p-2 bg-card border rounded-sm transition-colors cursor-pointer group ${
+                                isDefectSelected(defect) ? 'border-primary bg-[#58a6ff]/5' : 'border-border hover:border-primary/50'
                               } ${newDefectKeys.has(
                                 getDefectSelectionKey({ id: defect.id, surface: defect.surface }),
                               ) ? "list-enter" : ""}`}
                           >
                             <div className="flex justify-between items-start mb-1">
                               <div className="flex items-center gap-1">
-                                <span className="text-[10px] font-bold text-[#58a6ff]">
+                                <span className="text-[10px] font-bold text-primary">
                                   #{idx + 1}
                                 </span>
-                                <span className="text-[9px] px-1 rounded-sm bg-[#30363d] text-[#c9d1d9]">
+                                <span className="text-[9px] px-1 rounded-sm bg-[#30363d] text-card-foreground">
                                   {defect.surface === 'top' ? '上' : '下'}
                                 </span>
-                                <span className="text-[9px] font-mono text-[#8b949e]">
+                                <span className="text-[9px] font-mono text-muted-foreground">
                                   ID:{defect.id}
                                 </span>
-                                <span className="text-[10px] font-bold text-[#58a6ff] truncate max-w-[90px]">
+                                <span className="text-[10px] font-bold text-primary truncate max-w-[90px]">
                                   {defect.type}
                                 </span>
                               </div>
                               <span className={`text-[9px] px-1 rounded-sm ${
-                                defect.confidence > 0.9 ? 'bg-[#238636]/20 text-[#3fb950]' : 'bg-[#d29922]/20 text-[#d29922]'
+                                defect.confidence > 0.9 ? 'bg-success/20 text-success' : 'bg-warning/20 text-warning'
                               }`}>
                                 {(defect.confidence * 100).toFixed(0)}%
                               </span>
                             </div>
-                            <div className="flex flex-col gap-0.5 text-[9px] text-[#8b949e] font-mono">
+                            <div className="flex flex-col gap-0.5 text-[9px] text-muted-foreground font-mono">
                               <div className="flex items-center gap-2">
                                 <Locate className="w-2.5 h-2.5" />
                                 <span>
@@ -4469,7 +4469,7 @@ export default function TraditionalMode() {
           </div>
 
           {/* Defect Legend (Legend area at bottom) */}
-          <div className="h-[120px] bg-[#0d1117] border border-[#30363d] flex overflow-hidden">
+          <div className="h-[120px] bg-card border border-border flex overflow-hidden">
              {/* Left: Defect Grid */}
              <div className="flex-1 p-2 overflow-y-auto custom-scrollbar">
                <div className="grid grid-cols-5 gap-x-1 gap-y-1.5">
@@ -4495,8 +4495,8 @@ export default function TraditionalMode() {
                          isDisabled
                            ? "bg-transparent border-transparent opacity-20 grayscale cursor-default"
                            : isSelected 
-                             ? "bg-[#30363d]/70 border-[#58a6ff]/70 shadow-[inset_0_0_10px_rgba(88,166,255,0.1)]" 
-                             : "bg-[#161b22]/40 border-transparent hover:border-[#30363d] hover:bg-[#161b22] cursor-pointer"
+                             ? "bg-[#30363d]/70 border-primary/70 shadow-[inset_0_0_10px_rgba(88,166,255,0.1)]" 
+                             : "bg-muted/40 border-transparent hover:border-border hover:bg-muted cursor-pointer"
                        }`}
                      >
                        <div className="relative shrink-0">
@@ -4509,17 +4509,17 @@ export default function TraditionalMode() {
                          )}
                        </div>
                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <span className={`text-[11px] font-bold truncate ${isDisabled ? 'text-[#8b949e]' : isSelected ? 'text-[#f0f6fc]' : 'text-[#c9d1d9]'}`}>
+                          <span className={`text-[11px] font-bold truncate ${isDisabled ? 'text-muted-foreground' : isSelected ? 'text-foreground' : 'text-card-foreground'}`}>
                             {item.label}
                           </span>
                           <div className="flex items-center gap-1.5 ml-auto">
                             {isDisabled ? (
-                              <span className="text-[10px] text-[#8b949e]/50 font-bold">无</span>
+                              <span className="text-[10px] text-muted-foreground/50 font-bold">无</span>
                             ) : (
                               <>
-                                <span className="text-[10px] text-[#f0f6fc] font-mono font-bold bg-[#30363d] px-1.5 rounded-sm">{count}</span>
-                                <span className="text-[10px] text-[#3fb950] font-mono font-bold">{confirmedCount}</span>
-                                <span className="text-[10px] text-[#f85149] font-mono font-bold">{unconfirmedCount}</span>
+                                <span className="text-[10px] text-foreground font-mono font-bold bg-[#30363d] px-1.5 rounded-sm">{count}</span>
+                                <span className="text-[10px] text-success font-mono font-bold">{confirmedCount}</span>
+                                <span className="text-[10px] text-destructive font-mono font-bold">{unconfirmedCount}</span>
                               </>
                             )}
                           </div>
@@ -4531,23 +4531,23 @@ export default function TraditionalMode() {
              </div>
 
              {/* Right: Action Buttons (Vertical) */}
-             <div className="w-[80px] bg-[#161b22] border-l border-[#30363d] flex flex-col p-1 gap-1">
+             <div className="w-[80px] bg-muted border-l border-border flex flex-col p-1 gap-1">
                <button 
                  onClick={() => setSelectedDefectTypes(defectTypeOptions.map(t => t.label))}
-                 className="flex-1 flex flex-col items-center justify-center gap-1 bg-[#21262d] hover:bg-[#30363d] text-[#58a6ff] transition-all border border-[#30363d]"
+                 className="flex-1 flex flex-col items-center justify-center gap-1 bg-secondary hover:bg-muted-foreground/20 text-primary transition-all border border-border"
                >
                  <Layout className="w-3.5 h-3.5" />
                  <span className="text-[9px] font-bold">全选</span>
                </button>
                <button 
                  onClick={() => setSelectedDefectTypes([])}
-                 className="flex-1 flex flex-col items-center justify-center gap-1 bg-[#21262d] hover:bg-[#30363d] text-[#f85149] transition-all border border-[#30363d]"
+                 className="flex-1 flex flex-col items-center justify-center gap-1 bg-secondary hover:bg-muted-foreground/20 text-destructive transition-all border border-border"
                >
                  <Square className="w-3.5 h-3.5" />
                  <span className="text-[9px] font-bold">清空</span>
                </button>
                <button 
-                 className="h-6 flex items-center justify-center bg-[#238636]/20 text-[#3fb950] border border-[#238636]/30 hover:bg-[#238636]/40 transition-colors"
+                 className="h-6 flex items-center justify-center bg-success/20 text-success border border-success/30 hover:bg-success/40 transition-colors"
                >
                  <RefreshCcw className="w-3 h-3" />
                </button>
@@ -4563,20 +4563,20 @@ export default function TraditionalMode() {
               animate={{ height: 160, opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.3, ease: "easeInOut" }}
-              className="bg-[#0d1117] flex flex-col border border-[#30363d] overflow-hidden whitespace-nowrap"
+              className="bg-card flex flex-col border border-border overflow-hidden whitespace-nowrap"
             >
-             <div className="h-6 bg-[#161b22] border-b border-[#30363d] flex items-center justify-between px-1 text-[9px]">
+             <div className="h-6 bg-muted border-b border-border flex items-center justify-between px-1 text-[9px]">
                <span>{surfaceFilter === 'all' ? '下表分布' : '传动侧分布'}</span>
                <div className="flex gap-1">
                <ZoomIn className="w-3 h-3" />
                <ZoomOut className="w-3 h-3" />
              </div>
            </div>
-           <div className="flex-1 relative flex items-center justify-center bg-[#161b22]/30 overflow-x-auto overflow-y-hidden">
+           <div className="flex-1 relative flex items-center justify-center bg-muted/30 overflow-x-auto overflow-y-hidden">
               {/* Viewport Indicator */}
               {activeNav === "图像分析" && (surfaceFilter === 'all' || surfaceFilter === 'bottom') && (
                  <div
-                   className="absolute top-0 bottom-0 border-2 border-[#58a6ff] bg-[#58a6ff]/20 pointer-events-none z-10"
+                   className="absolute top-0 bottom-0 border-2 border-primary bg-[#58a6ff]/20 pointer-events-none z-10"
                    style={bottomDistributionViewportStyle}
                  />
                )}
@@ -4586,7 +4586,7 @@ export default function TraditionalMode() {
                   handleDistributionWheel(e, bottomDistributionDefects)
                 }
               >
-                <div ref={bottomDistributionPlateRef} className="h-[70%] w-full bg-[#161b22] relative border-y border-[#30363d]">
+                <div ref={bottomDistributionPlateRef} className="h-[70%] w-full bg-muted relative border-y border-border">
                   {bottomDistributionTilePlan && analysisSeqNo != null && (
                     <div className="absolute inset-0 pointer-events-none">
                       {bottomDistributionTilePlan.tiles.map((tile) => {
@@ -4726,11 +4726,11 @@ export default function TraditionalMode() {
                 </div>
               </div>
               <div className="w-px h-full bg-[#30363d] absolute" />
-              <div className="absolute right-0 top-1/2 -rotate-90 origin-right text-[10px] text-[#8b949e] tracking-widest whitespace-nowrap translate-x-12">
+              <div className="absolute right-0 top-1/2 -rotate-90 origin-right text-[10px] text-muted-foreground tracking-widest whitespace-nowrap translate-x-12">
                 传动侧分布
               </div>
            </div>
-           <div className="h-4 bg-[#161b22] text-[8px] flex items-center px-1 text-[#8b949e]">446.0</div>
+           <div className="h-4 bg-muted text-[8px] flex items-center px-1 text-muted-foreground">446.0</div>
         </motion.div>
       )}
       </AnimatePresence>

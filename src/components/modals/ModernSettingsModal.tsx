@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import type { ImageOrientation, DistributionScaleMode } from "../types/app.types";
 import { useTheme, themePresets } from "../ThemeContext";
+import { useStyleSystem, useAppMode } from "@/components/StyleSystemProvider";
 import type { ApiNode } from "../../api/types";
 import { InfoPanel } from "../InfoPanel";
 
@@ -85,6 +86,8 @@ export function ModernSettingsModal({
   companyName,
 }: ModernSettingsModalProps) {
   const { currentTheme, applyTheme } = useTheme();
+  const { activePreset, applyPreset, traditionalPresets, modernPresets } = useStyleSystem();
+  const { mode: appMode, setMode: setAppMode } = useAppMode();
   const [activeSubTab, setActiveSubTab] = React.useState<"ui" | "theme" | "shortcuts" | "about">("ui");
 
   return (
@@ -433,35 +436,83 @@ export function ModernSettingsModal({
                 <DialogHeader className="p-6 pb-4">
                   <DialogTitle className="flex items-center gap-2 text-lg">
                     <Palette className="w-5 h-5 text-primary" />
-                    主题设置
+                    风格系统
                   </DialogTitle>
                   <DialogDescription className="text-xs">
-                    自定义系统视觉风格与配色方案。
+                    基于设计规范的专业风格系统，支持传统/现代化模式切换。
                   </DialogDescription>
                 </DialogHeader>
 
-                <div className="flex-1 overflow-y-auto p-6 pt-0 space-y-6">
+                <div className="flex-1 overflow-y-auto p-6 pt-0 space-y-5">
+                  {/* 应用模式切换 */}
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                      <Palette className="w-3.5 h-3.5" />
-                      主题预设
+                      <Monitor className="w-3.5 h-3.5" />
+                      应用模式
                     </div>
-                    
                     <div className="grid grid-cols-2 gap-3">
-                      {themePresets.map((preset) => (
+                      <button
+                        onClick={() => setAppMode("traditional")}
+                        className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-all ${
+                          appMode === "traditional"
+                            ? "border-primary bg-primary/10 ring-1 ring-primary"
+                            : "border-border bg-muted/30 hover:bg-muted/50"
+                        }`}
+                      >
+                        <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
+                          <Monitor className="w-5 h-5 text-primary" />
+                        </div>
+                        <div className="text-center">
+                          <span className="text-xs font-bold">传统模式</span>
+                          <span className="text-[9px] text-muted-foreground block mt-0.5">经典工业风格</span>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => setAppMode("modern")}
+                        className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-all ${
+                          appMode === "modern"
+                            ? "border-primary bg-primary/10 ring-1 ring-primary"
+                            : "border-border bg-muted/30 hover:bg-muted/50"
+                        }`}
+                      >
+                        <div className="w-10 h-10 rounded-lg bg-accent/20 flex items-center justify-center">
+                          <Monitor className="w-5 h-5 text-accent" />
+                        </div>
+                        <div className="text-center">
+                          <span className="text-xs font-bold">现代化模式</span>
+                          <span className="text-[9px] text-muted-foreground block mt-0.5">科技风格</span>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 风格预设选择 */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                        <Palette className="w-3.5 h-3.5" />
+                        风格预设
+                      </div>
+                      <span className="text-[9px] text-muted-foreground">
+                        当前: {activePreset.name}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      {(appMode === "modern" ? modernPresets : traditionalPresets).map((preset) => (
                         <button
                           key={preset.id}
-                          onClick={() => applyTheme(preset)}
+                          onClick={() => applyPreset(preset.id)}
                           className={`relative p-3 rounded-xl border-2 transition-all hover:scale-[1.02] active:scale-95 text-left group ${
-                            currentTheme.id === preset.id
+                            activePreset.id === preset.id
                               ? "border-primary shadow-lg shadow-primary/20"
                               : "border-border hover:border-muted-foreground/50"
                           }`}
                           style={{
-                            background: `linear-gradient(135deg, ${preset.colors.background} 0%, ${preset.colors.muted} 100%)`,
+                            background: `linear-gradient(135deg, ${preset.colors.background.hex} 0%, ${preset.colors.muted.hex} 100%)`,
                           }}
                         >
-                          {currentTheme.id === preset.id && (
+                          {activePreset.id === preset.id && (
                             <div className="absolute top-2 right-2 w-4 h-4 rounded-full bg-primary flex items-center justify-center shadow-sm animate-in fade-in zoom-in duration-200">
                               <Check className="w-2.5 h-2.5 text-primary-foreground" />
                             </div>
@@ -470,23 +521,23 @@ export function ModernSettingsModal({
                             <div className="flex gap-1.5">
                               <div
                                 className="w-5 h-5 rounded-full shadow-sm ring-1 ring-black/5"
-                                style={{ backgroundColor: preset.colors.primary }}
+                                style={{ backgroundColor: preset.colors.primary.hex }}
                               />
                               <div
                                 className="w-5 h-5 rounded-full shadow-sm ring-1 ring-black/5"
-                                style={{ backgroundColor: preset.colors.accent }}
+                                style={{ backgroundColor: preset.colors.accent.hex }}
                               />
                             </div>
                             <div>
                               <div
                                 className="text-xs font-bold"
-                                style={{ color: preset.colors.foreground }}
+                                style={{ color: preset.colors.foreground.hex }}
                               >
                                 {preset.name}
                               </div>
                               <div
                                 className="text-[9px] opacity-70 truncate mt-0.5"
-                                style={{ color: preset.colors.foreground }}
+                                style={{ color: preset.colors.foreground.hex }}
                               >
                                 {preset.description}
                               </div>
@@ -494,6 +545,9 @@ export function ModernSettingsModal({
                           </div>
                         </button>
                       ))}
+                    </div>
+                    <div className="text-[9px] text-muted-foreground text-center pt-1">
+                      {appMode === "modern" ? "现代化模式" : "传统模式"} · {appMode === "modern" ? modernPresets.length : traditionalPresets.length} 种风格
                     </div>
                   </div>
                 </div>

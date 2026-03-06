@@ -5,6 +5,7 @@ import {
   Rows3,
   Columns3,
   Palette,
+  Monitor,
 } from "lucide-react";
 import { ModeSwitch } from "../ModeSwitch";
 import type {
@@ -13,8 +14,16 @@ import type {
 } from "../../types/app.types";
 import { env } from "../../config/env";
 import type { ApiNode } from "../../api/types";
-import { useTheme, themePresets } from "../ThemeContext";
+import { useStyleSystem, useAppMode } from "@/components/StyleSystemProvider";
 import { Button } from "../ui/button";
+import { StyleSelector } from "../StyleSelector";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 
 interface SettingsPageProps {
   imageOrientation: ImageOrientation;
@@ -34,13 +43,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [imageScale, setImageScale] = useState(env.getImageScale());
   const [mode, setMode] = useState(env.getMode());
   const [corsBaseUrl, setCorsBaseUrl] = useState(env.getCorsBaseUrl());
-  const { currentTheme, applyTheme, applyThemeById } = useTheme();
-  
-  const theme = currentTheme.colors.background === "#ffffff" ? "light" : "dark";
+  const { activePreset, applyPreset, traditionalPresets, modernPresets } = useStyleSystem();
+  const { mode: appMode, setMode: setAppMode } = useAppMode();
 
   const activeNode =
     apiNodes.find((node) => node.key === lineName) ?? apiNodes[0];
-  
+
   useEffect(() => {
     const handleModeChange = (e: CustomEvent) => {
       setMode(e.detail);
@@ -85,8 +93,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     setImageScale(scale);
   };
 
+  // 获取当前模式的预设列表
+  const currentPresets = appMode === "modern" ? modernPresets : traditionalPresets;
+
   return (
-    <div className="max-w-2xl mx-auto space-y-6 p-8 border border-border bg-card mt-8">
+    <div className="max-w-3xl mx-auto space-y-6 p-8 border border-border bg-card mt-8">
       <div className="pb-4 border-b border-border">
         <h3 className="text-lg font-medium">
           系统配置
@@ -100,6 +111,92 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       <ModeSwitch />
 
       <div className="space-y-4">
+        {/* 风格系统设置 */}
+        <div className="bg-card border border-border rounded-lg p-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-medium flex items-center gap-2">
+                <Palette className="w-4 h-4" />
+                风格系统 / Style System
+              </div>
+              <div className="text-xs text-muted-foreground mt-0.5">
+                基于设计规范的专业风格系统，支持传统/现代化模式切换
+              </div>
+            </div>
+          </div>
+
+          {/* 应用模式切换 */}
+          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+            <div className="flex items-center gap-2">
+              <Monitor className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm font-medium">应用模式</span>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setAppMode("traditional")}
+                className={`px-3 py-1.5 text-xs rounded-md transition-colors ${
+                  appMode === "traditional"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-background border border-border hover:border-primary"
+                }`}
+              >
+                传统模式
+              </button>
+              <button
+                onClick={() => setAppMode("modern")}
+                className={`px-3 py-1.5 text-xs rounded-md transition-colors ${
+                  appMode === "modern"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-background border border-border hover:border-primary"
+                }`}
+              >
+                现代化模式
+              </button>
+            </div>
+          </div>
+
+          {/* 风格选择器 */}
+          <div className="space-y-2">
+            <div className="text-xs text-muted-foreground">
+              {appMode === "traditional" ? "传统模式风格" : "现代化模式风格"} · 当前: {activePreset.name}
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+              {currentPresets.map((preset) => (
+                <button
+                  key={preset.id}
+                  onClick={() => applyPreset(preset.id)}
+                  className={`p-3 rounded-lg border-2 transition-all hover:scale-105 ${
+                    activePreset.id === preset.id
+                      ? "border-primary shadow-lg shadow-primary/20"
+                      : "border-border hover:border-muted-foreground"
+                  }`}
+                  style={{
+                    background: `linear-gradient(135deg, ${preset.colors.background.hex} 0%, ${preset.colors.muted.hex} 100%)`,
+                  }}
+                  title={preset.description}
+                >
+                  <div className="flex gap-1 mb-2">
+                    <div
+                      className="w-4 h-4 rounded-full"
+                      style={{ backgroundColor: preset.colors.primary.hex }}
+                    />
+                    <div
+                      className="w-4 h-4 rounded-full"
+                      style={{ backgroundColor: preset.colors.accent.hex }}
+                    />
+                  </div>
+                  <div
+                    className="text-[10px] font-medium truncate"
+                    style={{ color: preset.colors.foreground.hex }}
+                  >
+                    {preset.name}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
         <div className="bg-card border border-border rounded-lg p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div>
@@ -143,17 +240,18 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 </div>
               </div>
             </div>
-            <select
-              className="w-full px-3 py-2 text-xs bg-background border border-border rounded-sm focus:outline-none focus:border-primary"
-              value={lineName || ""}
-              onChange={(event) => onLineChange?.(event.target.value)}
-            >
-              {apiNodes.map((node) => (
-                <option key={node.key} value={node.key}>
-                  {node.name} ({node.key})
-                </option>
-              ))}
-            </select>
+            <Select value={lineName || ""} onValueChange={onLineChange}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="选择产线" />
+              </SelectTrigger>
+              <SelectContent>
+                {apiNodes.map((node) => (
+                  <SelectItem key={node.key} value={node.key}>
+                    {node.name} ({node.key})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         )}
         {mode === "production" && (
@@ -167,100 +265,20 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               </div>
             </div>
             <div className="mt-2 flex items-center gap-3">
-              <select
-                className="w-full px-3 py-2 text-xs bg-background border border-border rounded-sm focus:outline-none focus:border-primary"
-                value={imageScale}
-                onChange={(event) => handleImageScaleChange(Number(event.target.value))}
-              >
-                <option value={1}>100%</option>
-                <option value={0.75}>75%</option>
-                <option value={0.5}>50%</option>
-                <option value={0.25}>25%</option>
-              </select>
+              <Select value={String(imageScale)} onValueChange={(v) => handleImageScaleChange(Number(v))}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">100%</SelectItem>
+                  <SelectItem value="0.75">75%</SelectItem>
+                  <SelectItem value="0.5">50%</SelectItem>
+                  <SelectItem value="0.25">25%</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         )}
-        {/* Theme Settings */}
-        <div className="bg-card border border-border rounded-lg p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm font-medium flex items-center gap-2">
-                <Palette className="w-4 h-4" />
-                COLOR THEME / 配色主题
-              </div>
-              <div className="text-xs text-muted-foreground mt-0.5">
-                当前主题: {currentTheme.name}
-              </div>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-2 mt-3">
-            {themePresets.map((preset) => (
-              <button
-                key={preset.id}
-                onClick={() => applyTheme(preset)}
-                className={`relative p-3 rounded-lg border-2 transition-all hover:scale-105 ${
-                  currentTheme.id === preset.id
-                    ? "border-primary shadow-lg shadow-primary/20"
-                    : "border-border hover:border-muted-foreground"
-                }`}
-                style={{
-                  background: `linear-gradient(135deg, ${preset.colors.background} 0%, ${preset.colors.muted} 100%)`,
-                }}
-                title={preset.description}
-              >
-                <div className="flex gap-1 mb-2">
-                  <div
-                    className="w-4 h-4 rounded"
-                    style={{ backgroundColor: preset.colors.primary }}
-                  />
-                  <div
-                    className="w-4 h-4 rounded"
-                    style={{ backgroundColor: preset.colors.accent }}
-                  />
-                </div>
-                <div
-                  className="text-[10px] font-medium"
-                  style={{ color: preset.colors.foreground }}
-                >
-                  {preset.name}
-                </div>
-              </button>
-            ))}
-          </div>
-          <div className="text-xs text-muted-foreground/80 mt-2">
-            当前支持 {themePresets.length} 种精选工业风格
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 items-center gap-4">
-          <label className="text-sm font-medium">
-            配色方案 / 明暗模式
-          </label>
-          <div className="flex items-center gap-2 bg-background border border-border rounded-sm p-1">
-            <button
-              onClick={() => applyThemeById("business-light")}
-              className={`flex-1 px-3 py-1.5 text-xs rounded-sm transition-colors flex items-center justify-center gap-1.5 ${
-                theme === "light"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Sun className="w-3.5 h-3.5" />
-              浅色
-            </button>
-            <button
-              onClick={() => applyThemeById("industrial-blue")}
-              className={`flex-1 px-3 py-1.5 text-xs rounded-sm transition-colors flex items-center justify-center gap-1.5 ${
-                theme === "dark"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Moon className="w-3.5 h-3.5" />
-              深色
-            </button>
-          </div>
-        </div>
 
         <div className="grid grid-cols-2 items-center gap-4">
           <label className="text-sm font-medium">

@@ -1,5 +1,16 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+/**
+ * ThemeContext - 主题上下文提供者
+ * 集成新的风格系统，同时保持向后兼容性
+ */
 
+import { createContext, useContext, ReactNode } from "react";
+import { StyleSystemProvider, useStyleSystem as useStyleSystemInternal } from "@/components/StyleSystemProvider";
+
+// ========== 保留旧版接口以保持兼容性 ==========
+
+/**
+ * @deprecated 使用 StylePreset 代替
+ */
 export interface ThemeColors {
   primary: string;
   accent: string;
@@ -9,6 +20,9 @@ export interface ThemeColors {
   border: string;
 }
 
+/**
+ * @deprecated 使用 StylePreset 代替
+ */
 export interface ThemePreset {
   id: string;
   name: string;
@@ -16,6 +30,9 @@ export interface ThemePreset {
   colors: ThemeColors;
 }
 
+/**
+ * @deprecated 使用 newStylePresets 代替
+ */
 export const themePresets: ThemePreset[] = [
   {
     id: "industrial-blue",
@@ -110,117 +127,57 @@ export const themePresets: ThemePreset[] = [
   },
 ];
 
-interface ThemeContextType {
+interface LegacyThemeContextType {
   currentTheme: ThemePreset;
   applyTheme: (preset: ThemePreset) => void;
   applyThemeById: (id: string) => void;
 }
 
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+const LegacyThemeContext = createContext<LegacyThemeContextType | undefined>(undefined);
 
+/**
+ * @deprecated 使用 useStyleSystem 代替
+ * 向后兼容的 useTheme hook，直接使用新的风格系统
+ */
 export const useTheme = () => {
-  const context = useContext(ThemeContext);
-  if (!context) {
-    throw new Error("useTheme must be used within ThemeProvider");
-  }
-  return context;
-};
+  // 直接使用新的风格系统，不需要额外的 context
+  const { activePreset, applyPreset } = useStyleSystemInternal();
 
-// 将颜色转换为 HSL 空间组件字符串 (h s% l%)
-const hexToHslComponents = (hex: string): string => {
-  let r = 0, g = 0, b = 0;
-  if (hex.length === 4) {
-    r = parseInt(hex[1] + hex[1], 16);
-    g = parseInt(hex[2] + hex[2], 16);
-    b = parseInt(hex[3] + hex[3], 16);
-  } else if (hex.length === 7) {
-    r = parseInt(hex.slice(1, 3), 16);
-    g = parseInt(hex.slice(3, 5), 16);
-    b = parseInt(hex.slice(5, 7), 16);
-  }
-  r /= 255; g /= 255; b /= 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  let h = 0, s = 0, l = (max + min) / 2;
-  if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    switch (max) {
-      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-      case g: h = (b - r) / d + 2; break;
-      case b: h = (r - g) / d + 4; break;
-    }
-    h /= 6;
-  }
-  return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
-};
-
-export const ThemeProvider = ({ children }: { children: ReactNode }) => {
-  const [currentTheme, setCurrentTheme] = useState<ThemePreset>(() => {
-    // 从localStorage加载保存的主题
-    const saved = localStorage.getItem("app_theme_preset");
-    if (saved) {
-      const preset = themePresets.find((p) => p.id === saved);
-      if (preset) return preset;
-    }
-    return themePresets[0]; // 默认主题
-  });
+  // 将新风格系统转换为旧接口
+  const currentTheme: ThemePreset = {
+    id: activePreset.id,
+    name: activePreset.name,
+    description: activePreset.description,
+    colors: {
+      primary: activePreset.colors.primary.hex,
+      accent: activePreset.colors.accent.hex,
+      background: activePreset.colors.background.hex,
+      foreground: activePreset.colors.foreground.hex,
+      muted: activePreset.colors.muted.hex,
+      border: activePreset.colors.border.hex,
+    },
+  };
 
   const applyTheme = (preset: ThemePreset) => {
-    setCurrentTheme(preset);
-    localStorage.setItem("app_theme_preset", preset.id);
-
-    // 应用CSS变量到根元素
-    const root = document.documentElement;
-    const colors = preset.colors;
-
-    // 设置 HSL 颜色变量（适配 globals.css 的格式）
-    root.style.setProperty("--primary", hexToHslComponents(colors.primary));
-    root.style.setProperty("--accent", hexToHslComponents(colors.accent));
-    root.style.setProperty("--background", hexToHslComponents(colors.background));
-    root.style.setProperty("--foreground", hexToHslComponents(colors.foreground));
-    root.style.setProperty("--muted", hexToHslComponents(colors.muted));
-    root.style.setProperty("--border", hexToHslComponents(colors.border));
-    
-    // 同步更新 card/popover 等衍生变量
-    root.style.setProperty("--card", hexToHslComponents(colors.background));
-    root.style.setProperty("--card-foreground", hexToHslComponents(colors.foreground));
-    root.style.setProperty("--popover", hexToHslComponents(colors.background));
-    root.style.setProperty("--popover-foreground", hexToHslComponents(colors.foreground));
-
-    // 设置额外的变量供直接使用
-    root.style.setProperty("--color-primary", colors.primary);
-    root.style.setProperty("--color-accent", colors.accent);
-    root.style.setProperty("--color-background", colors.background);
-    root.style.setProperty("--color-foreground", colors.foreground);
-    root.style.setProperty("--color-muted", colors.muted);
-    root.style.setProperty("--color-border", colors.border);
-
-    // 判断是浅色还是深色主题
-    const bgBrightness = parseInt(colors.background.slice(1, 3), 16);
-    if (bgBrightness > 128) {
-      document.documentElement.classList.remove("dark");
-    } else {
-      document.documentElement.classList.add("dark");
-    }
-
-    console.log(`🎨 应用主题: ${preset.name}`);
+    applyPreset(preset.id);
   };
 
   const applyThemeById = (id: string) => {
-    const preset = themePresets.find((p) => p.id === id);
-    if (preset) {
-      applyTheme(preset);
-    }
+    applyPreset(id);
   };
 
-  // 初始化时应用主题
-  useEffect(() => {
-    applyTheme(currentTheme);
-  }, []);
-
-  return (
-    <ThemeContext.Provider value={{ currentTheme, applyTheme, applyThemeById }}>
-      {children}
-    </ThemeContext.Provider>
-  );
+  return { currentTheme, applyTheme, applyThemeById };
 };
+
+/**
+ * ThemeProvider - 主入口
+ * 直接使用 StyleSystemProvider
+ */
+export const ThemeProvider = ({ children }: { children: ReactNode }) => {
+  return <StyleSystemProvider>{children}</StyleSystemProvider>;
+};
+
+// 导出新的风格系统
+export { StyleSystemProvider, useStyleSystem, useAppMode } from "@/components/StyleSystemProvider";
+export type { StylePreset, AppMode } from "@/styles/themes/types";
+export { presetNames, getPresetsByMode } from "@/styles/themes";
