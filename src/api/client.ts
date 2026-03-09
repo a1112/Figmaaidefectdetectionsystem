@@ -383,6 +383,68 @@ export async function getFrameImage(
   return `${baseUrl}/images/frame?${search.toString()}`;
 }
 
+function getRustImageBaseUrl(): string {
+  return env.getRustImageBaseUrl();
+}
+
+export function getRustPreviewImageUrl(params: {
+  surface: Surface;
+  coilId: string | number;
+  type: string;
+}): string {
+  const { surface, coilId, type } = params;
+  return `${getRustImageBaseUrl()}/image/preview/${encodeURIComponent(surface)}/${encodeURIComponent(String(coilId))}/${encodeURIComponent(type)}`;
+}
+
+export function getRustSourceImageUrl(params: {
+  surface: Surface;
+  coilId: string | number;
+  type: string;
+}): string {
+  const { surface, coilId, type } = params;
+  return `${getRustImageBaseUrl()}/image/source/${encodeURIComponent(surface)}/${encodeURIComponent(String(coilId))}/${encodeURIComponent(type)}`;
+}
+
+export function getRustAreaImageUrl(params: {
+  surface: Surface;
+  coilId: string | number;
+  row?: number;
+  col?: number;
+  count?: number;
+  level?: number;
+}): string {
+  const { surface, coilId, row, col, count, level } = params;
+  const search = new URLSearchParams();
+  if (typeof row === "number") {
+    search.set("row", row.toString());
+  }
+  if (typeof col === "number") {
+    search.set("col", col.toString());
+  }
+  if (typeof count === "number") {
+    search.set("count", count.toString());
+  }
+  if (typeof level === "number") {
+    search.set("level", level.toString());
+  }
+  const query = search.toString();
+  const base = `${getRustImageBaseUrl()}/image/area/${encodeURIComponent(surface)}/${encodeURIComponent(String(coilId))}`;
+  return query ? `${base}?${query}` : base;
+}
+
+export function getRustDefectImageUrl(params: {
+  surface: Surface;
+  coilId: string | number;
+  type: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}): string {
+  const { surface, coilId, type, x, y, w, h } = params;
+  return `${getRustImageBaseUrl()}/defect_image/${encodeURIComponent(surface)}/${encodeURIComponent(String(coilId))}/${encodeURIComponent(type)}/${Math.round(x)}/${Math.round(y)}/${Math.round(w)}/${Math.round(h)}`;
+}
+
 /**
  * 获取缺陷小图 URL
  * 对应后端 /api/images/defect/{defect_id}，内部已实现：

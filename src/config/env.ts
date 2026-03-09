@@ -10,7 +10,9 @@ export type ImageScale = 0.25 | 0.5 | 0.75 | 1;
 const LINE_COOKIE = "line_name";
 const DEFAULT_CORS_BASE_URL = "http://9qwygl8e.zjz-service.cn:80";
 const DEFAULT_LOCAL_BASE_URL = "http://127.0.0.1:80";
+const DEFAULT_RUST_IMAGE_BASE_URL = "http://127.0.0.1:6013";
 const PRODUCTION_BASE_URL_KEY = "production_base_url";
+const RUST_IMAGE_BASE_URL_KEY = "rust_image_base_url";
 const IMAGE_SCALE_KEY = "image_scale";
 const DEFAULT_IMAGE_SCALE: ImageScale = 1;
 
@@ -48,6 +50,13 @@ const getInitialProductionBaseUrl = (): string => {
     : DEFAULT_LOCAL_BASE_URL;
 };
 
+const getInitialRustImageBaseUrl = (): string => {
+  const stored = localStorage.getItem(RUST_IMAGE_BASE_URL_KEY);
+  return stored && stored.trim()
+    ? stored.trim()
+    : DEFAULT_RUST_IMAGE_BASE_URL;
+};
+
 const getCookieValue = (name: string): string | null => {
   const cookies = document.cookie ? document.cookie.split(";") : [];
   for (const cookie of cookies) {
@@ -77,6 +86,7 @@ class EnvironmentConfig {
   private lineName: string;
   private corsBaseUrl: string;
   private productionBaseUrl: string;
+  private rustImageBaseUrl: string;
   private imageScale: ImageScale;
 
   constructor() {
@@ -84,6 +94,7 @@ class EnvironmentConfig {
     this.lineName = getInitialLineName();
     this.corsBaseUrl = getInitialCorsBaseUrl();
     this.productionBaseUrl = getInitialProductionBaseUrl();
+    this.rustImageBaseUrl = getInitialRustImageBaseUrl();
     this.imageScale = getInitialImageScale();
   }
 
@@ -190,6 +201,24 @@ class EnvironmentConfig {
     window.dispatchEvent(
       new CustomEvent("production_base_url_change", {
         detail: this.productionBaseUrl,
+      }),
+    );
+  }
+
+  getRustImageBaseUrl(): string {
+    return this.rustImageBaseUrl.replace(/\/+$/, "");
+  }
+
+  setRustImageBaseUrl(url: string): void {
+    const normalized = url.trim();
+    this.rustImageBaseUrl = normalized || DEFAULT_RUST_IMAGE_BASE_URL;
+    localStorage.setItem(
+      RUST_IMAGE_BASE_URL_KEY,
+      this.rustImageBaseUrl,
+    );
+    window.dispatchEvent(
+      new CustomEvent("rust_image_base_url_change", {
+        detail: this.rustImageBaseUrl,
       }),
     );
   }
